@@ -418,25 +418,4 @@ INSERT INTO "Pokemon_Base" ("nome", "tipi", "statistiche", "mosse", "sprite") VA
 INSERT INTO "Pokemon_Base" ("nome", "tipi", "statistiche", "mosse", "sprite") VALUES ('Mewtwo', '["Psico"]', '{"speed": {"base_stat": 130}, "special-defense": {"base_stat": 90}, "special-attack": {"base_stat": 154}, "defense": {"base_stat": 90}, "attack": {"base_stat": 110}, "hp": {"base_stat": 106}}', '["Comete", "Confusione", "Goccia vitale", "Inibitore", "Forzantica", "Psicoraggio", "Salvaguardia", "Amnesia", "Sferapulsar", "Psichico", "Barattoforza", "Barattoscudo", "Nebbia", "Psicobotta", "Ripresa", "Divinazione"]', '{"normal": "https://media.pokemoncentral.it/wiki/d/db/Sprnbm0150.gif", "shiny": "https://media.pokemoncentral.it/wiki/b/b8/Sprnbmsh0150.gif"}');
 INSERT INTO "Pokemon_Base" ("nome", "tipi", "statistiche", "mosse", "sprite") VALUES ('Mew', '["Psico"]', '{"speed": {"base_stat": 100}, "special-defense": {"base_stat": 100}, "special-attack": {"base_stat": 100}, "defense": {"base_stat": 100}, "attack": {"base_stat": 100}, "hp": {"base_stat": 100}}', '["Botta", "Riflettipo", "Amnesia", "Staffetta", "Forzantica", "Goccia Vitale", "Congiura", "Metronomo", "Esclusiva", "Trasformazione", "Sferapulsar", "Psichico"]', '{"normal": "https://media.pokemoncentral.it/wiki/e/e2/Sprnbm0151.gif", "shiny": "https://media.pokemoncentral.it/wiki/c/c2/Sprnbmsh0151.gif"}');
 
-CREATE TABLE IF NOT EXISTS "Tipi" ("nome_tipo" TEXT);
-TRUNCATE TABLE "Tipi";
-INSERT INTO "Tipi" ("nome_tipo") VALUES ('Acciaio');
-INSERT INTO "Tipi" ("nome_tipo") VALUES ('Acqua');
-INSERT INTO "Tipi" ("nome_tipo") VALUES ('Buio');
-INSERT INTO "Tipi" ("nome_tipo") VALUES ('Coleottero');
-INSERT INTO "Tipi" ("nome_tipo") VALUES ('Drago');
-INSERT INTO "Tipi" ("nome_tipo") VALUES ('Elettro');
-INSERT INTO "Tipi" ("nome_tipo") VALUES ('Erba');
-INSERT INTO "Tipi" ("nome_tipo") VALUES ('Folletto');
-INSERT INTO "Tipi" ("nome_tipo") VALUES ('Fuoco');
-INSERT INTO "Tipi" ("nome_tipo") VALUES ('Ghiaccio');
-INSERT INTO "Tipi" ("nome_tipo") VALUES ('Lotta');
-INSERT INTO "Tipi" ("nome_tipo") VALUES ('Normale');
-INSERT INTO "Tipi" ("nome_tipo") VALUES ('Psico');
-INSERT INTO "Tipi" ("nome_tipo") VALUES ('Roccia');
-INSERT INTO "Tipi" ("nome_tipo") VALUES ('Spettro');
-INSERT INTO "Tipi" ("nome_tipo") VALUES ('Terra');
-INSERT INTO "Tipi" ("nome_tipo") VALUES ('Veleno');
-INSERT INTO "Tipi" ("nome_tipo") VALUES ('Volante');
-
 SET session_replication_role = 'origin';
