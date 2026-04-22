@@ -51,7 +51,7 @@ class BootScene extends Phaser.Scene {
     create() {
         let pDB = {};
         this.cache.json.get('pokemonDB').forEach(p => pDB[p.nome] = p);
-        this.registry.set('pokemonDB', pDB); 
+        this.registry.set('pokemonDB', pDB);
 
         let mDB = {};
         this.cache.json.get('moveDB').forEach(m => mDB[m.Nome] = m);
@@ -397,9 +397,8 @@ class BattleScene extends Phaser.Scene {
         this.pEntity = new PokemonEntity(this.pName, this.pkmnDB[this.pName]);
         this.eEntity = new PokemonEntity(this.eName, this.pkmnDB[this.eName]);
 
-        // SFONDO
-        this.add.image(0, 0, this.bgKey).setOrigin(0, 0).setDisplaySize(1000, 800);
-
+        // SFONDO (Altezza ridotta a 665 per fermarsi esattamente sopra il log)
+        this.add.image(0, 0, this.bgKey).setOrigin(0, 0).setDisplaySize(1000, 665);
         // --- POKEMON (ABBASSATI) ---
         // Player: da 500 a 580 | Enemy: da 250 a 320
         this.pSprite = this.add.dom(250, 500).createFromHTML(`<img src="${this.pkmnDB[this.pName].sprite?.normal}" style="transform: scale(2.5); image-rendering: pixelated;">`);
@@ -544,7 +543,7 @@ class BattleScene extends Phaser.Scene {
 
         this.mostraLogsSequenziali(stato.logs, () => {
             this.updateUI();
-            
+
             if (stato.finito || !this.pEntity.alive || !this.eEntity.alive) {
                 this.time.delayedCall(1500, () => {
                     this.logText.setText(!this.pEntity.alive ? 'HAI PERSO... 💀' : 'HAI VINTO! 🎉');
@@ -566,19 +565,67 @@ class BattleScene extends Phaser.Scene {
         });
     }
 
+    // ==========================================
+    // MOTORE GRAFICO DI BATTAGLIA (Sincronizzato ai Log)
+    // ==========================================
     mostraLogsSequenziali(logs, onComplete) {
         if (!logs || logs.length === 0) {
             if (onComplete) onComplete();
             return;
         }
+
         let index = 0;
+        let ultimoAttaccanteEraPlayer = null;
+
         let mostraProssimo = () => {
             if (index < logs.length) {
-                this.logText.setText(logs[index]);
-                // Aggiorniamo le barre della vita quando il testo cita i danni!
-                if (logs[index].includes("Inflitti") || logs[index].includes("danni")) {
-                    this.updateUI(); 
+                let riga = logs[index];
+                this.logText.setText(riga);
+
+                // 1. RILEVAMENTO TARGET (Chi riceve l'effetto?)
+                // Cerchiamo quale Pokémon è menzionato nella riga
+                let isPlayerTarget = riga.includes(this.pEntity.name);
+                let isEnemyTarget = riga.includes(this.eEntity.name);
+
+                // 2. SCATTO ATTACCO (Solo se la riga dice "usa")
+                if (riga.includes(" usa ")) {
+                    ultimoAttaccanteEraPlayer = riga.includes(this.pEntity.name);
+                    this.playDash(ultimoAttaccanteEraPlayer);
                 }
+
+                // 3. ANIMAZIONE DANNO (Trema chi riceve il danno)
+                if (riga.includes("Inflitti") || riga.includes("efficace")) {
+                    this.updateUI();
+                    // Se il log non specifica il nome, trema l'opposto di chi ha attaccato
+                    if (ultimoAttaccanteEraPlayer !== null) {
+                        this.playDamage(!ultimoAttaccanteEraPlayer);
+                    }
+                }
+
+                // 4. STATISTICHE (Aumenta/Diminuisce)
+                // Qui usiamo isPlayerTarget per capire su quale Pokémon far apparire la grafica
+                if (riga.includes("aumenta")) {
+                    this.playStatAnim(isPlayerTarget, true);
+                } else if (riga.includes("diminuisce")) {
+                    this.playStatAnim(isPlayerTarget, false);
+                }
+
+                // 5. STATI ALTERATI (Overlay visivo)
+                if (riga.includes("stato di")) {
+                    let stato = riga.split("stato di ")[1].replace("!", "").trim();
+                    this.updateStatusOverlay(isPlayerTarget, stato);
+                }
+
+                // 6. CONFUSIONE (Paperelle 🦆)
+                if (riga.includes("confuso") || riga.includes("Confusione")) {
+                    this.playConfusion(isPlayerTarget);
+                }
+
+                // 7. TRAPPOLE (Legatutto/Parassiseme)
+                if (riga.includes("intrappolato") || riga.includes("Legatutto") || riga.includes("Parassiseme")) {
+                    this.playTrap(isPlayerTarget);
+                }
+
                 index++;
                 this.time.delayedCall(1500, mostraProssimo);
             } else {
@@ -586,6 +633,96 @@ class BattleScene extends Phaser.Scene {
             }
         };
         mostraProssimo();
+    }
+
+    // ==========================================
+    // LE ANIMAZIONI (Da aggiungere subito sotto)
+    // ==========================================
+
+    playDash(isPlayer) {
+        let sprite = isPlayer ? this.pSprite : this.eSprite;
+        let dist = isPlayer ? 60 : -60;
+        this.tweens.add({
+            targets: sprite,
+            x: sprite.x + dist,
+            duration: 100,
+            yoyo: true,
+            ease: 'Power2'
+        });
+    }
+
+    playDamage(isPlayer) {
+        let sprite = isPlayer ? this.pSprite : this.eSprite;
+        this.tweens.add({
+            targets: sprite,
+            alpha: 0.5,
+            x: sprite.x + (isPlayer ? 5 : -5),
+            duration: 50,
+            yoyo: true,
+            repeat: 5,
+            onComplete: () => sprite.alpha = 1
+        });
+    }
+
+    playStatAnim(isPlayer, isUp) {
+        let x = isPlayer ? 250 : 750;
+        let y = isPlayer ? 500 : 230;
+        let color = isUp ? '#00FF00' : '#FF0000';
+        let label = isUp ? '↑ STATS' : '↓ STATS';
+
+        let t = this.add.text(x, y, label, { fontSize: '32px', fill: color, fontStyle: 'bold', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5);
+        this.tweens.add({ targets: t, y: y - 100, alpha: 0, duration: 1500, onComplete: () => t.destroy() });
+    }
+
+    playOverlayTesto(isPlayer, testo, colore) {
+        let targetX = isPlayer ? 250 : 750;
+        let targetY = isPlayer ? 500 : 230;
+
+        let txt = this.add.text(targetX, targetY, testo, {
+            fontSize: '40px', fill: colore, fontStyle: 'bold',
+            stroke: '#000', strokeThickness: 6
+        }).setOrigin(0.5);
+
+        this.tweens.add({
+            targets: txt,
+            y: targetY - 80,
+            scale: 1.2,
+            alpha: 0,
+            duration: 1500,
+            onComplete: () => txt.destroy()
+        });
+    }
+
+    updateStatusOverlay(isPlayer, stato) {
+        let ui = isPlayer ? this.pUI : this.eUI;
+        if (!ui.statusLabel) {
+            ui.statusLabel = this.add.text(ui.text.x, ui.text.y - 25, '', { fontSize: '16px', fontStyle: 'bold', padding: { x: 4, y: 2 } });
+        }
+        const colori = { 'Scottatura': '#f08030', 'Paralisi': '#f8d030', 'Sonno': '#8c888c', 'Avvelenamento': '#a040a0' };
+        ui.statusLabel.setText(stato.toUpperCase()).setBackgroundColor(colori[stato] || '#777');
+    }
+
+    playConfusion(isPlayer) {
+        let x = isPlayer ? 250 : 750;
+        let y = isPlayer ? 420 : 150;
+        let d1 = this.add.text(x - 30, y, '🦆', { fontSize: '30px' }).setOrigin(0.5);
+        let d2 = this.add.text(x + 30, y, '🦆', { fontSize: '30px' }).setOrigin(0.5);
+        this.tweens.add({ targets: [d1, d2], angle: 360, duration: 1000, repeat: 1, onComplete: () => { d1.destroy(); d2.destroy(); } });
+    }
+
+    playTrap(isPlayer) {
+        let targetX = isPlayer ? 250 : 750;
+        let targetY = isPlayer ? 500 : 230;
+
+        // Un'emoji gigante di una catena che si stringe
+        let trap = this.add.text(targetX, targetY, '🔗', { fontSize: '100px' }).setOrigin(0.5);
+        this.tweens.add({
+            targets: trap,
+            scale: { from: 2, to: 1 }, // Si stringe
+            alpha: { from: 1, to: 0 }, // Svanisce
+            duration: 1500,
+            onComplete: () => trap.destroy()
+        });
     }
 }
 
