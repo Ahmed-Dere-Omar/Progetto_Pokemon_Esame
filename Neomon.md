@@ -43,15 +43,15 @@ Il sistema Neomon è progettato come una Web-App distribuita basata su un'archit
 * **Frontend:** Sviluppato con tecnologie web standard (HTML5, CSS3, JavaScript) e framework per il gaming 2D (Phaser.js), garantendo una natura Responsive per l'accesso da PC, tablet e smartphone.
 * **Backend:** Un server centrale gestisce la logica di business, l'invio dei dati tramite API REST e la sincronizzazione della Lobby 2D.
 * **Comunicazione Real-time:** Per la gestione del multiplayer e dei movimenti nella mappa condivisa, il sistema utilizza il protocollo WebSocket, riducendo la latenza rispetto alle tradizionali chiamate HTTP.
-* **Accesso ai Dati:** Il sistema interagisce con un database relazionale per la persistenza dei profili utente e utilizza invece database non relazionale per l’esperienza di gioco quindi il recupero di pokémon, mosse, tipi ecc.
+* **Accesso ai Dati:** Il sistema interagisce con un database relazionale per la persistenza dei profili utente e l’esperienza di gioco come il recupero di pokémon, mosse, tipi è integrata in modo statica nel backend.
 
 ## 3.2 Stack Tecnologico
 
 | Livello | Tecnologia |
 |----------|-----------|
 | Frontend | HTML, CSS, JavaScript, Phaser.js (Motore grafico 2D) |
-| Backend | Node.js / Python |
-| Database | MySQL (Relazionale) e mongoDB (Non relazionale) |
+| Backend | Node.js |
+| Database | POSTGRESQL (Relazionale) |
 | Autenticazione | JWT (JSON Web Token) |
 | Infrastruttura | Hosting Cloud (Render) |
 
@@ -59,29 +59,61 @@ Il sistema Neomon è progettato come una Web-App distribuita basata su un'archit
 
 # 4. Data Flow Diagram (DFD)
 
+Il Data Flow Diagram illustra come i dati fluiscono tra l'utente, i processi logici ospitati su Render e la persistenza dei dati su Supabase (PostgreSQL).
+
 ## 4.1 Diagramma di Contesto (Livello 0)
 
-* **Entità esterne:**
-  * **Giocatore:** Invia credenziali, comandi di movimento nella lobby e scelte tattiche durante i combattimenti. Riceve lo stato del mondo di gioco, le animazioni di lotta e l'aggiornamento del proprio profilo.
-* **Processo principale:** Sistema Informativo Neomon (Web-App).
-* **Flussi di dati primari:**
-  * **Input:** Richieste di login, coordinate di movimento 2D, selezione mosse.
-  * **Output:** Visualizzazione sincronizzata dei player, feedback visivo delle battaglie, statistiche aggiornate.
- 
-<img width="3215" height="8192" alt="Neomon Game" src="https://github.com/user-attachments/assets/ba58d783-6a11-4d78-9a2a-dfd5e318c134" />
+Il Livello 0 definisce i confini del sistema e le interazioni con l'utente esterno.
 
-## 4.2 DFD Livello 1
+* **Entità Esterne:**
+    * **Giocatore:** Interagisce con il client (Netlify) inviando credenziali, comandi di movimento, messaggi in chat e scelte tattiche. Riceve lo stato aggiornato del mondo, i messaggi degli altri utenti e il feedback visivo delle battaglie.
+* **Processo Principale:**
+    * **0.0 Sistema Gestionale Neomon:** L'intera infrastruttura (Netlify + Render + Supabase) che elabora le richieste e mantiene la coerenza del gioco.
+* **Archivi Dati (Data Store):**
+    * **Database Relazionale (Supabase/PostgreSQL):** Archivio centrale per utenti, Pokémon dell'utente e stati della squadra.
+
+---
+
+<img width="945" height="650" alt="Screenshot 2026-04-22 221142" src="https://github.com/user-attachments/assets/7d094d98-24b5-433c-bd6a-70989a4c2b89" />
+
+
+## 4.2 DFD Livello 1 (Esplosione dei Processi)
+
+Il sistema viene suddiviso in processi logici che riflettono l'architettura relazionale e le funzionalità di gioco.
 
 | ID Processo | Nome Processo | Descrizione |
-|------------|--------------|------------|
-| P1 | Gestione Profili | Gestisce l'accesso (MySQL). Legge/Scrive dati utente e livello skill. |
-| P2 | Sincronizzazione Real-time | Gestisce i WebSocket per smistare le posizioni tra i client. |
-| P3 | Logica di Combattimento | Gestisce i turni PvP/PvE recuperando dati da MongoDB. |
-| P4 | Motore Roguelike/Bot | Gestisce la modalità offline endless basata sui dati MongoDB. |
+| :--- | :--- | :--- |
+| **1.0** | **Gestione Accessi e Profili** | Gestisce la registrazione e il login. Interroga Supabase Auth e le tabelle dei profili per caricare le statistiche e l'avatar del giocatore. |
+| **2.0** | **Sincronizzazione Mondiale e Chat** | Gestisce i flussi Socket.io su Render. Smista le coordinate di movimento tra i client e gestisce lo scambio di messaggi testuali nella chat globale/privata. |
+| **3.0** | **Logica di Combattimento (PvP/PvE)** | Riceve le scelte delle mosse o il cambio Pokémon. Calcola i danni e gli effetti di stato tramite le relazioni tra mosse e tipi memorizzate nel DB PostgreSQL. Gestisce l'IA per le sfide contro i Bot. |
+| **4.0** | **Gestione Ecosistema (Erba/NPC)** | Gestisce l'ingresso nell'erba alta e l'interazione con NPC. Genera incontri casuali e gestisce la logica di cattura o sconfitta dei Pokémon selvatici. |
+| **5.0** | **Gestione PC e Squadra** | Permette l'apertura del PC Pokémon. Gestisce lo spostamento dei Pokémon tra il database dei "Box" e la tabella della "Squadra Attiva" (Party) del giocatore. |
+| **6.0** | **Persistenza e Salvataggio** | Processo di scrittura che aggiorna su PostgreSQL il progresso del giocatore, i Pokémon catturati. |
 
-**Flusso tra Processi e Archivi Dati:**
-Dall'Utente a P1/P2: Il giocatore si autentica (P1) e inizia a muoversi nella mappa (P2). Quando inizia una lotta, P3 interroga l'archivio MongoDB per ottenere i documenti relativi a mosse e statistiche. Al termine del combattimento, il risultato viene inviato a P1 per aggiornare il campo "Livello" in MySQL. Il frontend riceve i dati da MongoDB per mappare le animazioni corrette durante lo scontro.
+---
 
+## 4.3 Flusso dei Dati per le Funzionalità Chiave
+-Utente non loggato
+-Utente Loggato
+### Percorso del Giocatore non Loggato
+1.  **Input:** Il Giocatore inserisce i dati nel form su **Netlify**.
+2.  **Processo 1.0:** Invia le credenziali a **Supabase**.
+3.  **Risposta:** Il database valida la relazione e restituisce il profilo, sbloccando l'accesso alla Lobby.
+
+### Percorso del Giocatore Loggato (Lobby, Gestione e PvE)
+<img width="945" height="650" alt="Screenshot 2026-04-22 221142" src="https://github.com/user-attachments/assets/f83f9bb7-4e6b-46c5-9a27-9072825849ae" />
+<img width="945" height="650" alt="Screenshot 2026-04-22 221142" src="https://github.com/user-attachments/assets/ee33472c-cfb1-482d-a34f-a34e7bc8dff3" />
+1.  **Input (Lobby Base):** Il giocatore accede alla Lobby, dove può visualizzare il profilo, chattare con altri utenti e decidere la modalità di gioco (PvP online o PvE).
+2.  **Processo (Gestione Squadra):** Il giocatore apre il PC Pokémon per esplorare i box e scegliere i Pokémon da mettere in squadra, aggiornando la formazione attiva.
+3.  **Interazione (Esplorazione PvE):** Entrando in modalità PvE, il giocatore accede alle aree d'erba dove può incontrare, catturare o sconfiggere Pokémon selvatici, oppure sfidare dei bot. Durante la lotta gestisce le mosse o il cambio Pokémon.
+4.  **Chiusura (Salvataggio):** Il sistema salva il progresso dell'avventura PvE (team, catture, XP) sul database.
+
+### Percorso di Battaglia Online (PvP)
+1.  **Input:** Due giocatori inviano il comando di "Sfida".
+2.  **Processo 2.0:** Crea una stanza virtuale su **Render** e sincronizza i due client.
+3.  **Interazione:** I giocatori scelgono mosse o cambiano Pokémon (invio ID a **P3.0**).
+4.  **Processo 3.0:** Elabora l'ordine di velocità e i danni, aggiornando temporaneamente lo stato degli HP.
+5.  **Chiusura:** A fine match, **P6.0** salva l'esito (vittoria/sconfitta) e l'esperienza guadagnata su **PostgreSQL**.
 ---
 
 # 5. Requisiti di Sistema
@@ -90,9 +122,9 @@ Dall'Utente a P1/P2: Il giocatore si autentica (P1) e inizia a muoversi nella ma
 
 | ID | Descrizione del Requisito | Priorità |
 |---|---|---|
-| RF-01 | Gestione Account: Registrazione e login con dati salvati in MySQL. | Alta |
+| RF-01 | Gestione Account: Registrazione e login con dati salvati in POSTGRESQL. | Alta |
 | RF-02 | Lobby 2D Real-time: Movimento sincronizzato via WebSocket. | Alta |
-| RF-03 | Sistema di Lotta: Gestione turni e calcoli basati su MongoDB. | Alta |
+| RF-03 | Sistema di Lotta: Gestione turni e calcoli basati su DB. | Alta |
 | RF-04 | Modalità Offline: Combattimenti contro bot con struttura roguelike. | Alta |
 | RF-05 | Integrazione Asset: Caricamento dinamico delle animazioni. | Alta |
 | RF-06 | Ranking Skill: Aggiornamento automatico dello status vittoria/sconfitta. | Media |
@@ -101,8 +133,8 @@ Dall'Utente a P1/P2: Il giocatore si autentica (P1) e inizia a muoversi nella ma
 ## 5.2 Requisiti Non Funzionali
 
 * **Latenza:** Movimenti nella Lobby 2D (target < 100ms).
-* **Sicurezza:** Password in MySQL criptate tramite hashing; sessioni via JWT.
-* **Scalabilità:** Supporto per almeno 50 utenti contemporanei per istanza.
+* **Sicurezza:** Password in POSTGRESQL criptate tramite hashing; sessioni via JWT.
+* **Scalabilità:** Supporto per almeno 20 utenti contemporanei per istanza.
 * **Usabilità:** Design Responsive per adattarsi a PC, Tablet e Smartphone.
 
 ## 5.3 Requisiti Hardware (Minimi)
@@ -118,8 +150,8 @@ Dall'Utente a P1/P2: Il giocatore si autentica (P1) e inizia a muoversi nella ma
 | Componente | Versione / Tipo |
 |---|---|
 | Sistema Operativo | Agnostico (Linux, Windows, Android, iOS) |
-| Database | MySQL e MongoDB |
-| Runtime Backend | Node.js v18+ o Python 3.10+ |
+| Database | POSTGRESQL e MongoDB |
+| Runtime Backend | Node.js v18+ |
 | Motore Grafico | Phaser.js |
 | Browser | Chrome, Firefox, Safari (supporto WebGL) |
 
@@ -127,7 +159,7 @@ Dall'Utente a P1/P2: Il giocatore si autentica (P1) e inizia a muoversi nella ma
 
 # 6. Schema Entità-Relazione (E/R)
 
-L'architettura dei dati separa la gestione degli utenti e delle sessioni (MySQL) dai dati statici e strutturali del gioco (MongoDB).
+L'architettura dei dati separa la gestione degli utenti e delle sessioni (POSTGRESQL) dai dati statici e strutturali del gioco (MongoDB).
 
 ![Schema E/R Neomon](https://github.com/user-attachments/assets/959af4c0-7190-4938-822e-9000e16e9e2a)
 
@@ -135,10 +167,10 @@ L'architettura dei dati separa la gestione degli utenti e delle sessioni (MySQL)
 
 | Entità | Descrizione | DB |
 | :--- | :--- | :--- |
-| **UTENTE** | Credenziali d'accesso e dati anagrafici del giocatore. | MySQL |
-| **PROFILO** | Progressi, statistiche globali e personalizzazioni dell'utente. | MySQL |
-| **PARTITA** | Sessione specifica di gioco (PvP o PvE). | MySQL |
-| **POKEMON_ESTRATTO** | Istanza dinamica di un Neomon durante una specifica partita. | MySQL |
+| **UTENTE** | Credenziali d'accesso e dati anagrafici del giocatore. | POSTGRESQL |
+| **PROFILO** | Progressi, statistiche globali e personalizzazioni dell'utente. | POSTGRESQL |
+| **PARTITA** | Sessione specifica di gioco (PvP o PvE). | POSTGRESQL |
+| **POKEMON_ESTRATTO** | Istanza dinamica di un Neomon durante una specifica partita. | POSTGRESQL |
 | **SPECIE_POKEMON** | Dati strutturali del Neomon (statistiche base, nome, ID asset). | MongoDB |
 | **MOSSA** | Descrizione tecnica delle abilità (danno, precisione, tipo). | MongoDB |
 | **TIPO_ELEMENTALE** | Definizione degli elementi (Fuoco, Acqua, ecc.) e relative tabelle efficacia. | MongoDB |
