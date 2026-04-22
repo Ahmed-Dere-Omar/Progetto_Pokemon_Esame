@@ -24,8 +24,6 @@ class Effetti {
                 return target.statiVolatili && target.statiVolatili.statoSeminvulnerabile === "Sottoterra";
             case "BersaglioSottacqua":
                 return target.statiVolatili && target.statiVolatili.statoSeminvulnerabile === "Sottacqua";
-            case "BaccaConsumata":
-                return utente.statiVolatili && utente.statiVolatili.baccaConsumata === true;
             case "AlleatoKOTurnoPrecedente":
                 return utente.statiVolatili && utente.statiVolatili.alleatoKOTurnoPrecedente === true;
             case "BersaglioMinimizzato":

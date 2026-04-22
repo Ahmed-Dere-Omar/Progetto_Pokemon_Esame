@@ -364,9 +364,32 @@ class BattleScene extends Phaser.Scene {
         this.pUI = this.createUIBox(100, 360, this.pEntity);
         this.eUI = this.createUIBox(600, 100, this.eEntity);
 
-        this.add.rectangle(500, 730, 950, 130, 0xffffff).setStrokeStyle(4, 0x000000);
-        this.logText = this.add.text(70, 685, '', {
-            fontSize: '22px', fill: '#000', fontStyle: 'bold', wordWrap: { width: 500 }
+        // ==========================================
+        // NUOVO LOG "STILE GBA RETRÒ" (Fighissimo)
+        // ==========================================
+
+        // 1. Sfondo scuro principale che riempie il fondo (da Y:665 a 800)
+        this.add.rectangle(0, 665, 1000, 135, 0x2b2b2b).setOrigin(0, 0);
+
+        // 2. Bordo principale (rosso/arancio stile gioco originale)
+        this.add.rectangle(3, 668, 994, 129).setOrigin(0, 0).setStrokeStyle(6, 0xd05050);
+
+        // 3. Bordo interno sottile per dare profondità 3D
+        this.add.rectangle(6, 671, 988, 123).setOrigin(0, 0).setStrokeStyle(2, 0x555555);
+
+        // 4. Divisorio verticale tra le frasi e i bottoni
+        this.add.rectangle(590, 668, 6, 129, 0xd05050).setOrigin(0, 0);
+
+        // 5. Testo del log formattato come i veri giochi
+        this.logText = this.add.text(30, 690, '', {
+            fontSize: '26px',
+            fill: '#ffffff',
+            fontFamily: '"Courier New", Courier, monospace',
+            fontStyle: 'bold',
+            wordWrap: { width: 530 },
+            lineSpacing: 8,
+            // L'ombra nera dietro le scritte bianche è il tocco magico
+            shadow: { offsetX: 2, offsetY: 2, color: '#000000', blur: 0, fill: true }
         });
 
         this.createButtons();
@@ -406,11 +429,18 @@ class BattleScene extends Phaser.Scene {
     }
 
     createUIBox(x, y, entity) {
-        this.add.text(x, y, entity.name.toUpperCase(), { fontSize: '24px', fill: '#000', fontStyle: 'bold', backgroundColor: '#fff8' });
-        let txt = this.add.text(x, y + 30, `HP: ${entity.hp}/${entity.maxHp}`, { fontSize: '20px', fill: '#000', backgroundColor: '#fff8' });
+        // Salviamo il riferimento al testo del nome per posizionarci sopra lo stato
+        let nameTxt = this.add.text(x, y, entity.name.toUpperCase(), {
+            fontSize: '24px', fill: '#000', fontStyle: 'bold', backgroundColor: '#fff8'
+        });
+        let hpTxt = this.add.text(x, y + 30, `HP: ${entity.hp}/${entity.maxHp}`, {
+            fontSize: '20px', fill: '#000', backgroundColor: '#fff8'
+        });
         this.add.rectangle(x, y + 60, 200, 15, 0x555555).setOrigin(0, 0);
         let bar = this.add.rectangle(x, y + 60, 200, 15, 0x00ff00).setOrigin(0, 0);
-        return { text: txt, bar: bar };
+
+        // Aggiungiamo nameText al ritorno per usarlo dopo
+        return { nameText: nameTxt, text: hpTxt, bar: bar };
     }
 
     updateUI() {
@@ -424,32 +454,89 @@ class BattleScene extends Phaser.Scene {
 
     createButtons() {
         this.btns = [];
+        this.selectedMoveIndex = 0; // Traccia la mossa selezionata
+        this.isInputActive = false; // Attivato solo quando è il turno del giocatore
+
+        // Setup tastiera
+        this.moveKeys = this.input.keyboard.createCursorKeys();
+        this.confirmKey = this.input.keyboard.addKey('ENTER');
+
         this.pEntity.moves.forEach((m, i) => {
-            let bx = 600 + (i % 2) * 190;
+            let bx = 620 + (i % 2) * 200; // Aumentato spazio orizzontale a 200
             let by = 685 + Math.floor(i / 2) * 45;
-            let b = this.add.text(bx, by, m.toUpperCase(), {
-                fontSize: '18px', fill: '#fff', backgroundColor: '#333',
-                padding: { x: 12, y: 6 }, fixedWidth: 170, align: 'center'
-            }).setInteractive().on('pointerdown', () => this.handleMoveClick(m));
+
+            let b = this.add.text(bx, by, '', {
+                fontSize: '20px', // Leggermente più piccolo per far stare nomi lunghi
+                fill: '#ffffff',
+                fontFamily: '"Courier New", Courier, monospace',
+                fontStyle: 'bold',
+                shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true },
+                padding: { x: 2, y: 5 }
+                // Rimosso fixedWidth per evitare tagli
+            })
+                .setInteractive()
+                .on('pointerdown', () => { if (this.isInputActive) this.handleMoveClick(m); })
+                .on('pointerover', () => {
+                    if (this.isInputActive) {
+                        this.selectedMoveIndex = i;
+                        this.updateMoveSelection();
+                    }
+                });
+
             this.btns.push(b);
         });
+        this.updateMoveSelection();
     }
+    updateMoveSelection() {
+        this.btns.forEach((b, i) => {
+            let moveName = this.pEntity.moves[i].toUpperCase();
+            if (i === this.selectedMoveIndex) {
+                b.setText("▶ " + moveName);
+                b.setStyle({ fill: '#ffcc00' });
+            } else {
+                // Usiamo uno spazio vuoto per mantenere l'allineamento
+                b.setText("  " + moveName);
+                b.setStyle({ fill: '#ffffff' });
+            }
+        });
+    }
+    update() {
+        if (!this.isInputActive) return;
 
+        if (Phaser.Input.Keyboard.JustDown(this.moveKeys.left)) {
+            if (this.selectedMoveIndex % 2 !== 0) this.selectedMoveIndex--;
+            this.updateMoveSelection();
+        } else if (Phaser.Input.Keyboard.JustDown(this.moveKeys.right)) {
+            if (this.selectedMoveIndex % 2 === 0) this.selectedMoveIndex++;
+            this.updateMoveSelection();
+        } else if (Phaser.Input.Keyboard.JustDown(this.moveKeys.up)) {
+            if (this.selectedMoveIndex >= 2) this.selectedMoveIndex -= 2;
+            this.updateMoveSelection();
+        } else if (Phaser.Input.Keyboard.JustDown(this.moveKeys.down)) {
+            if (this.selectedMoveIndex <= 1) this.selectedMoveIndex += 2;
+            this.updateMoveSelection();
+        }
+
+        if (Phaser.Input.Keyboard.JustDown(this.confirmKey)) {
+            this.handleMoveClick(this.pEntity.moves[this.selectedMoveIndex]);
+        }
+    }
     startTurn() {
         this.logText.setText(`Cosa deve fare ${this.pName.toUpperCase()}?`);
-        this.btns.forEach(b => b.setInteractive());
+        this.isInputActive = true; // Abilita frecce e click
+        this.updateMoveSelection();
     }
 
     handleMoveClick(moveName) {
-        this.btns.forEach(b => b.disableInteractive());
+        this.isInputActive = false; // Disabilita input durante l'attesa/animazione
+
         if (this.isWild) {
             let findMove = (name) => this.moveDB[name] || Object.values(this.moveDB).find(m => m.Nome.toLowerCase() === name.toLowerCase());
             let myMoveData = findMove(moveName);
             let botMoveName = Phaser.Utils.Array.GetRandom(this.eEntity.moves);
             let botMoveData = findMove(botMoveName);
-            let azioneP1 = { mossa: myMoveData };
-            let azioneP2 = { mossa: botMoveData };
-            let statoAggiornato = this.partita.processaTurno(azioneP1, azioneP2);
+
+            let statoAggiornato = this.partita.processaTurno({ mossa: myMoveData }, { mossa: botMoveData });
             this.applicaStatoPartita(statoAggiornato, false);
         } else {
             this.logText.setText("In attesa dell'avversario...");
@@ -586,14 +673,20 @@ class BattleScene extends Phaser.Scene {
     updateStatusOverlay(isPlayer, stato) {
         let ui = isPlayer ? this.pUI : this.eUI;
         if (!ui.statusLabel) {
-            ui.statusLabel = this.add.text(ui.text.x, ui.text.y - 25, '', { fontSize: '16px', fontStyle: 'bold', padding: { x: 4, y: 2 } });
+            // Posizioniamo lo stato sopra il nome (y - 25)
+            ui.statusLabel = this.add.text(ui.nameText.x, ui.nameText.y - 25, '', {
+                fontSize: '16px', fontStyle: 'bold', padding: { x: 4, y: 2 }
+            });
         }
         if (!stato) {
             ui.statusLabel.setText('');
             ui.statusLabel.setBackgroundColor('transparent');
             return;
         }
-        const colori = { 'Scottatura': '#f08030', 'Paralisi': '#f8d030', 'Sonno': '#8c888c', 'Avvelenamento': '#a040a0', 'Iperavvelenamento': '#a040a0', 'Congelamento': '#98d8d8' };
+        const colori = {
+            'Scottatura': '#f08030', 'Paralisi': '#f8d030', 'Sonno': '#8c888c',
+            'Avvelenamento': '#a040a0', 'Iperavvelenamento': '#a040a0', 'Congelamento': '#98d8d8'
+        };
         ui.statusLabel.setText(stato.toUpperCase()).setBackgroundColor(colori[stato] || '#777');
     }
 

@@ -408,7 +408,6 @@
       "Sfoghenergia",
       "Acidobomba",
       "Fangobomba",
-      "Rutto",
       "Nube",
       "Arrotola",
       "Sporcolancio"
@@ -1372,6 +1371,7 @@
     "mosse": [
       "Azione",
       "Lucidatura",
+      "Pesobomba",
       "Ricciolscudo",
       "Terrempesta",
       "Rotolamento",
@@ -1681,7 +1681,6 @@
       "Stridio",
       "Sporcolancio",
       "Scudo Acido",
-      "Rutto",
       "Memento"
     ],
     "sprite": {
@@ -1780,7 +1779,9 @@
       "Ombra Notturna",
       "Sbigoattacco",
       "Neropulsar",
-      "Palla Ombra"
+      "Palla Ombra",
+      "Destinobbligato",
+      "Mangiasogni"
     ],
     "sprite": {
       "normal": "https://media.pokemoncentral.it/wiki/6/66/Sprnbm0094.gif",
@@ -1873,7 +1874,8 @@
       "Conchilama",
       "Schianto",
       "Danzaspada",
-      "Martellata"
+      "Martellata",
+      "Ghigliottina"
     ],
     "sprite": {
       "normal": "https://media.pokemoncentral.it/wiki/9/9e/Sprnbm0099.gif",
@@ -2168,9 +2170,9 @@
       "Autodistruzione",
       "Fangobomba",
       "Tossina",
-      "Rutto",
       "Esplosione",
-      "Memento"
+      "Memento",
+      "Destinobbligato"
     ],
     "sprite": {
       "normal": "https://media.pokemoncentral.it/wiki/4/43/Sprnbm0110.gif",
@@ -2216,7 +2218,8 @@
       "Sgranocchio",
       "Resistenza",
       "Contropiede",
-      "Oltraggio"
+      "Oltraggio",
+      "Ultimascelta"
     ],
     "sprite": {
       "normal": "https://media.pokemoncentral.it/wiki/a/a9/Sprnbf0115.gif",
@@ -2452,6 +2455,7 @@
       "Forza",
       "Danzaspada",
       "Sottomissione",
+      "Ghigliottina",
       "Troppoforte"
     ],
     "sprite": {
@@ -2994,11 +2998,11 @@
       "Sonnolalia",
       "Sgranocchio",
       "Corposcontro",
+      "Pesobomba",
       "Amnesia",
       "Forza Equina",
       "Martelpugno",
       "Panciamburo",
-      "Rutto",
       "Gigaimpatto"
     ],
     "sprite": {
