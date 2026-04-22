@@ -27,38 +27,6 @@ class PokemonEntity {
     }
 }
 
-// MOTORE DI DANNO GLOBALE: Separato dalla grafica!
-const BattleEngine = {
-    calcolaDanno: function (attPkmn, defPkmn, moveName, moveDB, randoms) {
-        let move = moveDB[moveName];
-        if (!move) return { damage: 0, msg: "Mossa sconosciuta!" };
-
-        let hitRoll = randoms ? (randoms.acc * 100) : Phaser.Math.Between(1, 100);
-        if (move.Precisione && hitRoll > move.Precisione) {
-            return { damage: 0, msg: `${attPkmn.name.toUpperCase()} fallisce!` };
-        }
-
-        let isPhys = move.Categoria === "Fisico";
-        let att = isPhys ? attPkmn.stats.attack : attPkmn.stats.spAttack;
-        let dif = isPhys ? defPkmn.stats.defense : defPkmn.stats.spDefense;
-        let base_dmg = ((move.Potenza * (att / dif)) / 2) + 2;
-
-        let stab = attPkmn.types.includes(move.Tipo) ? 1.5 : 1.0;
-        
-        // Efficacia fissa a 1.0 senza la tabella dei tipi
-        let effectiveness = 1.0; 
-
-        let critRoll = randoms ? randoms.crit : Math.random();
-        let crit = critRoll < 0.1 ? 1.5 : 1.0;
-
-        let total_dmg = Math.floor(base_dmg * stab * effectiveness * crit);
-
-        let msg = `${attPkmn.name.toUpperCase()} usa ${moveName.toUpperCase()}!\nDanno: ${total_dmg}.`;
-        if (total_dmg >= defPkmn.hp) msg += `\n${defPkmn.name.toUpperCase()} è K.O.!`;
-
-        return { damage: total_dmg, msg: msg };
-    }
-};
 
 
 // ==============================================================================
@@ -456,6 +424,34 @@ class BattleScene extends Phaser.Scene {
 
         this.createButtons();
 
+        // SETUP gestionePartita per PvE
+        if (this.isWild) {
+            let creaSquadra = (id, entity) => ({
+                id: id,
+                squadra: [{
+                    nome: entity.name,
+                    hp: entity.hp,
+                    hpMax: entity.maxHp,
+                    statistiche: {
+                        attacco: entity.stats.attack,
+                        difesa: entity.stats.defense,
+                        attaccoSpeciale: entity.stats.spAttack,
+                        difesaSpeciale: entity.stats.spDefense,
+                        velocita: entity.stats.speed
+                    },
+                    modificatori: {},
+                    tipi: entity.types,
+                    livello: 50,
+                    stato: null,
+                    mosse: entity.moves.map(m => this.moveDB[m] || Object.values(this.moveDB).find(dbM => dbM.Nome.toLowerCase() === m.toLowerCase())).filter(m => m)
+                }],
+                attivoIdx: 0
+            });
+            let p1 = creaSquadra('player', this.pEntity);
+            let p2 = creaSquadra('bot', this.eEntity);
+            this.partita = new gestionePartita(p1, p2);
+        }
+
         if (!this.isWild) {
             this.socket.off('resolveTurn');
             this.socket.on('resolveTurn', (data) => this.resolveTurn(data));
@@ -514,17 +510,18 @@ class BattleScene extends Phaser.Scene {
         this.btns.forEach(b => b.disableInteractive());
 
         if (this.isWild) {
-            let myAction = { att: this.pEntity, def: this.eEntity, move: moveName };
-            let botAction = { att: this.eEntity, def: this.pEntity, move: Phaser.Utils.Array.GetRandom(this.eEntity.moves) };
+            let findMove = (name) => this.moveDB[name] || Object.values(this.moveDB).find(m => m.Nome.toLowerCase() === name.toLowerCase());
 
-            // Il player attacca sempre per primo contro il bot in questa logica semplificata
-            this.executeAction(myAction, () => {
-                if (this.eEntity.alive) {
-                    this.executeAction(botAction, () => {
-                        if (this.pEntity.alive) this.startTurn();
-                    });
-                }
-            });
+            let myMoveData = findMove(moveName);
+            let botMoveName = Phaser.Utils.Array.GetRandom(this.eEntity.moves);
+            let botMoveData = findMove(botMoveName);
+
+            let azioneP1 = { mossa: myMoveData };
+            let azioneP2 = { mossa: botMoveData };
+
+            // Risolviamo l'intero turno localmente
+            let statoAggiornato = this.partita.processaTurno(azioneP1, azioneP2);
+            this.applicaStatoPartita(statoAggiornato, false);
         } else {
             this.logText.setText("In attesa dell'avversario...");
             this.socket.emit('pvpUseMove', { roomId: this.roomId, moveName });
@@ -532,85 +529,63 @@ class BattleScene extends Phaser.Scene {
     }
 
     resolveTurn(turnData) {
-        let myMove = turnData.moves[this.socket.id];
-        let oppId = Object.keys(turnData.moves).find(id => id !== this.socket.id);
+        this.applicaStatoPartita(turnData.stato, turnData.inverti);
+    }
 
-        let iGoFirst = (this.pEntity.stats.speed > this.eEntity.stats.speed) ||
-            (this.pEntity.stats.speed === this.eEntity.stats.speed && this.socket.id < oppId);
+    applicaStatoPartita(stato, inverti) {
+        // Se la partita è gestita dal server ed io sono il secondo giocatore p2, invertiamo il senso dei dati ricevuti
+        let p1Data = inverti ? stato.p2 : stato.p1;
+        let p2Data = inverti ? stato.p1 : stato.p2;
 
-        let myAction = { att: this.pEntity, def: this.eEntity, move: myMove, rng: turnData.randoms[this.socket.id] };
-        let oppAction = { att: this.eEntity, def: this.pEntity, move: turnData.moves[oppId], rng: turnData.randoms[oppId] };
+        this.pEntity.hp = p1Data.hp;
+        this.eEntity.hp = p2Data.hp;
+        if (this.pEntity.hp <= 0) this.pEntity.alive = false;
+        if (this.eEntity.hp <= 0) this.eEntity.alive = false;
 
-        this.executeAction(iGoFirst ? myAction : oppAction, () => {
-            if ((iGoFirst ? this.eEntity : this.pEntity).alive) {
-                this.executeAction(iGoFirst ? oppAction : myAction, () => {
-                    if (this.pEntity.alive && this.eEntity.alive) this.startTurn();
+        this.mostraLogsSequenziali(stato.logs, () => {
+            this.updateUI();
+            
+            if (stato.finito || !this.pEntity.alive || !this.eEntity.alive) {
+                this.time.delayedCall(1500, () => {
+                    this.logText.setText(!this.pEntity.alive ? 'HAI PERSO... 💀' : 'HAI VINTO! 🎉');
+                    let loserSprite = !this.pEntity.alive ? this.pSprite : this.eSprite;
+                    this.tweens.add({
+                        targets: loserSprite,
+                        y: loserSprite.y + 100,
+                        alpha: 0,
+                        duration: 1000,
+                        onComplete: () => {
+                            if (this.socket) this.socket.emit('setInBattle', false);
+                            this.scene.stop(); this.scene.resume('WorldScene');
+                        }
+                    });
                 });
+            } else {
+                this.startTurn();
             }
         });
     }
 
-    executeAction(action, onComplete) {
-        // Capiamo chi sta attaccando e chi si difende per muovere gli sprite giusti
-        let isPlayerAttacking = (action.att === this.pEntity);
-        let attackerSprite = isPlayerAttacking ? this.pSprite : this.eSprite;
-        let defenderSprite = isPlayerAttacking ? this.eSprite : this.pSprite;
-
-        // Direzione dello scatto (il player va verso destra +50, il nemico verso sinistra -50)
-        let dashX = isPlayerAttacking ? 50 : -50;
-        let dashY = isPlayerAttacking ? -30 : 30;
-
-        // 1. ANIMAZIONE ATTACCO (Scatto in avanti)
-        this.tweens.add({
-            targets: attackerSprite,
-            x: attackerSprite.x + dashX,
-            y: attackerSprite.y + dashY,
-            duration: 150,
-            yoyo: true, // Torna subito indietro
-            ease: 'Power2',
-            onComplete: () => {
-
-                // 2. CALCOLO DEL DANNO (Appena il colpo va a segno)
-                let res = BattleEngine.calcolaDanno(action.att, action.def, action.move, this.moveDB, action.rng);
-                action.def.takeDamage(res.damage);
-                this.updateUI();
-                this.logText.setText(res.msg);
-
-                // 3. ANIMAZIONE DANNO (Se il colpo non ha fallito)
-                if (res.damage > 0) {
-                    // Non potendo usare setTint sulle GIF HTML, le facciamo lampeggiare!
-                    this.tweens.add({
-                        targets: defenderSprite,
-                        alpha: 0.2, // Diventa quasi trasparente
-                        x: defenderSprite.x + (isPlayerAttacking ? 10 : -10), // Trema
-                        duration: 50,
-                        yoyo: true,
-                        repeat: 3 // Trema 3 volte
-                    });
+    mostraLogsSequenziali(logs, onComplete) {
+        if (!logs || logs.length === 0) {
+            if (onComplete) onComplete();
+            return;
+        }
+        let index = 0;
+        let mostraProssimo = () => {
+            if (index < logs.length) {
+                this.logText.setText(logs[index]);
+                // Aggiorniamo le barre della vita quando il testo cita i danni!
+                if (logs[index].includes("Inflitti") || logs[index].includes("danni")) {
+                    this.updateUI(); 
                 }
-
-                // Controllo KO e fine turno
-                if (!action.def.alive) {
-                    this.time.delayedCall(2000, () => {
-                        this.logText.setText(action.def === this.eEntity ? 'HAI VINTO! 🎉' : 'HAI PERSO... 💀');
-
-                        // Il Pokémon sconfitto cade verso il basso e scompare
-                        this.tweens.add({
-                            targets: defenderSprite,
-                            y: defenderSprite.y + 100,
-                            alpha: 0,
-                            duration: 1000,
-                            onComplete: () => {
-                                if (this.socket) this.socket.emit('setInBattle', false);
-                                this.scene.stop(); this.scene.resume('WorldScene');
-                            }
-                        });
-                    });
-                } else {
-                    this.time.delayedCall(2000, onComplete);
-                }
+                index++;
+                this.time.delayedCall(1500, mostraProssimo);
+            } else {
+                if (onComplete) onComplete();
             }
-        });
+        };
+        mostraProssimo();
     }
 }
 

@@ -2,6 +2,16 @@ const express = require('express');
 const app = express();
 const server = require('http').Server(app);
 const io = require('socket.io')(server);
+const fs = require('fs');
+
+const gestionePartita = require('./gestione_partita.js');
+
+const moveDBArray = JSON.parse(fs.readFileSync(__dirname + '/DB/DB_mosse.json', 'utf8'));
+const moveDB = {};
+moveDBArray.forEach(m => moveDB[m.Nome] = m);
+const pkmnDBArray = JSON.parse(fs.readFileSync(__dirname + '/DB/DB_pokemon.json', 'utf8'));
+const pkmnDB = {};
+pkmnDBArray.forEach(p => pkmnDB[p.nome] = p);
 
 app.use(express.static(__dirname));
 
@@ -61,7 +71,13 @@ io.on('connection', (socket) => {
 
     socket.on('acceptChallenge', (challengerId) => {
         let roomId = `battle_${challengerId}_${socket.id}`;
-        battleRooms[roomId] = { p1: challengerId, p2: socket.id, selections: {}, moves: {} };
+        battleRooms[roomId] = { 
+            p1: challengerId, 
+            p2: socket.id, 
+            selections: {}, 
+            moves: {},
+            partitaObj: null 
+        };
         
         io.to(challengerId).emit('startPvP', { roomId, isPlayerOne: true });
         io.to(socket.id).emit('startPvP', { roomId, isPlayerOne: false });
@@ -77,6 +93,35 @@ io.on('connection', (socket) => {
         room.selections[socket.id] = data.pkmnName;
         
         if (Object.keys(room.selections).length === 2) {
+            // Crea i due giocatori usando il database del server
+            let p1Name = room.selections[room.p1];
+            let p2Name = room.selections[room.p2];
+            let p1Data = pkmnDB[p1Name];
+            let p2Data = pkmnDB[p2Name];
+            
+            let creaSquadra = (pData) => [{
+                nome: pData.nome,
+                hp: pData.statistiche.hp.base_stat,
+                hpMax: pData.statistiche.hp.base_stat,
+                statistiche: {
+                    attacco: pData.statistiche.attack.base_stat,
+                    difesa: pData.statistiche.defense.base_stat,
+                    attaccoSpeciale: pData.statistiche['special-attack'].base_stat,
+                    difesaSpeciale: pData.statistiche['special-defense'].base_stat,
+                    velocita: pData.statistiche.speed.base_stat
+                },
+                modificatori: {},
+                tipi: pData.tipi,
+                livello: 50,
+                stato: null,
+                mosse: pData.mosse.map(m => moveDB[m]).filter(m => m)
+            }];
+
+            let player1 = { id: room.p1, squadra: creaSquadra(p1Data), attivoIdx: 0 };
+            let player2 = { id: room.p2, squadra: creaSquadra(p2Data), attivoIdx: 0 };
+            
+            room.partitaObj = new gestionePartita(player1, player2);
+            
             io.to(room.p1).emit('pvpBothSelected', room.selections);
             io.to(room.p2).emit('pvpBothSelected', room.selections);
         }
@@ -84,20 +129,19 @@ io.on('connection', (socket) => {
 
     socket.on('pvpUseMove', (data) => {
         let room = battleRooms[data.roomId];
-        if (!room) return;
+        if (!room || !room.partitaObj) return;
 
         room.moves[socket.id] = data.moveName;
         
         if (Object.keys(room.moves).length === 2) {
-            let randoms = {};
-            // Generiamo RNG lato server per evitare desincronizzazioni!
-            [room.p1, room.p2].forEach(pid => {
-                randoms[pid] = { acc: Math.random(), crit: Math.random() };
-            });
-
-            let turnData = { moves: room.moves, randoms: randoms };
-            io.to(room.p1).emit('resolveTurn', turnData);
-            io.to(room.p2).emit('resolveTurn', turnData);
+            let azioneP1 = { mossa: moveDB[room.moves[room.p1]] };
+            let azioneP2 = { mossa: moveDB[room.moves[room.p2]] };
+            
+            let statoAggiornato = room.partitaObj.processaTurno(azioneP1, azioneP2);
+            
+            io.to(room.p1).emit('resolveTurn', { stato: statoAggiornato, inverti: false });
+            io.to(room.p2).emit('resolveTurn', { stato: statoAggiornato, inverti: true });
+            
             room.moves = {}; // Reset turno
         }
     });
