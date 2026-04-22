@@ -1372,7 +1372,6 @@
     "mosse": [
       "Azione",
       "Lucidatura",
-      "Pesobomba",
       "Ricciolscudo",
       "Terrempesta",
       "Rotolamento",
@@ -1781,9 +1780,7 @@
       "Ombra Notturna",
       "Sbigoattacco",
       "Neropulsar",
-      "Palla Ombra",
-      "Destinobbligato",
-      "Mangiasogni"
+      "Palla Ombra"
     ],
     "sprite": {
       "normal": "https://media.pokemoncentral.it/wiki/6/66/Sprnbm0094.gif",
@@ -1876,8 +1873,7 @@
       "Conchilama",
       "Schianto",
       "Danzaspada",
-      "Martellata",
-      "Ghigliottina"
+      "Martellata"
     ],
     "sprite": {
       "normal": "https://media.pokemoncentral.it/wiki/9/9e/Sprnbm0099.gif",
@@ -2174,8 +2170,7 @@
       "Tossina",
       "Rutto",
       "Esplosione",
-      "Memento",
-      "Destinobbligato"
+      "Memento"
     ],
     "sprite": {
       "normal": "https://media.pokemoncentral.it/wiki/4/43/Sprnbm0110.gif",
@@ -2221,8 +2216,7 @@
       "Sgranocchio",
       "Resistenza",
       "Contropiede",
-      "Oltraggio",
-      "Ultimascelta"
+      "Oltraggio"
     ],
     "sprite": {
       "normal": "https://media.pokemoncentral.it/wiki/a/a9/Sprnbf0115.gif",
@@ -2458,7 +2452,6 @@
       "Forza",
       "Danzaspada",
       "Sottomissione",
-      "Ghigliottina",
       "Troppoforte"
     ],
     "sprite": {
@@ -3001,7 +2994,6 @@
       "Sonnolalia",
       "Sgranocchio",
       "Corposcontro",
-      "Pesobomba",
       "Amnesia",
       "Forza Equina",
       "Martelpugno",

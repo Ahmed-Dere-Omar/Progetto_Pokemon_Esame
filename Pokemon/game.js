@@ -7,7 +7,7 @@ class PokemonEntity {
         this.name = dbData.nome;
         this.types = dbData.tipi;
         this.stats = {
-            hp: dbData.statistiche.hp.base_stat,
+            hp: Math.floor(dbData.statistiche.hp.base_stat * 1.5),
             attack: dbData.statistiche.attack.base_stat,
             defense: dbData.statistiche.defense.base_stat,
             spAttack: dbData.statistiche['special-attack'].base_stat,
@@ -16,9 +16,10 @@ class PokemonEntity {
         };
         this.maxHp = this.stats.hp;
         this.hp = this.maxHp;
-        this.moves = dbData.mosse.slice(0, 4);
+        let mosseMischiate = [...dbData.mosse].sort(() => 0.5 - Math.random());
+        this.moves = mosseMischiate.slice(0, 4);
         this.alive = true;
-        this.sprites = dbData.sprite; // Ora punta a 'sprite', non 'sprites'
+        this.sprites = dbData.sprite;
     }
 
     takeDamage(amount) {
@@ -26,8 +27,6 @@ class PokemonEntity {
         if (this.hp === 0) this.alive = false;
     }
 }
-
-
 
 // ==============================================================================
 // PARTE 2: SCENE DI PHASER
@@ -40,7 +39,6 @@ class BootScene extends Phaser.Scene {
     preload() {
         this.load.json('pokemonDB', 'DB/DB_pokemon.json');
         this.load.json('moveDB', 'DB/DB_mosse.json');
-        // Rimosso typeDB!
 
         this.load.tilemapTiledJSON('map', 'assets/mappa.tmj');
         this.load.image('tiles', 'assets/tileset.png');
@@ -95,8 +93,6 @@ class WorldScene extends Phaser.Scene {
         this.setupMap();
         this.setupAnimations();
         this.setupNetwork();
-
-        // AGGIUNGI QUESTO: Creiamo i personaggi non giocanti
         this.setupNPCs();
 
         this.cursors = this.input.keyboard.createCursorKeys();
@@ -105,7 +101,6 @@ class WorldScene extends Phaser.Scene {
         this.canEncounter = true;
         this.isTransitioning = false;
 
-        // Reset post-battaglia
         this.events.on('resume', () => {
             this.cursors.left.reset(); this.cursors.right.reset();
             this.cursors.up.reset(); this.cursors.down.reset();
@@ -127,26 +122,19 @@ class WorldScene extends Phaser.Scene {
         this.physics.world.setBounds(0, 0, this.mapWidth, this.mapHeight);
         this.wallLayer.setCollisionByExclusion([-1]);
     }
+
     setupNPCs() {
-        // Creiamo l'NPC usando la chiave 'allenatore'
         this.npc = this.physics.add.sprite(300, 200, 'allenatore');
-
-        // FONDAMENTALE: L'immagine originale è 900x586, la riduciamo al 10%!
-        // this.npc.setScale(0.2);
-
-        // Diciamo alla fisica di ricalcolare i bordi delle collisioni dopo averlo rimpicciolito
         this.npc.body.updateFromGameObject();
-
-        // Evitiamo che venga spinto in giro dal giocatore
         this.npc.setCollideWorldBounds(true);
         this.npc.setImmovable(true);
         this.physics.add.collider(this.npc, this.wallLayer);
 
-        // Aggiungiamo l'etichetta del nome sopra la sua testa
         this.add.text(this.npc.x, this.npc.y - 40, "NPC", {
             fontSize: '12px', fill: '#fff', backgroundColor: '#00000088', padding: { x: 4, y: 2 }
         }).setOrigin(0.5, 1);
     }
+
     setupNetwork() {
         this.otherPlayers = this.physics.add.group();
         this.socket = io();
@@ -171,15 +159,12 @@ class WorldScene extends Phaser.Scene {
             });
         });
 
-        // PvP Network
         this.socket.on('challengeReceived', (id) => this.socket.emit('acceptChallenge', id));
         this.socket.on('opponentBusy', () => alert("Questo allenatore è occupato!"));
 
-        // Passa il socket e isWild al pacchetto della battaglia
         this.socket.on('startPvP', (data) => {
             data.socket = this.socket;
             data.isWild = false;
-            // Aggiunto il testo per il PvP
             this.startEncounter(data, "SFIDA PVP!");
         });
     }
@@ -230,7 +215,6 @@ class WorldScene extends Phaser.Scene {
         this.player.body.velocity.normalize().scale(speed);
         this.playerNameText.setPosition(this.player.x, this.player.y - 35);
 
-        // Network Emit
         if (isMoving) {
             let px = this.player.x;
             let py = this.player.y;
@@ -240,33 +224,22 @@ class WorldScene extends Phaser.Scene {
             this.player.oldP = { x: px, y: py };
         }
 
-        // Erba Alta (WILD)
         if (isMoving && this.canEncounter && this.grassLayer.getTileAtWorldXY(this.player.x, this.player.y, true)?.index !== -1) {
             if (Phaser.Math.Between(1, 100) <= 5) {
-                // Aggiunto il testo per i selvatici
                 this.startEncounter({ isWild: true, socket: this.socket }, "POKÉMON SELVATICO!");
             }
             this.canEncounter = false;
             this.time.delayedCall(250, () => this.canEncounter = true);
         }
 
-        // Sfida PvP o Interazione NPC (ENTER)
         if (Phaser.Input.Keyboard.JustDown(this.enterKey) && !this.isTransitioning) {
-
-            // 1. Controlliamo se siamo vicini all'NPC
             let distToNpc = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.npc.x, this.npc.y);
-
             if (distToNpc < 50) {
                 this.player.anims.stop();
-
-                // LANCIA LA BATTAGLIA CONTRO L'NPC!
-                // Gli passiamo isWild: true perché lo controlla il computer, e un testo personalizzato
                 this.startEncounter({ isWild: true, socket: this.socket }, "SFIDA CONTRO NPC!");
-
-                return; // Ferma il codice qui
+                return;
             }
 
-            // 2. Se non siamo vicini all'NPC, cerchiamo un giocatore per il PvP
             let closest = this.otherPlayers.getChildren().find(op => Phaser.Math.Distance.Between(this.player.x, this.player.y, op.x, op.y) < 150);
             if (closest) this.socket.emit('challengePlayer', closest.playerId);
         }
@@ -277,7 +250,6 @@ class WorldScene extends Phaser.Scene {
         this.player.body.setVelocity(0);
         this.player.anims.stop();
 
-        // creiamo un vero livello HTML "sopra" al gioco!
         let overlay = document.createElement('div');
         overlay.style.position = 'absolute';
         overlay.style.top = '0';
@@ -287,19 +259,14 @@ class WorldScene extends Phaser.Scene {
         overlay.style.display = 'flex';
         overlay.style.justifyContent = 'center';
         overlay.style.alignItems = 'center';
-        overlay.style.pointerEvents = 'none'; // Non blocca il mouse
-        overlay.style.zIndex = '9999'; // È in primissimo piano
+        overlay.style.pointerEvents = 'none';
+        overlay.style.zIndex = '9999';
 
-        // Cerca questa riga nel tuo startEncounter e aggiungi font-size: 8rem; (o il numero che preferisci)
         overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 4rem;">${testo}</h1>`;
-
-        // La "appiccichiamo" fisicamente sopra al contenitore del gioco
         document.getElementById('game-container').appendChild(overlay);
 
         this.time.delayedCall(2000, () => {
-            // Dopo 2 secondi, eliminiamo l'overlay HTML pulendo lo schermo
             overlay.remove();
-
             this.isTransitioning = false;
             this.scene.pause();
             this.scene.launch('SelectionScene', battleData);
@@ -373,57 +340,37 @@ class BattleScene extends Phaser.Scene {
     }
 
     preload() {
-        this.pkmnDB = this.registry.get('pokemonDB'); // Usa registry!
-
+        this.pkmnDB = this.registry.get('pokemonDB');
         let pData = this.pkmnDB[this.pName];
         let eData = this.pkmnDB[this.eName];
-
-        // Prendiamo l'URL "normal" dai nuovi DB
         let pSpriteUrl = pData.sprite?.normal;
         let eSpriteUrl = eData.sprite?.normal;
 
         this.bgKey = `background_${Phaser.Math.Between(0, 11)}`;
-
-        // Phaser scarica l'immagine direttamente dal link web!
         if (pSpriteUrl) this.load.image(this.pName, pSpriteUrl);
         if (eSpriteUrl) this.load.image(this.eName, eSpriteUrl);
-
         this.load.image(this.bgKey, `DB/Immagini/Sfondi/${this.bgKey}.png`);
     }
 
     create() {
         this.moveDB = this.registry.get('moveDB');
-
         this.pEntity = new PokemonEntity(this.pName, this.pkmnDB[this.pName]);
         this.eEntity = new PokemonEntity(this.eName, this.pkmnDB[this.eName]);
 
-        // SFONDO (Altezza ridotta a 665 per fermarsi esattamente sopra il log)
         this.add.image(0, 0, this.bgKey).setOrigin(0, 0).setDisplaySize(1000, 665);
-        // --- POKEMON (ABBASSATI) ---
-        // Player: da 500 a 580 | Enemy: da 250 a 320
         this.pSprite = this.add.dom(250, 500).createFromHTML(`<img src="${this.pkmnDB[this.pName].sprite?.normal}" style="transform: scale(2.5); image-rendering: pixelated;">`);
         this.eSprite = this.add.dom(750, 230).createFromHTML(`<img src="${this.pkmnDB[this.eName].sprite?.normal}" style="transform: scale(2.2); image-rendering: pixelated;">`);
 
-        // --- UI BOX (ABBASSATI) ---
-        // Player UI: da 560 a 630 | Enemy UI: da 80 a 160
         this.pUI = this.createUIBox(100, 360, this.pEntity);
         this.eUI = this.createUIBox(600, 100, this.eEntity);
 
-        // --- BLOCCO LOG E MOSSE (ABBASSATO AL LIMITE) ---
-        // Rettangolo di fondo: centrato a 730 (quasi sul bordo)
         this.add.rectangle(500, 730, 950, 130, 0xffffff).setStrokeStyle(4, 0x000000);
-
-        // Testo del log: spostato a 685
         this.logText = this.add.text(70, 685, '', {
-            fontSize: '22px',
-            fill: '#000',
-            fontStyle: 'bold',
-            wordWrap: { width: 500 }
+            fontSize: '22px', fill: '#000', fontStyle: 'bold', wordWrap: { width: 500 }
         });
 
         this.createButtons();
 
-        // SETUP gestionePartita per PvE
         if (this.isWild) {
             let creaSquadra = (id, entity) => ({
                 id: id,
@@ -459,11 +406,8 @@ class BattleScene extends Phaser.Scene {
     }
 
     createUIBox(x, y, entity) {
-        // Testo nome e HP
         this.add.text(x, y, entity.name.toUpperCase(), { fontSize: '24px', fill: '#000', fontStyle: 'bold', backgroundColor: '#fff8' });
         let txt = this.add.text(x, y + 30, `HP: ${entity.hp}/${entity.maxHp}`, { fontSize: '20px', fill: '#000', backgroundColor: '#fff8' });
-
-        // Barre della vita
         this.add.rectangle(x, y + 60, 200, 15, 0x555555).setOrigin(0, 0);
         let bar = this.add.rectangle(x, y + 60, 200, 15, 0x00ff00).setOrigin(0, 0);
         return { text: txt, bar: bar };
@@ -481,21 +425,12 @@ class BattleScene extends Phaser.Scene {
     createButtons() {
         this.btns = [];
         this.pEntity.moves.forEach((m, i) => {
-            // Posizionamento bottoni: griglia 2x2 spostata verso il basso (Y: 685 e 730)
             let bx = 600 + (i % 2) * 190;
             let by = 685 + Math.floor(i / 2) * 45;
-
             let b = this.add.text(bx, by, m.toUpperCase(), {
-                fontSize: '18px',
-                fill: '#fff',
-                backgroundColor: '#333',
-                padding: { x: 12, y: 6 },
-                fixedWidth: 170,
-                align: 'center'
-            })
-                .setInteractive()
-                .on('pointerdown', () => this.handleMoveClick(m));
-
+                fontSize: '18px', fill: '#fff', backgroundColor: '#333',
+                padding: { x: 12, y: 6 }, fixedWidth: 170, align: 'center'
+            }).setInteractive().on('pointerdown', () => this.handleMoveClick(m));
             this.btns.push(b);
         });
     }
@@ -507,18 +442,13 @@ class BattleScene extends Phaser.Scene {
 
     handleMoveClick(moveName) {
         this.btns.forEach(b => b.disableInteractive());
-
         if (this.isWild) {
             let findMove = (name) => this.moveDB[name] || Object.values(this.moveDB).find(m => m.Nome.toLowerCase() === name.toLowerCase());
-
             let myMoveData = findMove(moveName);
             let botMoveName = Phaser.Utils.Array.GetRandom(this.eEntity.moves);
             let botMoveData = findMove(botMoveName);
-
             let azioneP1 = { mossa: myMoveData };
             let azioneP2 = { mossa: botMoveData };
-
-            // Risolviamo l'intero turno localmente
             let statoAggiornato = this.partita.processaTurno(azioneP1, azioneP2);
             this.applicaStatoPartita(statoAggiornato, false);
         } else {
@@ -532,7 +462,6 @@ class BattleScene extends Phaser.Scene {
     }
 
     applicaStatoPartita(stato, inverti) {
-        // Se la partita è gestita dal server ed io sono il secondo giocatore p2, invertiamo il senso dei dati ricevuti
         let p1Data = inverti ? stato.p2 : stato.p1;
         let p2Data = inverti ? stato.p1 : stato.p2;
 
@@ -543,7 +472,6 @@ class BattleScene extends Phaser.Scene {
 
         this.mostraLogsSequenziali(stato.logs, () => {
             this.updateUI();
-
             if (stato.finito || !this.pEntity.alive || !this.eEntity.alive) {
                 this.time.delayedCall(1500, () => {
                     this.logText.setText(!this.pEntity.alive ? 'HAI PERSO... 💀' : 'HAI VINTO! 🎉');
@@ -565,63 +493,56 @@ class BattleScene extends Phaser.Scene {
         });
     }
 
-    // ==========================================
-    // MOTORE GRAFICO DI BATTAGLIA (Sincronizzato ai Log)
-    // ==========================================
     mostraLogsSequenziali(logs, onComplete) {
         if (!logs || logs.length === 0) {
             if (onComplete) onComplete();
             return;
         }
-
         let index = 0;
         let ultimoAttaccanteEraPlayer = null;
-
         let mostraProssimo = () => {
             if (index < logs.length) {
                 let riga = logs[index];
                 this.logText.setText(riga);
 
-                // 1. RILEVAMENTO TARGET (Chi riceve l'effetto?)
-                // Cerchiamo quale Pokémon è menzionato nella riga
                 let isPlayerTarget = riga.includes(this.pEntity.name);
                 let isEnemyTarget = riga.includes(this.eEntity.name);
 
-                // 2. SCATTO ATTACCO (Solo se la riga dice "usa")
                 if (riga.includes(" usa ")) {
                     ultimoAttaccanteEraPlayer = riga.includes(this.pEntity.name);
                     this.playDash(ultimoAttaccanteEraPlayer);
                 }
 
-                // 3. ANIMAZIONE DANNO (Trema chi riceve il danno)
-                if (riga.includes("Inflitti") || riga.includes("efficace")) {
+                if (riga.includes("Inflitti") || riga.includes("efficace") || riga.includes("subisce danni") || riga.includes("rubano energia") || riga.includes("recupera") || riga.includes("rigenera") || riga.includes("contraccolpo")) {
                     this.updateUI();
-                    // Se il log non specifica il nome, trema l'opposto di chi ha attaccato
-                    if (ultimoAttaccanteEraPlayer !== null) {
-                        this.playDamage(!ultimoAttaccanteEraPlayer);
+                    if (riga.includes("Inflitti") || riga.includes("efficace")) {
+                        if (ultimoAttaccanteEraPlayer !== null) {
+                            this.playDamage(!ultimoAttaccanteEraPlayer);
+                        }
+                    } else if (riga.includes("subisce danni") || riga.includes("rubano energia") || riga.includes("contraccolpo")) {
+                        this.playDamage(isPlayerTarget);
                     }
                 }
 
-                // 4. STATISTICHE (Aumenta/Diminuisce)
-                // Qui usiamo isPlayerTarget per capire su quale Pokémon far apparire la grafica
                 if (riga.includes("aumenta")) {
                     this.playStatAnim(isPlayerTarget, true);
                 } else if (riga.includes("diminuisce")) {
                     this.playStatAnim(isPlayerTarget, false);
                 }
 
-                // 5. STATI ALTERATI (Overlay visivo)
                 if (riga.includes("stato di")) {
                     let stato = riga.split("stato di ")[1].replace("!", "").trim();
                     this.updateStatusOverlay(isPlayerTarget, stato);
+                } else if (riga.includes("addormentato per la sonnolenza")) {
+                    this.updateStatusOverlay(isPlayerTarget, "Sonno");
+                } else if (riga.includes("si è svegliato") || riga.includes("si è scongelato") || riga.includes("curato dal suo problema di stato")) {
+                    this.updateStatusOverlay(isPlayerTarget, null);
                 }
 
-                // 6. CONFUSIONE (Paperelle 🦆)
-                if (riga.includes("confuso") || riga.includes("Confusione")) {
+                if ((riga.includes("confuso") || riga.includes("Confusione")) && !riga.includes("non è più confuso")) {
                     this.playConfusion(isPlayerTarget);
                 }
 
-                // 7. TRAPPOLE (Legatutto/Parassiseme)
                 if (riga.includes("intrappolato") || riga.includes("Legatutto") || riga.includes("Parassiseme")) {
                     this.playTrap(isPlayerTarget);
                 }
@@ -635,33 +556,15 @@ class BattleScene extends Phaser.Scene {
         mostraProssimo();
     }
 
-    // ==========================================
-    // LE ANIMAZIONI (Da aggiungere subito sotto)
-    // ==========================================
-
     playDash(isPlayer) {
         let sprite = isPlayer ? this.pSprite : this.eSprite;
         let dist = isPlayer ? 60 : -60;
-        this.tweens.add({
-            targets: sprite,
-            x: sprite.x + dist,
-            duration: 100,
-            yoyo: true,
-            ease: 'Power2'
-        });
+        this.tweens.add({ targets: sprite, x: sprite.x + dist, duration: 100, yoyo: true, ease: 'Power2' });
     }
 
     playDamage(isPlayer) {
         let sprite = isPlayer ? this.pSprite : this.eSprite;
-        this.tweens.add({
-            targets: sprite,
-            alpha: 0.5,
-            x: sprite.x + (isPlayer ? 5 : -5),
-            duration: 50,
-            yoyo: true,
-            repeat: 5,
-            onComplete: () => sprite.alpha = 1
-        });
+        this.tweens.add({ targets: sprite, alpha: 0.5, x: sprite.x + (isPlayer ? 5 : -5), duration: 50, yoyo: true, repeat: 5, onComplete: () => sprite.alpha = 1 });
     }
 
     playStatAnim(isPlayer, isUp) {
@@ -669,7 +572,6 @@ class BattleScene extends Phaser.Scene {
         let y = isPlayer ? 500 : 230;
         let color = isUp ? '#00FF00' : '#FF0000';
         let label = isUp ? '↑ STATS' : '↓ STATS';
-
         let t = this.add.text(x, y, label, { fontSize: '32px', fill: color, fontStyle: 'bold', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5);
         this.tweens.add({ targets: t, y: y - 100, alpha: 0, duration: 1500, onComplete: () => t.destroy() });
     }
@@ -677,20 +579,8 @@ class BattleScene extends Phaser.Scene {
     playOverlayTesto(isPlayer, testo, colore) {
         let targetX = isPlayer ? 250 : 750;
         let targetY = isPlayer ? 500 : 230;
-
-        let txt = this.add.text(targetX, targetY, testo, {
-            fontSize: '40px', fill: colore, fontStyle: 'bold',
-            stroke: '#000', strokeThickness: 6
-        }).setOrigin(0.5);
-
-        this.tweens.add({
-            targets: txt,
-            y: targetY - 80,
-            scale: 1.2,
-            alpha: 0,
-            duration: 1500,
-            onComplete: () => txt.destroy()
-        });
+        let txt = this.add.text(targetX, targetY, testo, { fontSize: '40px', fill: colore, fontStyle: 'bold', stroke: '#000', strokeThickness: 6 }).setOrigin(0.5);
+        this.tweens.add({ targets: txt, y: targetY - 80, scale: 1.2, alpha: 0, duration: 1500, onComplete: () => txt.destroy() });
     }
 
     updateStatusOverlay(isPlayer, stato) {
@@ -698,7 +588,12 @@ class BattleScene extends Phaser.Scene {
         if (!ui.statusLabel) {
             ui.statusLabel = this.add.text(ui.text.x, ui.text.y - 25, '', { fontSize: '16px', fontStyle: 'bold', padding: { x: 4, y: 2 } });
         }
-        const colori = { 'Scottatura': '#f08030', 'Paralisi': '#f8d030', 'Sonno': '#8c888c', 'Avvelenamento': '#a040a0' };
+        if (!stato) {
+            ui.statusLabel.setText('');
+            ui.statusLabel.setBackgroundColor('transparent');
+            return;
+        }
+        const colori = { 'Scottatura': '#f08030', 'Paralisi': '#f8d030', 'Sonno': '#8c888c', 'Avvelenamento': '#a040a0', 'Iperavvelenamento': '#a040a0', 'Congelamento': '#98d8d8' };
         ui.statusLabel.setText(stato.toUpperCase()).setBackgroundColor(colori[stato] || '#777');
     }
 
@@ -713,16 +608,8 @@ class BattleScene extends Phaser.Scene {
     playTrap(isPlayer) {
         let targetX = isPlayer ? 250 : 750;
         let targetY = isPlayer ? 500 : 230;
-
-        // Un'emoji gigante di una catena che si stringe
         let trap = this.add.text(targetX, targetY, '🔗', { fontSize: '100px' }).setOrigin(0.5);
-        this.tweens.add({
-            targets: trap,
-            scale: { from: 2, to: 1 }, // Si stringe
-            alpha: { from: 1, to: 0 }, // Svanisce
-            duration: 1500,
-            onComplete: () => trap.destroy()
-        });
+        this.tweens.add({ targets: trap, scale: { from: 2, to: 1 }, alpha: { from: 1, to: 0 }, duration: 1500, onComplete: () => trap.destroy() });
     }
 }
 

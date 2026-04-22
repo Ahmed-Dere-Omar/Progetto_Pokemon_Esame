@@ -1,17 +1,61 @@
 class Effetti {
     
-    static verificaCondizione(Condizione, target, utente) {
-        // Metodo di placeholder per verificare le logiche custom se fornite nel motore.
-        return true;
+    static verificaCondizione(Condizione, target, utente, Partita) {
+        if (!Condizione) return true;
+
+        switch (Condizione) {
+            case "MandaKO":
+                return target.hp <= 0;
+            case "BersaglioAvvelenato":
+                return target.stato === 'Avvelenamento' || target.stato === 'Iperavvelenamento';
+            case "BersaglioDanneggiatoInTurno":
+                return target.hp < target.hpMax;
+            case "BersaglioInVolo":
+                return target.statiVolatili && target.statiVolatili.statoSeminvulnerabile === "InVolo";
+            case "NemicoAttacca":
+                return !target.haGiaAgito;
+            case "PSMassimi":
+                return target.hp === target.hpMax;
+            case "MeteoPioggia":
+                return Partita && (Partita.meteo === "Pioggia" || Partita.meteo === "Pioggia Battente");
+            case "MeteoGrandine":
+                return Partita && Partita.meteo === "Grandine";
+            case "BersaglioSottoterra":
+                return target.statiVolatili && target.statiVolatili.statoSeminvulnerabile === "Sottoterra";
+            case "BersaglioSottacqua":
+                return target.statiVolatili && target.statiVolatili.statoSeminvulnerabile === "Sottacqua";
+            case "BaccaConsumata":
+                return utente.statiVolatili && utente.statiVolatili.baccaConsumata === true;
+            case "AlleatoKOTurnoPrecedente":
+                return utente.statiVolatili && utente.statiVolatili.alleatoKOTurnoPrecedente === true;
+            case "BersaglioMinimizzato":
+                return target.statiVolatili && target.statiVolatili["Minimizzato"] === true;
+            case "PrimoTurno":
+                return utente.statiVolatili && utente.statiVolatili.primoTurnoInCampo === true; 
+            case "BersaglioSottoMetaPS":
+                return target.hp <= (target.hpMax / 2);
+            case "BersaglioConStato":
+                return target.stato !== null;
+            case "UtenteDanneggiato":
+                return utente.hp < utente.hpMax;
+            case "UtenteMuoveDopo":
+                return target.haGiaAgito === true;
+            case "AlTermine":
+                return false; 
+            default:
+                console.warn(`[Sistema Effetti] Condizione non riconosciuta: ${Condizione}`);
+                return true;
+        }
     }
 
-    static ModificaStatistica({ Gradi, Bersaglio, Statistica, Probabilita = 100, Condizione = null, Turno = null, Utente, Logs }) {
+    static ModificaStatistica({ Gradi, Bersaglio, Statistica, Probabilità, Probabilita = 100, Condizione = null, Turno = null, Utente, Partita, Logs }) {
         // Applica o rimuove gradi alle statistiche del bersaglio fino a un massimo di +/-6.
-        if (Math.random() * 100 > Probabilita) return false;
+        let prob = Probabilità !== undefined ? Probabilità : Probabilita;
+        if (Math.random() * 100 > prob) return false;
         
         let target = (typeof Bersaglio === "string" && Bersaglio === "Utente") ? Utente : Bersaglio; 
         if (!target) return false;
-        if (Condizione && !this.verificaCondizione(Condizione, target, Utente)) return false;
+        if (Condizione && !this.verificaCondizione(Condizione, target, Utente, Partita)) return false;
 
         target.modificatori = target.modificatori || {};
         let statKey = Statistica.toLowerCase();
@@ -47,14 +91,15 @@ class Effetti {
         return true;
     }
 
-    static ApplicaStato({ Stato, Bersaglio, Probabilita = 100, Condizione = null, Durata = null, Utente, Logs }) {
+    static ApplicaStato({ Stato, Bersaglio, Probabilità, Probabilita = 100, Condizione = null, Durata = null, Utente, Partita, Logs }) {
         // Applica uno stato alterato primario al bersaglio (es. Scottatura, Paralisi, Sonno).
-        if (Math.random() * 100 > Probabilita) return false;
+        let prob = Probabilità !== undefined ? Probabilità : Probabilita;
+        if (Math.random() * 100 > prob) return false;
         
         let target = (typeof Bersaglio === "string" && Bersaglio === "Utente") ? Utente : Bersaglio;
         if (!target || (target.stato !== null && target.stato !== undefined)) return false; 
 
-        if (Condizione && !this.verificaCondizione(Condizione, target, Utente)) return false;
+        if (Condizione && !this.verificaCondizione(Condizione, target, Utente, Partita)) return false;
 
         if (Stato === "Scottatura" && target.tipi.includes("Fuoco")) return false;
         if (Stato === "Paralisi" && target.tipi.includes("Elettro")) return false;
@@ -197,26 +242,30 @@ class Effetti {
         return true;
     }
 
-    static RimuoviEffettiCampo({ Effetti, Lato = "Utente", Utente, Bersaglio }) {
+    static RimuoviEffettiCampo({ Effetti, Lato = "Utente", Utente, Proprietario, Avversario, Logs }) {
         // Libera l'utente o il lato alleato da effetti persistenti come trappole o prese.
-        let latoTarget = typeof getLatoCampo !== "undefined" ? getLatoCampo(Lato) : { trappoleAttive: false, effetti: {} }; 
+        let latoTarget = (Lato === "Utente" || Lato === "LatoUtente") ? Proprietario : Avversario;
         let utente = Utente;
-        if (!utente) return false;
+        if (!utente || !latoTarget) return false;
         utente.statiVolatili = utente.statiVolatili || {};
 
         let successo = false;
 
         if (Effetti.includes("Trappole") && latoTarget.trappoleAttive) {
-            latoTarget.trappole = { levitoroccia: false, punte: 0, fielepunte: 0, ragnatela: false };
+            latoTarget.trappole = {};
+            latoTarget.trappoleAttive = false;
             successo = true;
+            if (Logs) Logs.push(`Le trappole sono state spazzate via!`);
         }
         if (Effetti.includes("Parassiseme") && utente.statiVolatili["Parassiseme"]) {
             utente.statiVolatili["Parassiseme"] = false;
             successo = true;
+            if (Logs) Logs.push(`I semi sono stati rimossi!`);
         }
         if (Effetti.includes("Legatutto") && utente.statiVolatili.dannoIntrappolamento) {
             utente.statiVolatili.dannoIntrappolamento = null;
             successo = true;
+            if (Logs) Logs.push(`${utente.nome} si è liberato!`);
         }
         
         return successo;
@@ -240,18 +289,13 @@ class Effetti {
         return true;
     }
 
-    static CambiaMeteo({ Turni = 5, Meteo, Utente }) {
+    static CambiaMeteo({ Turni = 5, Meteo, Partita, Logs }) {
         // Sostituisce il meteo del campo di lotta per un determinato numero di turni.
-        if (typeof getMeteoAttivo === "undefined" || typeof impostaMeteo === "undefined") return true; // Graceful fallback
-        let meteoAttuale = getMeteoAttivo();
-        let meteoEstremi = ["Luce Solare Intensa", "Pioggia Battente", "Correnti Misteriose"];
-        
-        if (meteoAttuale === Meteo || meteoEstremi.includes(meteoAttuale)) {
-            return false;
-        }
-
-        let durata = Turni;
-        impostaMeteo(Meteo, durata);
+        if (!Partita) return false;
+        if (Partita.meteo === Meteo) return false;
+        Partita.meteo = Meteo;
+        Partita.turniMeteo = Turni;
+        if (Logs) Logs.push(`Il meteo cambia: è ora ${Meteo}!`);
         return true;
     }
 
@@ -311,20 +355,20 @@ class Effetti {
         return true;
     }
 
-    static ModificaDanno({ Condizione, Moltiplicatore, Bersaglio, Utente }) {
+    static ModificaDanno({ Condizione, Moltiplicatore, Bersaglio, Utente, Partita }) {
         // Ritorna un moltiplicatore di danno se le condizioni richieste sono soddisfatte.
         let target = Bersaglio;
         let utente = Utente;
         
-        if (this.verificaCondizione(Condizione, target, utente)) {
+        if (this.verificaCondizione(Condizione, target, utente, Partita)) {
             return Moltiplicatore;
         }
         return 1;
     }
 
-    static PiazzaTrappola({ Tipo, Lato = "Nemico" }) {
+    static PiazzaTrappola({ Tipo, Lato = "Nemico", Proprietario, Avversario, Logs }) {
         // Piazza trappole sul lato nemico che penalizzeranno i Pokémon entranti.
-        let latoTarget = typeof getLatoCampo !== "undefined" ? getLatoCampo(Lato) : null;
+        let latoTarget = (Lato === "Nemico" || Lato === "LatoNemico") ? Avversario : Proprietario;
         if (!latoTarget) return false;
         
         if (!latoTarget.trappole) latoTarget.trappole = {};
@@ -335,14 +379,17 @@ class Effetti {
             case "Puntacciaio":
                 if (latoTarget.trappole[Tipo]) return false;
                 latoTarget.trappole[Tipo] = true;
+                if (Logs) Logs.push(`Delle pietre appuntite fluttuano sul lato avversario!`);
                 break;
             case "Punte":
                 if (latoTarget.trappole[Tipo] >= 3) return false;
                 latoTarget.trappole[Tipo] = (latoTarget.trappole[Tipo] || 0) + 1;
+                if (Logs) Logs.push(`Piazzate delle Punte sul lato avversario!`);
                 break;
             case "Fielepunte":
                 if (latoTarget.trappole[Tipo] >= 2) return false;
                 latoTarget.trappole[Tipo] = (latoTarget.trappole[Tipo] || 0) + 1;
+                if (Logs) Logs.push(`Piazzate delle Fielepunte sul lato avversario!`);
                 break;
             default:
                 return false;
@@ -352,13 +399,13 @@ class Effetti {
         return true;
     }
 
-    static ModificaPS({ Tipo, Bersaglio = "Bersaglio", Condizione = null, Utente }) {
+    static ModificaPS({ Tipo, Bersaglio = "Bersaglio", Condizione = null, Utente, Partita }) {
         // Permette di dimezzare o far combaciare i PS del bersaglio a quelli dell'utente.
         let target = (typeof Bersaglio === "string" && Bersaglio === "Utente") ? Utente : Bersaglio;
         let utente = Utente;
         if (!target || !utente) return false;
 
-        if (Condizione && !this.verificaCondizione(Condizione, target, utente)) return false;
+        if (Condizione && !this.verificaCondizione(Condizione, target, utente, Partita)) return false;
 
         if (Tipo === "UguagliaPSUtente") {
             if (target.hp <= utente.hp) return false;
@@ -372,10 +419,10 @@ class Effetti {
         return false;
     }
 
-    static ModificaPrecisione({ Valore, Condizione = null, Bersaglio, Utente }) {
+    static ModificaPrecisione({ Valore, Condizione = null, Bersaglio, Utente, Partita }) {
         // Modifica temporaneamente il controllo di precisione se una specifica condizione è vera.
         let target = Bersaglio;
-        if (Condizione && this.verificaCondizione(Condizione, target, Utente)) {
+        if (Condizione && this.verificaCondizione(Condizione, target, Utente, Partita)) {
             return Valore; 
         }
         return null; 
@@ -409,31 +456,38 @@ class Effetti {
         return true;
     }
 
-    static ApplicaEffettoCampo({ Effetto, Lato = "Utente", Turni = 5, Utente }) {
+    static ApplicaEffettoCampo({ Effetto, Lato = "Utente", Turni = 5, Utente, Proprietario, Avversario, Logs }) {
         // Applica uno schermo o campo (es. Ventoincoda, Riflesso) su uno o entrambi i lati.
-        if (typeof getCampo === "undefined" || typeof getLatoCampo === "undefined") return true;
-        let campo = getCampo(); 
-        let latoTarget = getLatoCampo(Lato);
-
-        let durata = Turni;
+        if (!Proprietario || !Avversario) return false;
 
         if (Lato === "EntrambiLati" || Lato === "Tutti") {
-            if (campo.effetti[Effetto]) return false;
-            campo.effetti[Effetto] = durata;
+            Proprietario.effetti = Proprietario.effetti || {};
+            Avversario.effetti = Avversario.effetti || {};
+            Proprietario.effetti[Effetto] = Turni;
+            Avversario.effetti[Effetto] = Turni;
+            if (Logs) Logs.push(`L'effetto ${Effetto} avvolge il campo di lotta!`);
+            return true;
         } else {
-            if (latoTarget.effetti[Effetto]) return false;
-            latoTarget.effetti[Effetto] = durata;
-        }
+            let targetTeam = (Lato === "Utente" || Lato === "LatoUtente") ? Proprietario : Avversario;
+            targetTeam.effetti = targetTeam.effetti || {};
+            if (targetTeam.effetti[Effetto]) return false;
+            targetTeam.effetti[Effetto] = Turni;
 
-        return true;
+            let dicitura = (Effetto === "Riflesso") ? "Riflesso ridurrà i danni fisici!" : 
+                           (Effetto === "SchermoLuce") ? "Schermoluce ridurrà i danni speciali!" : 
+                           (Effetto === "Ventoincoda") ? "Ventoincoda aumenta la Velocità!" : `È attivo l'effetto ${Effetto}!`;
+
+            if (Logs) Logs.push(`Sul lato di ${Utente.nome}: ${dicitura}`);
+            return true;
+        }
     }
 
-    static VerificaCondizione({ Condizione, Altrimenti = "Fallisci", Bersaglio, Utente }) {
+    static VerificaCondizione({ Condizione, Altrimenti = "Fallisci", Bersaglio, Utente, Partita }) {
         // Controlla se la condizione indicata si applica, determinando il successo o fallimento.
         let utente = Utente;
         let target = Bersaglio;
         
-        let soddisfatta = this.verificaCondizione(Condizione, target, utente);
+        let soddisfatta = this.verificaCondizione(Condizione, target, utente, Partita);
         
         if (!soddisfatta && Altrimenti === "Fallisci") {
             return false;
@@ -479,14 +533,15 @@ class Effetti {
         return potenzaBase; 
     }
 
-    static ResettaStatistiche({ Bersaglio = "Tutti", BersaglioObj, Utente }) {
+    static ResettaStatistiche({ Bersaglio = "Tutti", Utente, Proprietario, Avversario, Logs }) {
         // Azzera i cambiamenti positivi e negativi delle statistiche sui Pokémon scelti.
         let targets = [];
         
         if (Bersaglio === "Tutti") {
-            targets = typeof getTuttiIPokemonInCampo !== "undefined" ? getTuttiIPokemonInCampo() : [BersaglioObj, Utente].filter(Boolean);
+            if (Proprietario && Proprietario.squadra[Proprietario.attivoIdx]) targets.push(Proprietario.squadra[Proprietario.attivoIdx]);
+            if (Avversario && Avversario.squadra[Avversario.attivoIdx]) targets.push(Avversario.squadra[Avversario.attivoIdx]);
         } else {
-            let t = (typeof Bersaglio === "string" && Bersaglio === "Utente") ? Utente : BersaglioObj;
+            let t = (typeof Bersaglio === "object") ? Bersaglio : Utente;
             if (t) targets.push(t);
         }
 
@@ -499,6 +554,7 @@ class Effetti {
             }
         });
 
+        if (Logs) Logs.push(`Le modifiche alle statistiche sono state annullate!`);
         return true;
     }
 
@@ -527,26 +583,26 @@ class Effetti {
         return Math.min(potenza || 1, Max);
     }
 
-    static AumentaPotenzaMossaAlleato({ Moltiplicatore = 1.5, Utente }) {
+    static AumentaPotenzaMossaAlleato({ Moltiplicatore = 1.5, Utente, Proprietario }) {
         // Potenzia il danno della mossa che l'alleato effettuerà nel turno corrente.
-        let alleato = typeof getPokemon !== "undefined" ? getPokemon("AlleatoVicino") : null; // Fallback required context
-        if (!alleato) return false;
+        let alleato = Proprietario && Proprietario.squadra ? Proprietario.squadra[1] : null; 
+        if (!alleato) return true; // Nelle lotte in singolo non farà nulla
         alleato.statiVolatili = alleato.statiVolatili || {};
         
         alleato.statiVolatili.altruismo = Moltiplicatore;
         return true;
     }
 
-    static CopiaUltimaMossa() {
+    static CopiaUltimaMossa({ Utente, Partita, Logs }) {
         // Ritorna l'ultima mossa utilizzata in campo, ignorando alcune esclusioni.
-        if (typeof getCampo === "undefined") return false;
-        let campo = getCampo();
-        let mossa = campo.ultimaMossaUsata;
+        if (!Partita || !Partita.ultimaMossaUsata) return false;
+        let mossa = Partita.ultimaMossaUsata;
         
         const mosseNonCopiabili = ["Copione", "Assistente", "Sonnolalia", "Metronomo", "Naturaforza", "Protezione", "Individua", "Resistenza"];
-        if (!mossa || mosseNonCopiabili.includes(mossa)) return false;
+        if (!mossa || mosseNonCopiabili.includes(mossa.Nome)) return false;
         
-        return mossa;
+        if (Logs) Logs.push(`${Utente.nome} sfrutta ${mossa.Nome} di riflesso!`);
+        return true;
     }
 
     static CediTurno({ Bersaglio, Utente }) {
@@ -559,9 +615,9 @@ class Effetti {
         return true;
     }
 
-    static RimuoviStato({ Bersaglio = "Alleato", BersaglioObj, Utente }) {
+    static RimuoviStato({ Bersaglio = "Alleato", BersaglioObj, Utente, Proprietario, Logs }) {
         // Cura il bersaglio scelto rimuovendone il problema di stato primario.
-        let targets = Bersaglio === "TuttiAlleati" && typeof getTuttiAlleati !== "undefined" ? getTuttiAlleati() : [(Bersaglio === "Utente" ? Utente : BersaglioObj)];
+        let targets = Bersaglio === "TuttiAlleati" && Proprietario ? Proprietario.squadra : [(Bersaglio === "Utente" ? Utente : BersaglioObj)];
         let successo = false;
         
         targets.forEach(t => {
@@ -572,6 +628,7 @@ class Effetti {
                     t.contatoriStato.tossina = 0;
                 }
                 successo = true;
+                if (Logs) Logs.push(`${t.nome} è stato curato dal suo problema di stato!`);
             }
         });
         
@@ -602,9 +659,10 @@ class Effetti {
         return true;
     }
 
-    static NessunEffetto() {
+    static NessunEffetto({ Logs }) {
         // Non esegue assolutamente alcuna azione logica.
-        return false;
+        if (Logs) Logs.push("Ma non succede nulla...");
+        return true;
     }
 
     static PotenzaBasataSuStatistiche({ Utente }) {
@@ -669,14 +727,14 @@ class Effetti {
         return true;
     }
 
-    static AumentaPotenzaInCoro() {
+    static AumentaPotenzaInCoro({ Partita }) {
         // Aumenta e raddoppia la potenza d'attacco se questa mossa è stata appena usata nel turno.
-        if (typeof getCampo === "undefined") return 60;
-        let campo = getCampo();
-        if (campo.statiTurno.coroUsato) {
+        if (!Partita) return 60;
+        Partita.statiTurno = Partita.statiTurno || {};
+        if (Partita.statiTurno.coroUsato) {
             return 120;
         }
-        campo.statiTurno.coroUsato = true;
+        Partita.statiTurno.coroUsato = true;
         return 60;
     }
 
@@ -716,9 +774,10 @@ class Effetti {
         return true;
     }
 
-    static ApplicaStatoCasuale({ Probabilita = 100, Stati = [], Bersaglio = "Bersaglio", Utente, Logs }) {
+    static ApplicaStatoCasuale({ Probabilità, Probabilita = 100, Stati = [], Bersaglio = "Bersaglio", Utente, Logs }) {
         // Seleziona uno stato dalla lista in input per applicarlo sul Pokémon nemico.
-        if (Math.random() * 100 > Probabilita || Stati.length === 0) return false;
+        let prob = Probabilità !== undefined ? Probabilità : Probabilita;
+        if (Math.random() * 100 > prob || Stati.length === 0) return false;
 
         let statoScelto = Stati[Math.floor(Math.random() * Stati.length)];
         return this.ApplicaStato({ Stato: statoScelto, Bersaglio: Bersaglio, Probabilita: 100, Utente: Utente, Logs: Logs });
@@ -871,8 +930,8 @@ class Effetti {
     }
 
     static CalcolaDannoSuDifesaFisica() {
-        // Imposta un flag che ordina al motore di calcolare i danni speciali usando la Difesa base nemica.
-        return "UsaDifesaFisicaTarget";
+        // Questo flag è ora nativamente letto in gestione_partita.js durante il pre-calcolo
+        return true; 
     }
 
     static DannoFuturo({ Turni = 2, Bersaglio, Utente }) {
@@ -893,46 +952,18 @@ class Effetti {
         return true;
     }
 
-    static ProteggiDaArea({ Bersaglio = "TuttiAlleati" }) {
+    static ProteggiDaArea({ Bersaglio = "TuttiAlleati", Proprietario, Logs }) {
         // Salva il lato in campo alleato da tutti gli attacchi che bersaglierebbero tutta l'area.
-        if (typeof getLatoCampo === "undefined") return true;
-        let lato = getLatoCampo("Utente");
-        
-        lato.effetti["Vastaguardia"] = true;
+        if (!Proprietario) return false;
+        Proprietario.effetti = Proprietario.effetti || {};
+        Proprietario.effetti["Vastaguardia"] = 1;
+        if (Logs) Logs.push(`La squadra è protetta dagli attacchi ad area!`);
         return true;
     }
 
-    static PotenzaBasataSuPeso({ Formula, Bersaglio, Utente }) {
-        // Misura il danno applicando scaglioni proporzionali al peso dei combattenti in scena.
-        let target = Bersaglio;
-        let utente = Utente;
-        if (!target || !utente) return 1;
-
-        let pesoTarget = target.peso || 10;
-        let pesoUtente = utente.peso || 10;
-
-        if (Formula === "Laccioerboso" || Formula === "Colpokarate") {
-            if (pesoTarget < 10) return 20;
-            if (pesoTarget < 25) return 40;
-            if (pesoTarget < 50) return 60;
-            if (pesoTarget < 100) return 80;
-            if (pesoTarget < 200) return 100;
-            return 120;
-        } else if (Formula === "Pesobomba" || Formula === "Marchiafuoco") {
-            let rapporto = pesoTarget / pesoUtente;
-            if (rapporto <= 0.2) return 120;
-            if (rapporto <= 0.25) return 100;
-            if (rapporto <= 0.33) return 80;
-            if (rapporto <= 0.5) return 60;
-            return 40;
-        }
-        
-        return 1;
-    }
-
     static ColpoSicuro() {
-        // Contrassegna questa azione come infallibile scavalcando Precisione ed Elusione.
-        return "Infallibile";
+        // Contrassegno letto nativamente da gestione_partita.js
+        return true; 
     }
     
     static DannoFisso({ Danno = null, Formula = null, Utente }) {
@@ -1005,8 +1036,8 @@ class Effetti {
     }
 
     static Lascia1PS() {
-        // Flag che ostacola i KO costringendo l'esito dei danni del bersaglio ad almeno 1 PS.
-        return "NonMandareKO";
+        // Contrassegno gestito post-danno in gestione_partita.js nativamente
+        return true; 
     }
 
     static ImpedisciSonno({ Turni = 3, Utente }) {
@@ -1080,26 +1111,26 @@ class Effetti {
     }
 
     static ColpoCriticoSicuro() {
-        // Genera un contrassegno letto dal danno per scavalcare casualità e causare colpi inflessibilmente critici.
-        return "CriticoSicuro";
+        // Processato e tracciato a mano durante il calcolo danno.
+        return true; 
     }
 
-    static RompiBarriere({ Lato = "Nemico" }) {
+    static RompiBarriere({ Lato = "Nemico", Proprietario, Avversario, Logs }) {
         // Frantuma i muri di schermi ed aurore di velo sollevati sull'inquadratura nemica.
-        if (typeof getLatoCampo === "undefined") return true;
-        let latoTarget = getLatoCampo(Lato);
-        if (!latoTarget) return false;
+        let latoTarget = (Lato === "Nemico" || Lato === "LatoNemico") ? Avversario : Proprietario;
+        if (!latoTarget || !latoTarget.effetti) return false;
 
         let successo = false;
         const barriere = ["Riflesso", "SchermoLuce", "Velaurora"];
 
         barriere.forEach(barriera => {
             if (latoTarget.effetti[barriera]) {
-                latoTarget.effetti[barriera] = false;
+                delete latoTarget.effetti[barriera];
                 successo = true;
             }
         });
 
+        if (successo && Logs) Logs.push(`Le barriere nemiche sono state infrante!`);
         return successo;
     }
 
@@ -1152,9 +1183,10 @@ class Effetti {
         return true;
     }
 
-    static AumentaTutteStatistiche({ Gradi = 1, Probabilita = 10, Utente, Logs }) {
+    static AumentaTutteStatistiche({ Gradi = 1, Probabilità, Probabilita = 10, Utente, Logs }) {
         // Attua l'upgrade sincrono e progressivo ad ognuna delle statistiche centrali combattive.
-        if (Math.random() * 100 > Probabilita) return false;
+        let prob = Probabilità !== undefined ? Probabilità : Probabilita;
+        if (Math.random() * 100 > prob) return false;
 
         let successo = false;
         const statistiche = ["Attacco", "Difesa", "AttaccoSpeciale", "DifesaSpeciale", "Velocita"];

@@ -99,23 +99,27 @@ io.on('connection', (socket) => {
             let p1Data = pkmnDB[p1Name];
             let p2Data = pkmnDB[p2Name];
             
-            let creaSquadra = (pData) => [{
-                nome: pData.nome,
-                hp: pData.statistiche.hp.base_stat,
-                hpMax: pData.statistiche.hp.base_stat,
-                statistiche: {
-                    attacco: pData.statistiche.attack.base_stat,
-                    difesa: pData.statistiche.defense.base_stat,
-                    attaccoSpeciale: pData.statistiche['special-attack'].base_stat,
-                    difesaSpeciale: pData.statistiche['special-defense'].base_stat,
-                    velocita: pData.statistiche.speed.base_stat
-                },
-                modificatori: {},
-                tipi: pData.tipi,
-                livello: 50,
-                stato: null,
-                mosse: pData.mosse.map(m => moveDB[m]).filter(m => m)
-            }];
+            let creaSquadra = (pData) => {
+                let mosseRandom = [...pData.mosse].sort(() => 0.5 - Math.random()).slice(0, 4);
+                let baseHp = Math.floor(pData.statistiche.hp.base_stat * 1.5);
+                return [{
+                    nome: pData.nome,
+                    hp: baseHp,
+                    hpMax: baseHp,
+                    statistiche: {
+                        attacco: pData.statistiche.attack.base_stat,
+                        difesa: pData.statistiche.defense.base_stat,
+                        attaccoSpeciale: pData.statistiche['special-attack'].base_stat,
+                        difesaSpeciale: pData.statistiche['special-defense'].base_stat,
+                        velocita: pData.statistiche.speed.base_stat
+                    },
+                    modificatori: {},
+                    tipi: pData.tipi,
+                    livello: 50,
+                    stato: null,
+                    mosse: mosseRandom.map(m => moveDB[m]).filter(m => m)
+                }];
+            };
 
             let player1 = { id: room.p1, squadra: creaSquadra(p1Data), attivoIdx: 0 };
             let player2 = { id: room.p2, squadra: creaSquadra(p2Data), attivoIdx: 0 };
