@@ -101,8 +101,6 @@ Il sistema viene suddiviso in processi logici che riflettono l'architettura rela
 3.  **Risposta:** Il database valida la relazione e restituisce il profilo, sbloccando l'accesso alla Lobby.
 
 ### Percorso del Giocatore Loggato (Lobby, Gestione e PvE)
-<img width="945" height="650" alt="Screenshot 2026-04-22 221142" src="https://github.com/user-attachments/assets/f83f9bb7-4e6b-46c5-9a27-9072825849ae" />
-<img width="945" height="650" alt="Screenshot 2026-04-22 221142" src="https://github.com/user-attachments/assets/ee33472c-cfb1-482d-a34f-a34e7bc8dff3" />
 1.  **Input (Lobby Base):** Il giocatore accede alla Lobby, dove può visualizzare il profilo, chattare con altri utenti e decidere la modalità di gioco (PvP online o PvE).
 2.  **Processo (Gestione Squadra):** Il giocatore apre il PC Pokémon per esplorare i box e scegliere i Pokémon da mettere in squadra, aggiornando la formazione attiva.
 3.  **Interazione (Esplorazione PvE):** Entrando in modalità PvE, il giocatore accede alle aree d'erba dove può incontrare, catturare o sconfiggere Pokémon selvatici, oppure sfidare dei bot. Durante la lotta gestisce le mosse o il cambio Pokémon.
