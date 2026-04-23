@@ -157,33 +157,27 @@ Il sistema viene suddiviso in processi logici che riflettono l'architettura rela
 
 # 6. Schema Entità-Relazione (E/R)
 
-L'architettura dei dati separa la gestione degli utenti e delle sessioni (POSTGRESQL) dai dati statici e strutturali del gioco (MongoDB).
+L'architettura dei dati separa la gestione degli utenti, dei progressi e delle sessioni (salvati in un database relazionale PostgreSQL tramite Supabase) dai dati statici e strutturali del gioco (gestiti tramite file JSON locali caricati a runtime dal server).
 
-![Schema E/R Neomon](https://github.com/user-attachments/assets/959af4c0-7190-4938-822e-9000e16e9e2a)
+<img width="884" height="581" alt="Screenshot 2026-04-23 174619" src="https://github.com/user-attachments/assets/fe8f5ddb-9f5d-4b12-b6a6-165dad684c14" />
 
 ## 6.1 Entità
 
-| Entità | Descrizione | DB |
+| Entità | Descrizione | Archiviazione |
 | :--- | :--- | :--- |
-| **UTENTE** | Credenziali d'accesso e dati anagrafici del giocatore. | POSTGRESQL |
-| **PROFILO** | Progressi, statistiche globali e personalizzazioni dell'utente. | POSTGRESQL |
-| **PARTITA** | Sessione specifica di gioco (PvP o PvE). | POSTGRESQL |
-| **POKEMON_ESTRATTO** | Istanza dinamica di un Neomon durante una specifica partita. | POSTGRESQL |
-| **SPECIE_POKEMON** | Dati strutturali del Neomon (statistiche base, nome, ID asset). | MongoDB |
-| **MOSSA** | Descrizione tecnica delle abilità (danno, precisione, tipo). | MongoDB |
-| **TIPO_ELEMENTALE** | Definizione degli elementi (Fuoco, Acqua, ecc.) e relative tabelle efficacia. | MongoDB |
+| **UTENTE** | Credenziali d'accesso, hash della password e data di registrazione. | PostgreSQL |
+| **PROFILO** | Progressi, coordinate mappa, contatori vittorie/partite e avatar dell'utente. | PostgreSQL |
+| **PARTITA** | Log della singola sessione di gioco (PvP o PvE). | PostgreSQL |
+| **POKEMON** | Istanza dinamica ed esclusiva catturata dal giocatore. | PostgreSQL |
 
 ## 6.2 Relazioni
 
 | Relazione | Entità Coinvolte | Cardinalità | Descrizione |
 | :--- | :--- | :--- | :--- |
-| **Possiede** | UTENTE - PROFILO | **1 : 1** | Ogni utente ha un profilo univoco. |
-| **Gioca** | PROFILO - PARTITA | **1 : N** | Un profilo può avviare molteplici partite nel tempo. |
-| **Comprende** | PARTITA - POKEMON_ESTRATTO | **1 : N** | Una partita coinvolge più istanze di Neomon. |
-| **Istanza di** | POKEMON_ESTRATTO - SPECIE_POKEMON | **N : 1** | Più mostri in campo appartengono alla stessa specie del catalogo. |
-| **Può usare** | SPECIE_POKEMON - MOSSA | **N : M** | Una specie può imparare più mosse; una mossa può appartenere a più specie. |
-| **Definisce** | SPECIE_POKEMON - TIPO_ELEMENTALE | **N : 1 o 2** | Ogni specie è caratterizzata da uno o due tipi. |
-| **Definisce** | MOSSA - TIPO_ELEMENTALE | **N : 1** | Ogni mossa appartiene a un solo tipo elementale. |
+| **Possiede** | UTENTE - PROFILO | **1 : 1** | Ogni utente registrato ha un solo profilo. Quando l'utente viene eliminato, il profilo (e i suoi Pokémon) si eliminano a cascata. |
+| **Gioca** | PROFILO - PARTITA | **N : M** | In PvP, due profili partecipano alla stessa partita. Questa tabella contiene l'attributo `Esito` (Vittoria, Sconfitta, Abbandono). |
+| **Cattura / Ha** | PROFILO - POKEMON | **1 : N** | Un profilo è proprietario di molteplici Pokémon tramite la Foreign Key `ID_Profilo_Proprietario`. |
+| **Partecipa** | PARTITA - POKEMON | **N : M** | Registra quali esemplari specifici sono scesi fisicamente in campo durante quella lotta (utile per statistiche ed EXP). |
 
 ---
 # 7. Struttura dell’Interfaccia (Markup)
