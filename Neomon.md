@@ -148,7 +148,7 @@ Il sistema viene suddiviso in processi logici che riflettono l'architettura rela
 | Componente | Versione / Tipo |
 |---|---|
 | Sistema Operativo | Agnostico (Linux, Windows, Android, iOS) |
-| Database | POSTGRESQL e MongoDB |
+| Database | POSTGRESQL |
 | Runtime Backend | Node.js v18+ |
 | Motore Grafico | Phaser.js |
 | Browser | Chrome, Firefox, Safari (supporto WebGL) |
