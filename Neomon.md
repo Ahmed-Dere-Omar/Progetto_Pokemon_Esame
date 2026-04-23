@@ -180,23 +180,47 @@ L'architettura dei dati separa la gestione degli utenti, dei progressi e delle s
 | **Partecipa** | PARTITA - POKEMON | **N : M** | Registra quali esemplari specifici sono scesi fisicamente in campo durante quella lotta (utile per statistiche ed EXP). |
 
 ---
-# 7. Struttura dell’Interfaccia (Markup)
+# 7. Progettazione dell'Interfaccia Grafica (Mockup e UI)
 
-*(Da completare nelle versioni future)*
+L'interfaccia di Neomon è stata progettata per garantire un'esperienza utente immediata e una User Interface che richiami il design dei classici RPG 2D, ottimizzando allo stesso tempo gli spazi per la fruizione moderna da browser web.
 
 ## 7.1 Struttura delle Pagine
 
-| Pagina | Descrizione | Livello di Accesso |
+| Pagina / Scena | Descrizione | Livello di Accesso |
 |--------|------------|-------------------|
-| | | |
+| **Login / Registrazione** | Schermata iniziale contenente il form per l'autenticazione tramite credenziali o accesso rapido. | Utente non loggato |
+| **Lobby Base** | Mappa 2D esplorabile. Permette di muovere l'avatar, vedere gli altri giocatori connessi in tempo reale e accedere all'erba alta o agli NPC. | Utente Loggato |
+| **Selezione / PC Pokémon** | Interfaccia in sovrimpressione che si apre interagendo con specifici elementi. Permette di gestire la squadra o selezionare il Pokémon da schierare. | Utente Loggato |
+| **Arena di Lotta** | Schermata di combattimento PvP o PvE. Visualizza gli sprite dei Pokémon, le barre della vita e il pannello di comando inferiore. | Utente Loggato |
 
 ## 7.2 Componenti Principali
 
-- Navigazione  
-- Form  
-- Tabelle dati  
-- Dashboard  
-- Notifiche  
+- **Navigazione e Interazione:** Movimento gestito tramite frecce direzionali sulla mappa. Le interazioni (sfide, dialoghi) avvengono in base alla prossimità tra gli sprite (es. avvicinandosi all'NPC o premendo INVIO vicino a un utente).
+- **Form di Input:** Moduli testuali utilizzati nella schermata di accesso e input dedicato alla **Chat globale/privata** per comunicare con gli altri giocatori.
+- **HUD e Indicatori:** Indicatori posizionati sopra i Pokémon in battaglia. Mostrano in tempo reale Nome, Livello, HP attuali (con barra dinamica verde/gialla/rossa) e badge per gli status alterati.
+- **Pannello di Comando:** Posizionato in basso durante le lotte, riprende lo stile delle console portatili. È diviso in due aree: a sinistra il log testuale sequenziale degli eventi, a destra una griglia interattiva con i pulsanti delle mosse.
+- **Notifiche:** Messaggi in sovrimpressione che gestiscono il feedback del sistema.
+
+---
+
+## 7.3 Visuale di Gioco (Mockup)
+
+Di seguito sono riportate le bozze visive delle schermate principali del sistema:
+
+**1. Esplorazione Lobby**   
+
+<img width="1184" height="949" alt="Screenshot 2026-04-23 180944" src="https://github.com/user-attachments/assets/9c41b4eb-ab1f-406d-8d4c-c0c9d70968a7" />
+
+
+**2. Selezione Squadra**   
+
+<img width="1178" height="946" alt="Screenshot 2026-04-23 181004" src="https://github.com/user-attachments/assets/81a062c5-9e7b-4a6e-8aef-7f391bb8c431" />
+
+
+**3. Combattimento** 
+
+<img width="1178" height="942" alt="Screenshot 2026-04-23 181020" src="https://github.com/user-attachments/assets/d93887bd-5d9e-4835-882b-3a60367c71d1" />
+
 
 ---
 
