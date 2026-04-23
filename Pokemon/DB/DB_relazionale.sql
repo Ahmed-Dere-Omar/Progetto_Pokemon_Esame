@@ -1,24 +1,54 @@
--- Abilita l'estensione per generare UUID (opzionale ma consigliato per i giochi multiplayer)
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- =========================================
--- TABELLA UTENTI
--- =========================================
-CREATE TABLE utenti (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    google_id VARCHAR(255) UNIQUE,           -- ID univoco fornito da Google al momento del login
-    email VARCHAR(255) UNIQUE NOT NULL,      -- Email dell'utente (utile per il login)
-    password_hash VARCHAR(255) NOT NULL,     -- Password obbligatoria (salvata tramite hash, es. bcrypt)
-    username VARCHAR(50) UNIQUE NOT NULL,    -- Nome visualizzato in gioco
-    sprite_avatar VARCHAR(100) DEFAULT 'default_boy', -- Sprite scelto dal giocatore
-    vittorie INTEGER DEFAULT 0,              -- Statistiche PvP (dal documento Neomon.md)
-    sconfitte INTEGER DEFAULT 0,
-    data_registrazione TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    ultimo_accesso TIMESTAMP WITH TIME ZONE
+-- 1. ENTITÀ UTENTE
+CREATE TABLE utente (
+    id_utente UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    data_registrazione TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Indice per velocizzare il login tramite Google
-CREATE INDEX idx_utenti_google_id ON utenti(google_id);
+-- 2. ENTITÀ PROFILO
+CREATE TABLE profilo (
+    id_profilo UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_utente UUID UNIQUE NOT NULL REFERENCES utente(id_utente) ON DELETE CASCADE,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    avatar_sprite INT DEFAULT 1,
+    partite_totali INT DEFAULT 0,
+    vittorie_totali INT DEFAULT 0,
+    coord_x DECIMAL(8, 2) DEFAULT 0.00,
+    coord_y DECIMAL(8, 2) DEFAULT 0.00
+);
+
+-- 3. ENTITÀ PARTITA
+CREATE TABLE partita (
+    id_partita UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tipo VARCHAR(10) NOT NULL CHECK (tipo IN ('PvP', 'PvE')),
+    data_inizio TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    data_fine TIMESTAMP WITH TIME ZONE
+);
+
+-- 4. ENTITÀ POKEMON
+CREATE TABLE pokemon (
+    id_pokemon UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_specie VARCHAR(50) NOT NULL, -- Questo si collegherà all'ID del tuo file JSON
+    id_profilo_proprietario UUID NOT NULL REFERENCES profilo(id_profilo) ON DELETE CASCADE,
+    in_squadra BOOLEAN DEFAULT FALSE,
+    posizione_slot INT CHECK (posizione_slot BETWEEN 1 AND 6)
+);
+
+-- 5. RELAZIONE: GIOCA (Profilo N - M Partita)
+CREATE TABLE gioca (
+    id_profilo UUID REFERENCES profilo(id_profilo) ON DELETE CASCADE,
+    id_partita UUID REFERENCES partita(id_partita) ON DELETE CASCADE,
+    esito VARCHAR(20) CHECK (esito IN ('Vittoria', 'Sconfitta', 'Abbandono')),
+    PRIMARY KEY (id_profilo, id_partita)
+);
+
+-- 6. RELAZIONE: PARTECIPA (Partita N - M Pokemon)
+CREATE TABLE partecipa (
+    id_partita UUID REFERENCES partita(id_partita) ON DELETE CASCADE,
+    id_pokemon UUID REFERENCES pokemon(id_pokemon) ON DELETE CASCADE,
+    PRIMARY KEY (id_partita, id_pokemon)
+);
 
 /*
 -- =========================================
