@@ -1630,11 +1630,9 @@
       "Acquagetto",
       "Acquadisale",
       "Riduttore",
-      "Sub",
       "Idrondata",
       "Geloraggio",
-      "Salvaguardia",
-      "Grandine"
+      "Salvaguardia"
     ],
     "sprite": {
       "normal": "https://media.pokemoncentral.it/wiki/a/a5/Sprnbm0087.gif",
@@ -2015,7 +2013,6 @@
       "Bottintesta",
       "Nemesi",
       "Lancio",
-      "Battipiedi",
       "Ossoraffica",
       "Focalenergia",
       "Rimonta",
@@ -3045,10 +3042,8 @@
       "Agilità",
       "Forzantica",
       "Ventoincoda",
-      "Liofilizzazione",
       "Trespolo",
       "Geloraggio",
-      "Vista Innevata",
       "Tifone",
       "Nube",
       "Bora",
