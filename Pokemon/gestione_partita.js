@@ -91,8 +91,10 @@ class gestionePartita {
             { ...a2, proprietario: this.p2, bersaglio: this.p1, pk: pkP2 }
         ];
 
-        // Rimuoviamo eventuali azioni con mosse non valide prima di ordinarle
+        // 1. FILTRO SUPER SICURO: Controlliamo che il Pokemon e le sue statistiche esistano davvero!
         const mosseValide = mosse.filter(azione => {
+            if (!azione.pk || !azione.pk.statistiche) return false; // Evita il crash se mancano i dati
+            
             if (!azione.mossa) {
                 this.logs.push(`${azione.pk.nome} tentenna confuso... (Mossa non trovata nel DB!)`);
                 return false;
@@ -100,20 +102,26 @@ class gestionePartita {
             return true;
         });
 
+        // 2. ORDINAMENTO CON SALVAGENTE
         return mosseValide.sort((a, b) => {
             let prioA = a.mossa.Priorità || 0;
             let prioB = b.mossa.Priorità || 0;
+            
             if (prioA !== prioB) {
                 return prioB - prioA;
             }
-            const velA = a.pk.statistiche.velocita * (a.pk.modificatori.velocita || 1);
-            const velB = b.pk.statistiche.velocita * (b.pk.modificatori.velocita || 1);
+            
+            // Usiamo (|| 50) così se manca la velocità il gioco usa 50 di base e non va in crash!
+            const velA = (a.pk.statistiche.velocita || 50) * (a.pk.modificatori.velocita || 1);
+            const velB = (b.pk.statistiche.velocita || 50) * (b.pk.modificatori.velocita || 1);
+            
             return velB - velA;
         });
     }
 
     eseguiAzione(azione) {
         const { pk, bersaglio, mossa } = azione;
+        
         let targetPk = bersaglio.squadra[bersaglio.attivoIdx];
 
         if (pk.hp <= 0 || targetPk.hp <= 0) return;
@@ -130,7 +138,6 @@ class gestionePartita {
                 this.logs.push(`${pk.nome} si è svegliato!`);
             }
         }
-
         // 2. Controllo Congelamento
         if (GestoreFlagsModulo.gestione_scongelautente(mossa) && pk.stato === 'Congelamento') {
             pk.stato = null;
@@ -186,6 +193,11 @@ class gestionePartita {
                 }
             }
         }
+        let mossaPK = pk.mosse.find(m => m.Nome === mossa.Nome);
+        if (mossaPK && mossaPK.ppAttuali > 0) {
+            mossaPK.ppAttuali--; // Sottrae il PP solo se il pokemon non è bloccato
+        }
+        // ==========================================
 
         this.logs.push(`${pk.nome} usa ${mossa.Nome}!`);
 
@@ -230,34 +242,42 @@ class gestionePartita {
 
         let dannoInflittoReale = 0;
         
-        // --- GESTIONE MOSSE CON CARICA (es. Solarraggio, Fossa) ---
-        let effettoCarica = mossa.CodiceFunzione ? mossa.CodiceFunzione.find(eff => eff.NomeFunzione === "CaricaAttacco") : null;
-        if (effettoCarica) {
-            pk.statiVolatili = pk.statiVolatili || {};
-            if (!pk.statiVolatili.inCarica) {
-                pk.statiVolatili.inCarica = true;
-                let messaggio = effettoCarica.Parametri.Messaggio || `${pk.nome} si sta preparando per l'attacco!`;
-                this.logs.push(messaggio);
-                if (effettoCarica.Parametri.StatoSeminvulnerabile) {
-                    pk.statiVolatili.statoSeminvulnerabile = effettoCarica.Parametri.StatoSeminvulnerabile;
-                }
+       // --- GESTIONE MOSSE CON CARICA (es. Solarraggio, Fossa) ---
+       let effettoCarica = mossa.CodiceFunzione ? mossa.CodiceFunzione.find(eff => eff.NomeFunzione === "CaricaAttacco") : null;
+       if (effettoCarica) {
+           pk.statiVolatili = pk.statiVolatili || {};
+           if (!pk.statiVolatili.inCarica) {
+               pk.statiVolatili.inCarica = true;
+               let messaggio = effettoCarica.Parametri.Messaggio || `${pk.nome} si sta preparando per l'attacco!`;
+               this.logs.push(messaggio);
+               if (effettoCarica.Parametri.StatoSeminvulnerabile) {
+                   pk.statiVolatili.statoSeminvulnerabile = effettoCarica.Parametri.StatoSeminvulnerabile;
+               }
 
-                // Esegue SOLO gli effetti previsti per il turno 1 (es. aumento Difesa di Capocciata)
-                mossa.CodiceFunzione.forEach(eff => {
-                    if (eff.Parametri && eff.Parametri.Turno === 1 && EffettiModulo[eff.NomeFunzione]) {
-                        let reqTarget = (eff.Parametri.Bersaglio === "Utente") ? pk : targetPk;
-                        EffettiModuloeff.NomeFunzione;
-                    }
-                });
+               // Esegue SOLO gli effetti previsti per il turno 1 (es. aumento Difesa di Capocciata)
+               mossa.CodiceFunzione.forEach(eff => {
+                   if (eff.Parametri && eff.Parametri.Turno === 1 && EffettiModulo[eff.NomeFunzione]) {
+                       let reqTarget = (eff.Parametri.Bersaglio === "Utente") ? pk : targetPk;
+                       
+                       // FIX: Questa è la chiamata corretta al modulo degli effetti!
+                       EffettiModulo[eff.NomeFunzione]({
+                           ...eff.Parametri,
+                           Utente: pk,
+                           Bersaglio: reqTarget,
+                           Partita: this,
+                           Logs: this.logs
+                       });
+                   }
+               });
 
-                pk.haGiaAgito = true;
-                return; // INTERROMPE IL TURNO QUI
-            } else {
-                // E' il secondo turno: rimuove la carica e sferra finalmente l'attacco!
-                pk.statiVolatili.inCarica = false;
-                pk.statiVolatili.statoSeminvulnerabile = null;
-            }
-        }
+               pk.haGiaAgito = true;
+               return; // INTERROMPE IL TURNO QUI
+           } else {
+               // E' il secondo turno: rimuove la carica e sferra finalmente l'attacco!
+               pk.statiVolatili.inCarica = false;
+               pk.statiVolatili.statoSeminvulnerabile = null;
+           }
+       }
         // ----------------------------------------------------------
 
         if (mossa.Categoria !== 'Stato') {
@@ -338,7 +358,7 @@ class gestionePartita {
                 let parametriEffetto = {
                     ...eff.Parametri,
                     Utente: pk,
-                    Bersaglio: bersaglioEffetto,
+                    Bersaglio: bersaglioEffetto, // Questo è l'oggetto reale del Pokemon
                     DannoInflitto: dannoInflittoReale,
                     Proprietario: azione.proprietario,
                     Avversario: azione.bersaglio,
@@ -346,8 +366,11 @@ class gestionePartita {
                     Logs: this.logs
                 };
 
-                if (eff.Parametri && typeof eff.Parametri.Bersaglio === "string" && 
-                   (eff.Parametri.Bersaglio === "Tutti" || eff.Parametri.Bersaglio === "TuttiAlleati" || eff.Parametri.Bersaglio === "TuttiCombattenti")) {
+                // FIX: Evitiamo di sovrascrivere l'oggetto Bersaglio con una stringa,
+                // a meno che non sia una delle pochissime funzioni che legge esplicitamente il testo!
+                let effettiConStringa = ["ResettaStatistiche", "RimuoviStato", "ProteggiDaArea", "BloccaPriorità"];
+                
+                if (effettiConStringa.includes(eff.NomeFunzione) && eff.Parametri && typeof eff.Parametri.Bersaglio === "string") {
                     parametriEffetto.Bersaglio = eff.Parametri.Bersaglio;
                 }
 
@@ -580,12 +603,25 @@ class gestionePartita {
     }
 
     ottieniStatoAggiornato() {
+        let p1Pk = this.p1.squadra[this.p1.attivoIdx];
+        let p2Pk = this.p2.squadra[this.p2.attivoIdx];
+    
         return {
-            p1: { hp: this.p1.squadra[this.p1.attivoIdx].hp, attivo: this.p1.attivoIdx },
-            p2: { hp: this.p2.squadra[this.p2.attivoIdx].hp, attivo: this.p2.attivoIdx },
+            p1: { 
+                hp: p1Pk.hp, 
+                nome: p1Pk.nome,
+                mosse: p1Pk.mosse, // Invia gli oggetti completi con ppAttuali
+                trasformato: !!(p1Pk.statiVolatili && p1Pk.statiVolatili.trasformato)
+            },
+            p2: { 
+                hp: p2Pk.hp, 
+                nome: p2Pk.nome,
+                mosse: p2Pk.mosse,
+                trasformato: !!(p2Pk.statiVolatili && p2Pk.statiVolatili.trasformato)
+            },
             logs: this.logs,
             finito: this.finito,
-            turno: this.turno
+            turno: this.turno // Inviato per gestire il camuffamento del turno 1
         };
     }
 }

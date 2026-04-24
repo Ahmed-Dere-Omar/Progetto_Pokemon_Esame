@@ -117,7 +117,15 @@ io.on('connection', (socket) => {
                     tipi: pData.tipi,
                     livello: 50,
                     stato: null,
-                    mosse: mosseRandom.map(m => moveDB[m]).filter(m => m)
+                    mosse: mosseRandom.map(mName => {
+                        let mData = moveDB[mName];
+                        if (!mData) return null;
+                        return {
+                            ...mData,
+                            ppAttuali: mData.PP, // Inizializza i PP dal DB
+                            ppMassimi: mData.PP
+                        };
+                    }).filter(m => m)
                 }];
             };
 

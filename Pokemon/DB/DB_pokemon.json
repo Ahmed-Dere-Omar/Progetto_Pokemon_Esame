@@ -657,7 +657,6 @@
       "Incantavoce",
       "Lucelunare",
       "Meteorpugno",
-      "Metronomo",
       "Minimizzato",
       "Ricciolscudo",
       "Ripeti",
@@ -1768,7 +1767,6 @@
       "Leccata",
       "Malosguardo",
       "Stordiraggio",
-      "Pugnodombra",
       "Ultimocanto",
       "Rivincita",
       "Dispetto",
@@ -1777,9 +1775,7 @@
       "Ombra Notturna",
       "Sbigoattacco",
       "Neropulsar",
-      "Palla Ombra",
-      "Destinobbligato",
-      "Mangiasogni"
+      "Palla Ombra"
     ],
     "sprite": {
       "normal": "https://media.pokemoncentral.it/wiki/6/66/Sprnbm0094.gif",
@@ -2168,8 +2164,7 @@
       "Fangobomba",
       "Tossina",
       "Esplosione",
-      "Memento",
-      "Destinobbligato"
+      "Memento"
     ],
     "sprite": {
       "normal": "https://media.pokemoncentral.it/wiki/4/43/Sprnbm0110.gif",
@@ -2984,7 +2979,6 @@
       "Introenergia",
       "Lancio",
       "Leccata",
-      "Metronomo",
       "Ricciolscudo",
       "Stridio",
       "Ultimascelta",
@@ -3139,7 +3133,6 @@
       "Eterelama",
       "Trespolo",
       "Ondacalda",
-      "Giornodisole",
       "Tifone",
       "Resistenza",
       "Vampata",
@@ -3284,7 +3277,6 @@
       "Forzantica",
       "Goccia Vitale",
       "Congiura",
-      "Metronomo",
       "Esclusiva",
       "Trasformazione",
       "Sferapulsar",

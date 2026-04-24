@@ -352,11 +352,22 @@ class BattleScene extends Phaser.Scene {
         this.load.image(this.bgKey, `DB/Immagini/Sfondi/${this.bgKey}.png`);
     }
 
-    create() {
-        this.moveDB = this.registry.get('moveDB');
-        this.pEntity = new PokemonEntity(this.pName, this.pkmnDB[this.pName]);
-        this.eEntity = new PokemonEntity(this.eName, this.pkmnDB[this.eName]);
-
+        create() {
+            this.currentTurn = 1;
+            this.moveDB = this.registry.get('moveDB');
+            this.pEntity = new PokemonEntity(this.pName, this.pkmnDB[this.pName]);
+            this.eEntity = new PokemonEntity(this.eName, this.pkmnDB[this.eName]);
+    
+            // FIX: Trasformiamo subito le mosse da stringhe a oggetti completi con i PP!
+            let initMoves = (entity) => {
+                entity.moves = entity.moves.map(mName => {
+                    let mData = this.moveDB[mName] || Object.values(this.moveDB).find(m => m.Nome.toLowerCase() === mName.toLowerCase());
+                    return mData ? { ...mData, ppAttuali: mData.PP, ppMassimi: mData.PP } : null;
+                }).filter(m => m);
+            };
+            initMoves(this.pEntity);
+            initMoves(this.eEntity);
+    
         this.add.image(0, 0, this.bgKey).setOrigin(0, 0).setDisplaySize(1000, 665);
         this.pSprite = this.add.dom(250, 500).createFromHTML(`<img src="${this.pkmnDB[this.pName].sprite?.normal}" style="transform: scale(2.5); image-rendering: pixelated;">`);
         this.eSprite = this.add.dom(750, 230).createFromHTML(`<img src="${this.pkmnDB[this.eName].sprite?.normal}" style="transform: scale(2.2); image-rendering: pixelated;">`);
@@ -392,6 +403,22 @@ class BattleScene extends Phaser.Scene {
             shadow: { offsetX: 2, offsetY: 2, color: '#000000', blur: 0, fill: true }
         });
 
+        // --- UI INFO MOSSA (A Destra del divisorio) ---
+        this.infoTipoLabel = this.add.text(610, 685, 'TIPO:', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
+        this.infoTipoVal = this.add.text(700, 685, 'NORMALE', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
+
+        this.infoCatLabel = this.add.text(610, 725, 'CAT.:', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
+        this.infoCatVal = this.add.text(700, 725, 'FISICO', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
+
+        this.infoPPLabel = this.add.text(610, 765, 'PP:', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
+        this.infoPPVal = this.add.text(700, 765, '15/15', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
+
+        this.infoPotLabel = this.add.text(840, 765, 'POT:', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
+        this.infoPotVal = this.add.text(910, 765, '90', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
+
+        // Mettiamo tutto in un array per poterli nascondere/mostrare facilmente
+        this.moveInfoUI = [this.infoTipoLabel, this.infoTipoVal, this.infoCatLabel, this.infoCatVal, this.infoPPLabel, this.infoPPVal, this.infoPotLabel, this.infoPotVal];
+        
         this.createButtons();
 
         if (this.isWild) {
@@ -412,7 +439,8 @@ class BattleScene extends Phaser.Scene {
                     tipi: entity.types,
                     livello: 50,
                     stato: null,
-                    mosse: entity.moves.map(m => this.moveDB[m] || Object.values(this.moveDB).find(dbM => dbM.Nome.toLowerCase() === m.toLowerCase())).filter(m => m)
+                    // FIX: Passiamo direttamente le mosse che sono GIA' oggetti completi!
+                    mosse: [...entity.moves]
                 }],
                 attivoIdx: 0
             });
@@ -454,51 +482,76 @@ class BattleScene extends Phaser.Scene {
 
     createButtons() {
         this.btns = [];
-        this.selectedMoveIndex = 0; // Traccia la mossa selezionata
-        this.isInputActive = false; // Attivato solo quando è il turno del giocatore
+        this.selectedMoveIndex = 0;
+        this.isInputActive = false;
 
-        // Setup tastiera
         this.moveKeys = this.input.keyboard.createCursorKeys();
         this.confirmKey = this.input.keyboard.addKey('ENTER');
 
-        this.pEntity.moves.forEach((m, i) => {
-            let bx = 620 + (i % 2) * 200; // Aumentato spazio orizzontale a 200
-            let by = 685 + Math.floor(i / 2) * 45;
+        for (let i = 0; i < 4; i++) {
+            // SPOSTATI A SINISTRA! (Dove normalmente c'è il log)
+            let bx = 40 + (i % 2) * 260; 
+            let by = 690 + Math.floor(i / 2) * 45;
 
             let b = this.add.text(bx, by, '', {
-                fontSize: '20px', // Leggermente più piccolo per far stare nomi lunghi
+                fontSize: '24px', // Ora che hanno spazio a sinistra possiamo farli grandi
                 fill: '#ffffff',
                 fontFamily: '"Courier New", Courier, monospace',
                 fontStyle: 'bold',
                 shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true },
                 padding: { x: 2, y: 5 }
-                // Rimosso fixedWidth per evitare tagli
             })
-                .setInteractive()
-                .on('pointerdown', () => { if (this.isInputActive) this.handleMoveClick(m); })
-                .on('pointerover', () => {
-                    if (this.isInputActive) {
-                        this.selectedMoveIndex = i;
-                        this.updateMoveSelection();
-                    }
-                });
+            .setInteractive()
+            .on('pointerdown', () => { 
+                if (this.isInputActive && this.pEntity.moves[i]) this.handleMoveClick(this.pEntity.moves[i].Nome); 
+            })
+            .on('pointerover', () => {
+                if (this.isInputActive && this.pEntity.moves[i]) {
+                    this.selectedMoveIndex = i;
+                    this.updateMoveSelection();
+                }
+            });
 
+            b.setVisible(false); // Partono invisibili
             this.btns.push(b);
-        });
-        this.updateMoveSelection();
+        }
     }
     updateMoveSelection() {
+        // Aggiorna i cursori e i colori base dei bottoni
         this.btns.forEach((b, i) => {
-            let moveName = this.pEntity.moves[i].toUpperCase();
-            if (i === this.selectedMoveIndex) {
-                b.setText("▶ " + moveName);
-                b.setStyle({ fill: '#ffcc00' });
-            } else {
-                // Usiamo uno spazio vuoto per mantenere l'allineamento
-                b.setText("  " + moveName);
-                b.setStyle({ fill: '#ffffff' });
+            let m = this.pEntity.moves[i];
+            if (m) {
+                let moveName = m.Nome.toUpperCase();
+                if (i === this.selectedMoveIndex) {
+                    b.setText("▶ " + moveName);
+                    b.setStyle({ fill: '#ffcc00' }); // Giallo evidenziato
+                } else {
+                    b.setText("  " + moveName);
+                    b.setStyle({ fill: '#ffffff' }); // Bianco normale
+                }
             }
         });
+
+        // Aggiornamento Pannello Info Destra (Tipo, PP, ecc.)
+        let m = this.pEntity.moves[this.selectedMoveIndex];
+        if (m) {
+            this.infoTipoVal.setText(m.Tipo.toUpperCase()).setColor(this.getColorForType(m.Tipo));
+            this.infoCatVal.setText(m.Categoria.toUpperCase()).setColor(m.Categoria === "Fisico" ? '#ff4444' : (m.Categoria === "Speciale" ? '#4444ff' : '#aaaaaa'));
+            this.infoPPVal.setText(`${m.ppAttuali}/${m.ppMassimi}`).setColor('#ffffff');
+            this.infoPotVal.setText(m.Potenza > 0 ? m.Potenza : '-').setColor('#ffffff');
+        }
+    }
+
+    // Funzione helper per i colori
+    getColorForType(tipo) {
+        const colori = {
+            'Normale': '#A8A878', 'Fuoco': '#F08030', 'Acqua': '#6890F0', 'Elettro': '#F8D030',
+            'Erba': '#78C850', 'Ghiaccio': '#98D8D8', 'Lotta': '#C03028', 'Veleno': '#A040A0',
+            'Terra': '#E0C068', 'Volante': '#A890F0', 'Psico': '#F85888', 'Coleottero': '#A8B820',
+            'Roccia': '#B8A038', 'Spettro': '#705898', 'Drago': '#7038F8', 'Buio': '#705848',
+            'Acciaio': '#B8B8D0', 'Folletto': '#EE99AC'
+        };
+        return colori[tipo] || '#ffffff';
     }
     update() {
         if (!this.isInputActive) return;
@@ -518,23 +571,37 @@ class BattleScene extends Phaser.Scene {
         }
 
         if (Phaser.Input.Keyboard.JustDown(this.confirmKey)) {
-            this.handleMoveClick(this.pEntity.moves[this.selectedMoveIndex]);
+            this.handleMoveClick(this.pEntity.moves[this.selectedMoveIndex].Nome);
         }
     }
     startTurn() {
-        this.logText.setText(`Cosa deve fare ${this.pName.toUpperCase()}?`);
-        this.isInputActive = true; // Abilita frecce e click
+        this.logText.setVisible(false);
+        this.isInputActive = true;
+
+        // 1. PRIMA aggiorniamo i testi e i colori delle mosse
         this.updateMoveSelection();
+
+        // 2. POI mostriamo i bottoni (solo se esiste la mossa corrispondente in quell'indice)
+        this.btns.forEach((b, i) => { 
+            if (this.pEntity.moves[i]) b.setVisible(true); 
+        });
+        
+        // 3. Mostriamo le statistiche laterali
+        this.moveInfoUI.forEach(element => element.setVisible(true));
     }
 
     handleMoveClick(moveName) {
-        this.isInputActive = false; // Disabilita input durante l'attesa/animazione
+        this.isInputActive = false;
+
+        // Nascondi le mosse e le info, e rimostra il log text!
+        this.btns.forEach(b => b.setVisible(false));
+        this.moveInfoUI.forEach(element => element.setVisible(false));
+        this.logText.setVisible(true);
 
         if (this.isWild) {
-            let findMove = (name) => this.moveDB[name] || Object.values(this.moveDB).find(m => m.Nome.toLowerCase() === name.toLowerCase());
-            let myMoveData = findMove(moveName);
-            let botMoveName = Phaser.Utils.Array.GetRandom(this.eEntity.moves);
-            let botMoveData = findMove(botMoveName);
+            // FIX: Peschiamo le mosse direttamente dagli oggetti della squadra!
+            let myMoveData = this.pEntity.moves.find(m => m.Nome === moveName);
+            let botMoveData = Phaser.Utils.Array.GetRandom(this.eEntity.moves);
 
             let statoAggiornato = this.partita.processaTurno({ mossa: myMoveData }, { mossa: botMoveData });
             this.applicaStatoPartita(statoAggiornato, false);
@@ -549,7 +616,11 @@ class BattleScene extends Phaser.Scene {
     }
 
     applicaStatoPartita(stato, inverti) {
+        // Aggiorniamo il numero del turno ricevuto dal server
+        this.currentTurn = stato.turno;
         let p1Data = inverti ? stato.p2 : stato.p1;
+        // Aggiorniamo le mosse (che ora sono oggetti completi)
+        this.pEntity.moves = [...p1Data.mosse];
         let p2Data = inverti ? stato.p1 : stato.p2;
 
         this.pEntity.hp = p1Data.hp;
