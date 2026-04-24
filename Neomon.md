@@ -159,14 +159,14 @@ Il sistema viene suddiviso in processi logici che riflettono l'architettura rela
 
 L'architettura dei dati separa la gestione degli utenti, dei progressi e delle sessioni (salvati in un database relazionale PostgreSQL tramite Supabase) dai dati statici e strutturali del gioco (gestiti tramite file JSON locali caricati a runtime dal server).
 
-<img width="884" height="581" alt="Screenshot 2026-04-23 174619" src="https://github.com/user-attachments/assets/fe8f5ddb-9f5d-4b12-b6a6-165dad684c14" />
+<img width="746" height="526" alt="image" src="https://github.com/user-attachments/assets/88d9f707-97f8-451f-95b8-27fdcb6f71f0" />
 
 ## 6.1 Entità
 
 | Entità | Descrizione | Archiviazione |
 | :--- | :--- | :--- |
 | **UTENTE** | Credenziali d'accesso, hash della password e data di registrazione. | PostgreSQL |
-| **PROFILO** | Progressi, coordinate mappa, contatori vittorie/partite e avatar dell'utente. | PostgreSQL |
+| **PROFILO** | Progressi, coordinate e mappa per pve, contatori vittorie/partite e avatar dell'utente. | PostgreSQL |
 | **PARTITA** | Log della singola sessione di gioco (PvP o PvE). | PostgreSQL |
 | **POKEMON** | Istanza dinamica ed esclusiva catturata dal giocatore. | PostgreSQL |
 
