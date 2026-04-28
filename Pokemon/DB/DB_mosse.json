@@ -1552,7 +1552,7 @@
   },
   {
     "Nome": "Tornado",
-    "Tipo": "Volante",
+    "Tipo": "Drago",
     "Categoria": "Speciale",
     "Potenza": 40,
     "Precisione": 100,
@@ -1763,8 +1763,7 @@
         "NomeFunzione": "ModificaPS",
         "Parametri": {
           "Tipo": "Dimezza",
-          "Bersaglio": "Bersaglio",
-          "Condizione": "PSMassimi"
+          "Bersaglio": "Bersaglio"
         }
       }
     ],
@@ -4663,8 +4662,10 @@
       {
         "NomeFunzione": "ScambiaStatistiche",
         "Parametri": {
-          "Statistica1": "Difesa",
-          "Statistica2": "DifesaSpeciale",
+          "Statistiche": [
+            "Difesa",
+            "DifesaSpeciale"
+          ],
           "Turni": 5
         }
       }
@@ -5673,27 +5674,19 @@
   },
   {
     "Nome": "Sassata",
-    "Tipo": "Lotta",
+    "Tipo": "Roccia",
     "Categoria": "Fisico",
-    "Potenza": 0,
-    "Precisione": 100,
-    "PP": 10,
+    "Potenza": 50,
+    "Precisione": 90,
+    "PP": 15,
     "Bersaglio": "AltroVicino",
-    "Priorità": -6,
-    "CodiceFunzione": [
-      {
-        "NomeFunzione": "ForzaSostituzione",
-        "Parametri": {
-          "Bersaglio": "Bersaglio"
-        }
-      }
-    ],
+    "Priorità": 0,
+    "CodiceFunzione": [],
     "Flags": [
-      "Contatto",
       "Proteggibile",
       "Copiabile"
     ],
-    "Descrizione": "Lancia il nemico costringendolo al cambio."
+    "Descrizione": "Scaglia pietre contro il bersaglio."
   },
   {
     "Nome": "Abbattimento",

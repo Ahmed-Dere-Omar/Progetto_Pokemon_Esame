@@ -9,6 +9,24 @@ const gestionePartita = require('./gestione_partita.js');
 const moveDBArray = JSON.parse(fs.readFileSync(__dirname + '/DB/DB_mosse.json', 'utf8'));
 const moveDB = {};
 moveDBArray.forEach(m => moveDB[m.Nome] = m);
+
+// Aggiungiamo Scontro fittizia per quando finiscono i PP anche sul server
+moveDB["Scontro"] = {
+    Nome: "Scontro",
+    Tipo: "Normale",
+    Categoria: "Fisico",
+    Potenza: 50,
+    Precisione: 100,
+    PP: 1,
+    ppAttuali: 1,
+    ppMassimi: 1,
+    Bersaglio: "AltroVicino",
+    CodiceFunzione: [
+        { NomeFunzione: "DannoContraccolpo", Parametri: { Percentuale: 25, Su: "PSMassimi" } }
+    ],
+    Flags: ["Contatto"]
+};
+
 const pkmnDBArray = JSON.parse(fs.readFileSync(__dirname + '/DB/DB_pokemon.json', 'utf8'));
 const pkmnDB = {};
 pkmnDBArray.forEach(p => pkmnDB[p.nome] = p);

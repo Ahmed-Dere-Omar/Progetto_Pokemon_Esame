@@ -537,7 +537,7 @@ class BattleScene extends Phaser.Scene {
         if (m) {
             this.infoTipoVal.setText(m.Tipo.toUpperCase()).setColor(this.getColorForType(m.Tipo));
             this.infoCatVal.setText(m.Categoria.toUpperCase()).setColor(m.Categoria === "Fisico" ? '#ff4444' : (m.Categoria === "Speciale" ? '#4444ff' : '#aaaaaa'));
-            this.infoPPVal.setText(`${m.ppAttuali}/${m.ppMassimi}`).setColor('#ffffff');
+            this.infoPPVal.setText(`${m.ppAttuali}/${m.ppMassimi}`).setColor(m.ppAttuali <= 0 ? '#ff4444' : '#ffffff');
             this.infoPotVal.setText(m.Potenza > 0 ? m.Potenza : '-').setColor('#ffffff');
         }
     }
@@ -578,12 +578,39 @@ class BattleScene extends Phaser.Scene {
         this.logText.setVisible(false);
         this.isInputActive = true;
 
+        // Gestione mosse forzate (Carica, Ricarica, Ripeti)
+        if (this.pEntity.mossaForzata) {
+            let forcedMoveData = this.pEntity.moves.find(m => m && m.Nome === this.pEntity.mossaForzata);
+            if (forcedMoveData && forcedMoveData.ppAttuali <= 0 && this.pEntity.mossaForzata !== "Ricarica") {
+                this.pEntity.mossaForzata = null; // Annulla la costrizione se non ha PP
+            } else {
+                this.btns.forEach(b => b.setVisible(false));
+                this.moveInfoUI.forEach(element => element.setVisible(false));
+                
+                this.time.delayedCall(1000, () => {
+                    this.handleMoveClick(this.pEntity.mossaForzata);
+                });
+                return;
+            }
+        }
+
+        // Controllo: se il giocatore non ha più PP in nessuna mossa, forza Scontro
+        let haMosseDisponibili = this.pEntity.moves.some(m => m && m.ppAttuali > 0);
+        if (!haMosseDisponibili) {
+            this.pEntity.moves = [{ ...this.moveDB["Scontro"] }];
+            this.selectedMoveIndex = 0;
+        }
+
         // 1. PRIMA aggiorniamo i testi e i colori delle mosse
         this.updateMoveSelection();
 
         // 2. POI mostriamo i bottoni (solo se esiste la mossa corrispondente in quell'indice)
         this.btns.forEach((b, i) => { 
-            if (this.pEntity.moves[i]) b.setVisible(true); 
+            if (this.pEntity.moves[i]) {
+                b.setVisible(true); 
+            } else {
+                b.setVisible(false);
+            }
         });
         
         // 3. Mostriamo le statistiche laterali
@@ -591,6 +618,24 @@ class BattleScene extends Phaser.Scene {
     }
 
     handleMoveClick(moveName) {
+        let myMoveData = this.pEntity.moves.find(m => m.Nome === moveName);
+        
+        // Mossa finta dal backend per i Pokemon che devono saltare il turno a causa di stanchezza
+        if (moveName === "Ricarica") {
+            myMoveData = { Nome: "Ricarica", Tipo: "Normale", Categoria: "Stato", Potenza: 0, Precisione: 100, CodiceFunzione: [] };
+        }
+
+        // Blocca l'uso della mossa se i PP sono finiti e non è Scontro
+        if (myMoveData && myMoveData.ppAttuali <= 0 && myMoveData.Nome !== "Scontro" && myMoveData.Nome !== "Ricarica") {
+            let warningText = this.add.text(500, 400, "PP ESAURITI!", {
+                fontSize: '40px', fill: '#ff0000', fontStyle: 'bold', stroke: '#000', strokeThickness: 6 
+            }).setOrigin(0.5);
+            this.tweens.add({
+                targets: warningText, y: 350, alpha: 0, duration: 1500, onComplete: () => warningText.destroy()
+            });
+            return;
+        }
+
         this.isInputActive = false;
 
         // Nascondi le mosse e le info, e rimostra il log text!
@@ -599,9 +644,26 @@ class BattleScene extends Phaser.Scene {
         this.logText.setVisible(true);
 
         if (this.isWild) {
-            // FIX: Peschiamo le mosse direttamente dagli oggetti della squadra!
-            let myMoveData = this.pEntity.moves.find(m => m.Nome === moveName);
-            let botMoveData = Phaser.Utils.Array.GetRandom(this.eEntity.moves);
+            let mosseDisponibiliBot = this.eEntity.moves.filter(m => m.ppAttuali > 0);
+            let botMoveData;
+
+            if (this.eEntity.mossaForzata) {
+                botMoveData = this.eEntity.moves.find(m => m && m.Nome === this.eEntity.mossaForzata);
+                if (this.eEntity.mossaForzata === "Ricarica") {
+                    botMoveData = { Nome: "Ricarica", Tipo: "Normale", Categoria: "Stato", Potenza: 0, Precisione: 100, CodiceFunzione: [] };
+                } else if (botMoveData && botMoveData.ppAttuali <= 0) {
+                    this.eEntity.mossaForzata = null;
+                    if (mosseDisponibiliBot.length > 0) {
+                        botMoveData = Phaser.Utils.Array.GetRandom(mosseDisponibiliBot);
+                    } else {
+                        botMoveData = this.moveDB["Scontro"];
+                    }
+                }
+            } else if (mosseDisponibiliBot.length > 0) {
+                botMoveData = Phaser.Utils.Array.GetRandom(mosseDisponibiliBot);
+            } else {
+                botMoveData = this.moveDB["Scontro"];
+            }
 
             let statoAggiornato = this.partita.processaTurno({ mossa: myMoveData }, { mossa: botMoveData });
             this.applicaStatoPartita(statoAggiornato, false);
@@ -621,12 +683,23 @@ class BattleScene extends Phaser.Scene {
         let p1Data = inverti ? stato.p2 : stato.p1;
         // Aggiorniamo le mosse (che ora sono oggetti completi)
         this.pEntity.moves = [...p1Data.mosse];
+        this.pEntity.mossaForzata = p1Data.mossaForzata;
+
         let p2Data = inverti ? stato.p1 : stato.p2;
+        this.eEntity.mossaForzata = p2Data.mossaForzata;
 
         this.pEntity.hp = p1Data.hp;
         this.eEntity.hp = p2Data.hp;
         if (this.pEntity.hp <= 0) this.pEntity.alive = false;
         if (this.eEntity.hp <= 0) this.eEntity.alive = false;
+
+        // --- Aggiorniamo lo Sprite se si trasformano (es. Ditto, Mew) ---
+        if (p1Data.trasformato && this.pSprite.node) {
+            this.pSprite.node.querySelector('img').src = this.pkmnDB[this.eName].sprite.normal;
+        }
+        if (p2Data.trasformato && this.eSprite.node) {
+            this.eSprite.node.querySelector('img').src = this.pkmnDB[this.pName].sprite.normal;
+        }
 
         this.mostraLogsSequenziali(stato.logs, () => {
             this.updateUI();

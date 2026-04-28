@@ -40,7 +40,7 @@ class gestionePartita {
         this.p2.trappole = {};
         this.meteo = null;
         this.turniMeteo = 0;
-        this.ultimaMossaUsata = null;
+        this.ultimaMossaGlobale = null;
     }
 
     processaTurno(azioneP1, azioneP2) {
@@ -53,6 +53,7 @@ class gestionePartita {
             if (pk) {
                 pk.haGiaAgito = false;
                 pk.protetto = false;
+                pk.hpInizioTurno = pk.hp;
                 if (pk.statiVolatili) pk.statiVolatili.tentennamento = false;
             }
         });
@@ -170,12 +171,6 @@ class gestionePartita {
                 pk.haGiaAgito = true;
                 return;
             }
-            if (pk.statiVolatili.ricarica) {
-                this.logs.push(`${pk.nome} deve riposarsi!`);
-                pk.statiVolatili.ricarica = false;
-                pk.haGiaAgito = true;
-                return;
-            }
             if (pk.statiVolatili['Confusione']) {
                 if (pk.contatoriStato && pk.contatoriStato.confusione > 0) {
                     pk.contatoriStato.confusione--;
@@ -192,14 +187,55 @@ class gestionePartita {
                     this.logs.push(`${pk.nome} non è più confuso!`);
                 }
             }
+            
+            if (pk.statiVolatili.inibizione && pk.statiVolatili.inibizione.attivo && pk.statiVolatili.inibizione.mossa === mossa.Nome) {
+                this.logs.push(`${pk.nome} non può usare ${mossa.Nome} a causa di Inibitore!`);
+                pk.haGiaAgito = true;
+                return;
+            }
+            if (pk.statiVolatili.provocazione && pk.statiVolatili.provocazione.attivo && mossa.Categoria === 'Stato') {
+                this.logs.push(`${pk.nome} non può usare ${mossa.Nome} a causa di Provocazione!`);
+                pk.haGiaAgito = true;
+                return;
+            }
         }
+        
+        if (targetPk.statiVolatili && targetPk.statiVolatili.esclusiva) {
+            if (targetPk.mosse.some(m => m.Nome === mossa.Nome)) {
+                this.logs.push(`${pk.nome} non può usare ${mossa.Nome} a causa di Esclusiva!`);
+                pk.haGiaAgito = true;
+                return;
+            }
+        }
+
         let mossaPK = pk.mosse.find(m => m.Nome === mossa.Nome);
         if (mossaPK && mossaPK.ppAttuali > 0) {
             mossaPK.ppAttuali--; // Sottrae il PP solo se il pokemon non è bloccato
         }
         // ==========================================
 
-        this.logs.push(`${pk.nome} usa ${mossa.Nome}!`);
+        if (mossa.Nome === "Ricarica") {
+            this.logs.push(`${pk.nome} deve riposarsi!`);
+            if (pk.statiVolatili) {
+                pk.statiVolatili.ricarica = false;
+                pk.statiVolatili.mossaForzata = null;
+            }
+            pk.haGiaAgito = true;
+            return;
+        }
+
+        if (mossa.Nome === "Copione") {
+            if (this.ultimaMossaGlobale && !["Copione", "Scontro", "Ricarica"].includes(this.ultimaMossaGlobale.Nome)) {
+                mossa = { ...this.ultimaMossaGlobale };
+                this.logs.push(`${pk.nome} usa Copione e copia ${mossa.Nome}!`);
+            } else {
+                this.logs.push(`${pk.nome} usa Copione, ma fallisce!`);
+                pk.haGiaAgito = true;
+                return;
+            }
+        } else {
+            this.logs.push(`${pk.nome} usa ${mossa.Nome}!`);
+        }
 
         if (GestoreFlagsModulo.gestione_proteggibile(mossa) && targetPk.protetto) {
             this.logs.push(`${targetPk.nome} si è protetto!`);
@@ -248,6 +284,7 @@ class gestionePartita {
            pk.statiVolatili = pk.statiVolatili || {};
            if (!pk.statiVolatili.inCarica) {
                pk.statiVolatili.inCarica = true;
+                pk.statiVolatili.mossaForzata = mossa.Nome;
                let messaggio = effettoCarica.Parametri.Messaggio || `${pk.nome} si sta preparando per l'attacco!`;
                this.logs.push(messaggio);
                if (effettoCarica.Parametri.StatoSeminvulnerabile) {
@@ -265,7 +302,8 @@ class gestionePartita {
                            Utente: pk,
                            Bersaglio: reqTarget,
                            Partita: this,
-                           Logs: this.logs
+                            Logs: this.logs,
+                            MossaNome: mossa.Nome
                        });
                    }
                });
@@ -280,7 +318,9 @@ class gestionePartita {
        }
         // ----------------------------------------------------------
 
-        if (mossa.Categoria !== 'Stato') {
+        let isDannoFuturo = mossa.CodiceFunzione && mossa.CodiceFunzione.some(e => e.NomeFunzione === "DannoFuturo");
+
+        if (mossa.Categoria !== 'Stato' && !isDannoFuturo) {
             let multiHitEff = mossa.CodiceFunzione ? mossa.CodiceFunzione.find(eff => eff.NomeFunzione === "ColpiMultipli") : null;
             let hits = multiHitEff ? EffettiModulo.ColpiMultipli({ ...multiHitEff.Parametri }) : 1;
 
@@ -317,6 +357,14 @@ class gestionePartita {
                 targetPk.hp = Math.max(limit, targetPk.hp - danno);
                 totalDanno += vecchiHp - targetPk.hp;
                 actualHits++;
+                
+                if (targetPk.hp <= 0 && targetPk.statiVolatili && targetPk.statiVolatili.rancore) {
+                    let mPK = pk.mosse.find(m => m.Nome === mossa.Nome);
+                    if (mPK) {
+                        mPK.ppAttuali = 0;
+                        this.logs.push(`I PP di ${mossa.Nome} si sono azzerati a causa di Rancore!`);
+                    }
+                }
             }
 
             dannoInflittoReale = totalDanno;
@@ -334,7 +382,7 @@ class gestionePartita {
         }
 
         if (mossa.CodiceFunzione && mossa.CodiceFunzione.length > 0) {
-            const nativeMods = ["ColpiMultipli", "Lascia1PS", "ColpoSicuro", "CalcolaDannoSuDifesaFisica", "ColpoCriticoSicuro", "PotenzaInversaPS", "DannoFisso", "PotenzaVariabile", "ModificaDanno", "AumentaPotenzaInCoro"];
+            const nativeMods = ["ColpiMultipli", "Lascia1PS", "ColpoSicuro", "CalcolaDannoSuDifesaFisica", "ColpoCriticoSicuro", "PotenzaInversaPS", "DannoFisso", "PotenzaVariabile", "ModificaDanno", "AumentaPotenzaInCoro", "PotenzaBasataSuStatistiche", "PotenzaBasataSuPeso", "DannoVariabile", "DannoFuturo"];
             
             mossa.CodiceFunzione.forEach(eff => {
                 if (eff.Parametri && eff.Parametri.Turno === 1) return; // Saltiamo gli effetti già eseguiti nella carica
@@ -363,7 +411,9 @@ class gestionePartita {
                     Proprietario: azione.proprietario,
                     Avversario: azione.bersaglio,
                     Partita: this,
-                    Logs: this.logs
+                    Logs: this.logs,
+                    MossaNome: mossa.Nome,
+                    Mossa: mossa
                 };
 
                 // FIX: Evitiamo di sovrascrivere l'oggetto Bersaglio con una stringa,
@@ -385,7 +435,16 @@ class gestionePartita {
             });
         }
         
+        if (isDannoFuturo) {
+            let effDannoFuturo = mossa.CodiceFunzione.find(e => e.NomeFunzione === "DannoFuturo");
+            let turni = effDannoFuturo && effDannoFuturo.Parametri && effDannoFuturo.Parametri.Turni ? effDannoFuturo.Parametri.Turni : 2;
+            this.logs.push(`${pk.nome} ha previsto un attacco!`);
+            EffettiModulo.DannoFuturo({ Turni: turni, Bersaglio: targetPk, Utente: pk, Mossa: mossa }); 
+        }
+
         pk.haGiaAgito = true; // Necessario per garantire che i tentennamenti contino i turni sfalsati
+        pk.ultimaMossaUsata = mossa.Nome;
+        this.ultimaMossaGlobale = mossa;
     }
 
     calcolaDanno(a, d, m, targetPlayer) {
@@ -459,12 +518,51 @@ class gestionePartita {
                 if (eff.NomeFunzione === "AumentaPotenzaInCoro") {
                     potenzaReale = EffettiModulo.AumentaPotenzaInCoro({ Partita: this });
                 }
+                if (eff.NomeFunzione === "PotenzaBasataSuStatistiche") {
+                    potenzaReale = EffettiModulo.PotenzaBasataSuStatistiche({ Utente: a });
+                }
+                if (eff.NomeFunzione === "DannoVariabile") {
+                    potenzaReale = EffettiModulo.DannoVariabile({ ...eff.Parametri, Utente: a });
+                }
+                if (eff.NomeFunzione === "PotenzaBasataSuPeso") {
+                    if (eff.Parametri && eff.Parametri.Formula === "PesoUtenteVsBersaglio") {
+                        // Per Pesobomba (Heavy Slam)
+                        let ratio = (d.peso || 10) / Math.max(1, (a.peso || 10));
+                        if (ratio <= 0.2) potenzaReale = 120;
+                        else if (ratio <= 0.25) potenzaReale = 100;
+                        else if (ratio <= 0.33) potenzaReale = 80;
+                        else if (ratio <= 0.5) potenzaReale = 60;
+                        else potenzaReale = 40;
+                    } else {
+                        // Per Colpo Basso (Low Kick)
+                        let w = d.peso || 10;
+                        if (w < 10) potenzaReale = 20;
+                        else if (w < 25) potenzaReale = 40;
+                        else if (w < 50) potenzaReale = 60;
+                        else if (w < 100) potenzaReale = 80;
+                        else if (w < 200) potenzaReale = 100;
+                        else potenzaReale = 120;
+                    }
+                }
             });
         }
 
         // Raddoppiamenti progressivi (es. Rotolamento e Tagliofuria)
+        // Raddoppiamenti progressivi o incrementi (es. Rotolamento, Tagliofuria, Echeggiavoce)
         if (a.statiVolatili && a.statiVolatili.potenzaConsecutiva && a.statiVolatili.potenzaConsecutiva.mossa === m.Nome) {
             moltiplicatoreDanno *= Math.pow(2, a.statiVolatili.potenzaConsecutiva.contatore - 1);
+            let effConsecutiva = m.CodiceFunzione ? m.CodiceFunzione.find(e => e.NomeFunzione === "AumentaPotenzaConsecutiva") : null;
+            if (effConsecutiva && effConsecutiva.Parametri) {
+                let count = a.statiVolatili.potenzaConsecutiva.contatore - 1;
+                if (effConsecutiva.Parametri.Incremento) {
+                    potenzaReale += (effConsecutiva.Parametri.Incremento * count);
+                    if (effConsecutiva.Parametri.Max && potenzaReale > effConsecutiva.Parametri.Max) potenzaReale = effConsecutiva.Parametri.Max;
+                } else if (effConsecutiva.Parametri.Moltiplicatore) {
+                    moltiplicatoreDanno *= Math.pow(effConsecutiva.Parametri.Moltiplicatore, count);
+                }
+            } else {
+                moltiplicatoreDanno *= Math.pow(2, a.statiVolatili.potenzaConsecutiva.contatore - 1);
+            }
         }
 
         let effectiveness = 1;
@@ -584,10 +682,58 @@ class gestionePartita {
 
             // 5. Sbadiglio (Sonnolenza si trasforma in Sonno)
             if (pk.stato === 'Sonnolenza') {
-                pk.stato = 'Sonno';
-                pk.contatoriStato = pk.contatoriStato || {};
-                pk.contatoriStato.sonno = Math.floor(Math.random() * 3) + 1;
-                this.logs.push(`${pk.nome} si è addormentato per la sonnolenza!`);
+                if (pk.contatoriStato && pk.contatoriStato.sonnolenzaTurni > 0) {
+                    pk.contatoriStato.sonnolenzaTurni--;
+                } else {
+                    pk.stato = 'Sonno';
+                    pk.contatoriStato = pk.contatoriStato || {};
+                    pk.contatoriStato.sonno = Math.floor(Math.random() * 3) + 1;
+                    this.logs.push(`${pk.nome} si è addormentato per la sonnolenza!`);
+                }
+            }
+
+            // 6. Ripeti (Encore)
+            if (pk.statiVolatili && pk.statiVolatili.ripeti && pk.statiVolatili.ripeti.attivo) {
+                pk.statiVolatili.ripeti.turniRimanenti--;
+                if (pk.statiVolatili.ripeti.turniRimanenti <= 0) {
+                    pk.statiVolatili.ripeti = null;
+                    pk.statiVolatili.mossaForzata = null;
+                    this.logs.push(`${pk.nome} non deve più ripetere la mossa!`);
+                }
+            }
+
+            // 7. Danno Futuro (Divinazione)
+            if (pk.statiVolatili && pk.statiVolatili.dannoFuturo && pk.statiVolatili.dannoFuturo.attivo) {
+                pk.statiVolatili.dannoFuturo.turniRimanenti--;
+                if (pk.statiVolatili.dannoFuturo.turniRimanenti <= 0) {
+                    this.logs.push(`${pk.nome} subisce l'attacco previsto!`);
+                    let mossaFutura = pk.statiVolatili.dannoFuturo.mossa;
+                    let origine = pk.statiVolatili.dannoFuturo.origineAttacco;
+                    
+                    let dmgRes = this.calcolaDanno(origine || pk, pk, mossaFutura, null);
+                    pk.hp = Math.max(0, pk.hp - dmgRes.danno);
+                    this.logs.push(`Inflitti ${dmgRes.danno} danni a ${pk.nome}!`);
+                    
+                    pk.statiVolatili.dannoFuturo = null;
+                }
+            }
+
+            // 8. Inibitore
+            if (pk.statiVolatili && pk.statiVolatili.inibizione && pk.statiVolatili.inibizione.attivo) {
+                pk.statiVolatili.inibizione.turniRimanenti--;
+                if (pk.statiVolatili.inibizione.turniRimanenti <= 0) {
+                    pk.statiVolatili.inibizione = null;
+                    this.logs.push(`${pk.nome} non è più inibito!`);
+                }
+            }
+
+            // 9. Provocazione
+            if (pk.statiVolatili && pk.statiVolatili.provocazione && pk.statiVolatili.provocazione.attivo) {
+                pk.statiVolatili.provocazione.turniRimanenti--;
+                if (pk.statiVolatili.provocazione.turniRimanenti <= 0) {
+                    pk.statiVolatili.provocazione = null;
+                    this.logs.push(`${pk.nome} non è più provocato!`);
+                }
             }
         });
     }
@@ -602,6 +748,13 @@ class gestionePartita {
         }
     }
 
+    getMossaForzata(pk) {
+        if (pk.statiVolatili) {
+            if (pk.statiVolatili.mossaForzata) return pk.statiVolatili.mossaForzata;
+        }
+        return null;
+    }
+
     ottieniStatoAggiornato() {
         let p1Pk = this.p1.squadra[this.p1.attivoIdx];
         let p2Pk = this.p2.squadra[this.p2.attivoIdx];
@@ -611,13 +764,15 @@ class gestionePartita {
                 hp: p1Pk.hp, 
                 nome: p1Pk.nome,
                 mosse: p1Pk.mosse, // Invia gli oggetti completi con ppAttuali
-                trasformato: !!(p1Pk.statiVolatili && p1Pk.statiVolatili.trasformato)
+                trasformato: !!(p1Pk.statiVolatili && p1Pk.statiVolatili.trasformato),
+                mossaForzata: this.getMossaForzata(p1Pk)
             },
             p2: { 
                 hp: p2Pk.hp, 
                 nome: p2Pk.nome,
                 mosse: p2Pk.mosse,
-                trasformato: !!(p2Pk.statiVolatili && p2Pk.statiVolatili.trasformato)
+                trasformato: !!(p2Pk.statiVolatili && p2Pk.statiVolatili.trasformato),
+                mossaForzata: this.getMossaForzata(p2Pk)
             },
             logs: this.logs,
             finito: this.finito,

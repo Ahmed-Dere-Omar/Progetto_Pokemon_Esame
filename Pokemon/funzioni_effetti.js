@@ -9,7 +9,7 @@ class Effetti {
             case "BersaglioAvvelenato":
                 return target.stato === 'Avvelenamento' || target.stato === 'Iperavvelenamento';
             case "BersaglioDanneggiatoInTurno":
-                return target.hp < target.hpMax;
+                return target.hp < (target.hpInizioTurno !== undefined ? target.hpInizioTurno : target.hpMax);
             case "BersaglioInVolo":
                 return target.statiVolatili && target.statiVolatili.statoSeminvulnerabile === "InVolo";
             case "NemicoAttacca":
@@ -35,7 +35,7 @@ class Effetti {
             case "BersaglioConStato":
                 return target.stato !== null;
             case "UtenteDanneggiato":
-                return utente.hp < utente.hpMax;
+                return utente.hp < (utente.hpInizioTurno !== undefined ? utente.hpInizioTurno : utente.hpMax);
             case "UtenteMuoveDopo":
                 return target.haGiaAgito === true;
             case "AlTermine":
@@ -72,20 +72,24 @@ class Effetti {
         return true;
     }
 
-    static BloccaPerTurni({ Turni = null, TurniMin = 2, TurniMax = 3, Utente }) {
+    static BloccaPerTurni({ Turni = null, TurniMin = 2, TurniMax = 3, Utente, MossaNome }) {
         // Blocca l'uso della stessa mossa per alcuni turni e causa confusione alla fine.
         let utente = Utente;
         if (!utente) return false;
-        let durata = Turni !== null ? Turni : Math.floor(Math.random() * (TurniMax - TurniMin + 1)) + TurniMin;
         
         utente.statiVolatili = utente.statiVolatili || {};
-        utente.statiVolatili.bloccoMosse = {
-            attivo: true,
-            turniRimanenti: durata,
-            mossa: utente.ultimaMossaUsata
-        };
-        
-        utente.statiVolatili.applicaConfusioneAlTermine = true;
+        if (!utente.statiVolatili.bloccoMosse || utente.statiVolatili.bloccoMosse.mossa !== MossaNome) {
+            let durata = Turni !== null ? Turni : Math.floor(Math.random() * (TurniMax - TurniMin + 1)) + TurniMin;
+            utente.statiVolatili.bloccoMosse = { attivo: true, turniRimanenti: durata - 1, mossa: MossaNome };
+            utente.statiVolatili.mossaForzata = MossaNome;
+        } else {
+            utente.statiVolatili.bloccoMosse.turniRimanenti--;
+            if (utente.statiVolatili.bloccoMosse.turniRimanenti <= 0) {
+                utente.statiVolatili.bloccoMosse = null;
+                utente.statiVolatili.mossaForzata = null;
+                utente.statiVolatili.applicaConfusioneAlTermine = true;
+            }
+        }
         return true;
     }
 
@@ -111,6 +115,8 @@ class Effetti {
             target.contatoriStato.sonno = Durata || Math.floor(Math.random() * 3) + 1; 
         } else if (Stato === "Iperavvelenamento") {
             target.contatoriStato.tossina = 1;
+        } else if (Stato === "Sonnolenza") {
+            target.contatoriStato.sonnolenzaTurni = 1;
         }
         if (Logs) Logs.push(`${target.nome} è ora in stato di ${Stato}!`);
         return true;
@@ -183,7 +189,7 @@ class Effetti {
         return true;
     }
 
-    static CaricaAttacco({ StatoSeminvulnerabile = null, TurniDiCarica = 1, Messaggio = null, Utente }) {
+    static CaricaAttacco({ StatoSeminvulnerabile = null, TurniDiCarica = 1, Messaggio = null, Utente, MossaNome }) {
         // Prepara un attacco per il turno successivo applicando un eventuale stato di invulnerabilità.
         let utente = Utente;
         if (!utente) return false;
@@ -192,11 +198,12 @@ class Effetti {
         if (utente.statiVolatili.inCarica) {
             utente.statiVolatili.inCarica = false;
             utente.statiVolatili.statoSeminvulnerabile = null;
+            utente.statiVolatili.mossaForzata = null;
             return true; 
         }
 
         utente.statiVolatili.inCarica = true;
-        utente.statiVolatili.turniCaricaRimanenti = TurniDiCarica;
+        utente.statiVolatili.mossaForzata = MossaNome;
         if (StatoSeminvulnerabile) utente.statiVolatili.statoSeminvulnerabile = StatoSeminvulnerabile;
         
         return "IN_CARICA";
@@ -645,6 +652,7 @@ class Effetti {
             mossa: target.ultimaMossaUsata,
             turniRimanenti: Turni
         };
+        target.statiVolatili.mossaForzata = target.ultimaMossaUsata;
         return true;
     }
 
@@ -683,7 +691,7 @@ class Effetti {
         let target = (typeof Bersaglio === "string" && Bersaglio === "Utente") ? Utente : Bersaglio;
         if (!target || !target.ultimaMossaUsata) return false;
 
-        let mossa = target.mosse.find(m => m.nome === target.ultimaMossaUsata);
+        let mossa = target.mosse.find(m => m.Nome === target.ultimaMossaUsata);
         if (!mossa || mossa.ppAttuali <= 0) return false;
 
         mossa.ppAttuali = Math.max(0, mossa.ppAttuali - Quantita);
@@ -746,12 +754,13 @@ class Effetti {
         let mosseEscluse = ["Schizzo", "Mimica", "Scontro"];
         if (mosseEscluse.includes(target.ultimaMossaUsata)) return false;
 
-        let indiceMossa = utente.mosse.findIndex(m => m.nome === (Permanente ? "Schizzo" : "Mimica"));
+        let indiceMossa = utente.mosse.findIndex(m => m.Nome === (Permanente ? "Schizzo" : "Mimica"));
         if (indiceMossa === -1) return false;
 
-        if (typeof ottieniDatiMossa === "undefined") return false;
-        let mossaCopiata = ottieniDatiMossa(target.ultimaMossaUsata);
-        utente.mosse[indiceMossa] = { ...mossaCopiata };
+        let mossaCopiata = target.mosse.find(m => m.Nome === target.ultimaMossaUsata);
+        if (!mossaCopiata) return false;
+        
+        utente.mosse[indiceMossa] = { ...mossaCopiata, ppAttuali: mossaCopiata.PP, ppMassimi: mossaCopiata.PP };
         
         if (!Permanente) {
             utente.statiVolatili.mossaCopiata = { indice: indiceMossa, originale: "Mimica" };
@@ -932,7 +941,7 @@ class Effetti {
         return true; 
     }
 
-    static DannoFuturo({ Turni = 2, Bersaglio, Utente }) {
+    static DannoFuturo({ Turni = 2, Bersaglio, Utente, Mossa }) {
         // Piazzia un attacco sospeso in grado di colpire il bersaglio con un ritardo di alcuni turni.
         let target = Bersaglio;
         let utente = Utente;
@@ -944,8 +953,8 @@ class Effetti {
         target.statiVolatili.dannoFuturo = {
             attivo: true,
             turniRimanenti: Turni,
-            origine: utente.id,
-            mossa: utente.mossaInUso
+            origineAttacco: Utente,
+            mossa: Mossa
         };
         return true;
     }
@@ -1139,6 +1148,7 @@ class Effetti {
         utente.statiVolatili = utente.statiVolatili || {};
 
         utente.statiVolatili.ricarica = true;
+        utente.statiVolatili.mossaForzata = "Ricarica";
         return true;
     }
 
@@ -1178,6 +1188,7 @@ class Effetti {
             ppMassimi: 5
         }));
 
+        if (Logs) Logs.push(`${utente.nome} si è trasformato in ${target.nome}!`);
         return true;
     }
 
