@@ -89,14 +89,14 @@ io.on('connection', (socket) => {
 
     socket.on('acceptChallenge', (challengerId) => {
         let roomId = `battle_${challengerId}_${socket.id}`;
-        battleRooms[roomId] = { 
-            p1: challengerId, 
-            p2: socket.id, 
-            selections: {}, 
+        battleRooms[roomId] = {
+            p1: challengerId,
+            p2: socket.id,
+            selections: {},
             moves: {},
-            partitaObj: null 
+            partitaObj: null
         };
-        
+
         io.to(challengerId).emit('startPvP', { roomId, isPlayerOne: true });
         io.to(socket.id).emit('startPvP', { roomId, isPlayerOne: false });
     });
@@ -109,49 +109,62 @@ io.on('connection', (socket) => {
         if (!room) return;
 
         room.selections[socket.id] = data.pkmnName;
-        
+
         if (Object.keys(room.selections).length === 2) {
             // Crea i due giocatori usando il database del server
             let p1Name = room.selections[room.p1];
             let p2Name = room.selections[room.p2];
             let p1Data = pkmnDB[p1Name];
             let p2Data = pkmnDB[p2Name];
-            
-            let creaSquadra = (pData) => {
-                let mosseRandom = [...pData.mosse].sort(() => 0.5 - Math.random()).slice(0, 4);
-                let baseHp = Math.floor(pData.statistiche.hp.base_stat * 1.5);
-                return [{
-                    nome: pData.nome,
-                    hp: baseHp,
-                    hpMax: baseHp,
-                    statistiche: {
-                        attacco: pData.statistiche.attack.base_stat,
-                        difesa: pData.statistiche.defense.base_stat,
-                        attaccoSpeciale: pData.statistiche['special-attack'].base_stat,
-                        difesaSpeciale: pData.statistiche['special-defense'].base_stat,
-                        velocita: pData.statistiche.speed.base_stat
-                    },
-                    modificatori: {},
-                    tipi: pData.tipi,
-                    livello: 50,
-                    stato: null,
-                    mosse: mosseRandom.map(mName => {
-                        let mData = moveDB[mName];
-                        if (!mData) return null;
-                        return {
-                            ...mData,
-                            ppAttuali: mData.PP, // Inizializza i PP dal DB
-                            ppMassimi: mData.PP
-                        };
-                    }).filter(m => m)
-                }];
+
+            let creaSquadra = (pData, extraCount) => {
+                let createPkmn = (data) => {
+                    let mosseRandom = [...data.mosse].sort(() => 0.5 - Math.random()).slice(0, 4);
+                    let baseHp = Math.floor(data.statistiche.hp.base_stat * 1.5);
+                    return {
+                        nome: data.nome,
+                        hp: baseHp,
+                        hpMax: baseHp,
+                        statistiche: {
+                            attacco: data.statistiche.attack.base_stat,
+                            difesa: data.statistiche.defense.base_stat,
+                            attaccoSpeciale: data.statistiche['special-attack'].base_stat,
+                            difesaSpeciale: data.statistiche['special-defense'].base_stat,
+                            velocita: data.statistiche.speed.base_stat
+                        },
+                        modificatori: {},
+                        tipi: data.tipi,
+                        livello: 50,
+                        stato: null,
+                        mosse: mosseRandom.map(mName => {
+                            let mData = moveDB[mName];
+                            if (!mData) return null;
+                            return {
+                                ...mData,
+                                ppAttuali: mData.PP, // Inizializza i PP dal DB
+                                ppMassimi: mData.PP
+                            };
+                        }).filter(m => m)
+                    };
+                };
+
+                let team = [createPkmn(pData)];
+                let pkmnNames = Object.keys(pkmnDB);
+
+                // Aggiunge Pokémon extra casuali
+                for (let i = 0; i < extraCount; i++) {
+                    let randomName = pkmnNames[Math.floor(Math.random() * pkmnNames.length)];
+                    team.push(createPkmn(pkmnDB[randomName]));
+                }
+
+                return team;
             };
 
-            let player1 = { id: room.p1, squadra: creaSquadra(p1Data), attivoIdx: 0 };
-            let player2 = { id: room.p2, squadra: creaSquadra(p2Data), attivoIdx: 0 };
-            
+            let player1 = { id: room.p1, squadra: creaSquadra(p1Data, 3), attivoIdx: 0 }; // Team di 4
+            let player2 = { id: room.p2, squadra: creaSquadra(p2Data, 3), attivoIdx: 0 }; // Team di 4
+
             room.partitaObj = new gestionePartita(player1, player2);
-            
+
             io.to(room.p1).emit('pvpBothSelected', room.selections);
             io.to(room.p2).emit('pvpBothSelected', room.selections);
         }
@@ -161,18 +174,23 @@ io.on('connection', (socket) => {
         let room = battleRooms[data.roomId];
         if (!room || !room.partitaObj) return;
 
-        room.moves[socket.id] = data.moveName;
-        
+        // Salviamo l'intero oggetto data (che contiene tipo: 'switch' o moveName)
+        room.moves[socket.id] = data;
+
         if (Object.keys(room.moves).length === 2) {
-            let azioneP1 = { mossa: moveDB[room.moves[room.p1]] };
-            let azioneP2 = { mossa: moveDB[room.moves[room.p2]] };
-            
+            let rawP1 = room.moves[room.p1];
+            let rawP2 = room.moves[room.p2];
+
+            // Trasformiamo i dati grezzi in azioni comprensibili per gestione_partita
+            let azioneP1 = rawP1.tipo === 'switch' ? rawP1 : { mossa: moveDB[rawP1.moveName] };
+            let azioneP2 = rawP2.tipo === 'switch' ? rawP2 : { mossa: moveDB[rawP2.moveName] };
+
             let statoAggiornato = room.partitaObj.processaTurno(azioneP1, azioneP2);
-            
+
             io.to(room.p1).emit('resolveTurn', { stato: statoAggiornato, inverti: false });
             io.to(room.p2).emit('resolveTurn', { stato: statoAggiornato, inverti: true });
-            
-            room.moves = {}; // Reset turno
+
+            room.moves = {}; // Reset per il prossimo turno
         }
     });
 });

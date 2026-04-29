@@ -84,45 +84,52 @@ class gestionePartita {
     }
 
     determinaOrdine(a1, a2) {
-        const pkP1 = this.p1.squadra[this.p1.attivoIdx];
-        const pkP2 = this.p2.squadra[this.p2.attivoIdx];
+    const pkP1 = this.p1.squadra[this.p1.attivoIdx];
+    const pkP2 = this.p2.squadra[this.p2.attivoIdx];
 
-        const mosse = [
-            { ...a1, proprietario: this.p1, bersaglio: this.p2, pk: pkP1 },
-            { ...a2, proprietario: this.p2, bersaglio: this.p1, pk: pkP2 }
-        ];
+    const azioni = [
+        { ...a1, proprietario: this.p1, bersaglio: this.p2, pk: pkP1 },
+        { ...a2, proprietario: this.p2, bersaglio: this.p1, pk: pkP2 }
+    ];
 
-        // 1. FILTRO SUPER SICURO: Controlliamo che il Pokemon e le sue statistiche esistano davvero!
-        const mosseValide = mosse.filter(azione => {
-            if (!azione.pk || !azione.pk.statistiche) return false; // Evita il crash se mancano i dati
-            
-            if (!azione.mossa) {
-                this.logs.push(`${azione.pk.nome} tentenna confuso... (Mossa non trovata nel DB!)`);
-                return false;
-            }
-            return true;
-        });
+    return azioni.sort((a, b) => {
+        // 1. Priorità massima alla sostituzione
+        if (a.tipo === 'switch' && b.tipo !== 'switch') return -1;
+        if (a.tipo !== 'switch' && b.tipo === 'switch') return 1;
+        if (a.tipo === 'switch' && b.tipo === 'switch') return 0;
 
-        // 2. ORDINAMENTO CON SALVAGENTE
-        return mosseValide.sort((a, b) => {
-            let prioA = a.mossa.Priorità || 0;
-            let prioB = b.mossa.Priorità || 0;
-            
-            if (prioA !== prioB) {
-                return prioB - prioA;
-            }
-            
-            // Usiamo (|| 50) così se manca la velocità il gioco usa 50 di base e non va in crash!
-            const velA = (a.pk.statistiche.velocita || 50) * (a.pk.modificatori.velocita || 1);
-            const velB = (b.pk.statistiche.velocita || 50) * (b.pk.modificatori.velocita || 1);
-            
-            return velB - velA;
-        });
-    }
+        // 2. Priorità delle mosse (se entrambi non stanno switchando)
+        let prioA = a.mossa ? (a.mossa.Priorità || 0) : 0;
+        let prioB = b.mossa ? (b.mossa.Priorità || 0) : 0;
+        if (prioA !== prioB) return prioB - prioA;
+
+        // 3. Velocità
+        const velA = this.calcolaVelocitaCorrente(a.pk);
+        const velB = this.calcolaVelocitaCorrente(b.pk);
+        return velB - velA;
+    });
+}
 
     eseguiAzione(azione) {
-        const { pk, bersaglio, mossa } = azione;
+        const { pk, bersaglio, mossa, proprietario } = azione;
         
+        // 0. GESTIONE SOSTITUZIONE (SWITCH)
+        if (azione.tipo === 'switch') {
+            const vecchioPk = proprietario.squadra[proprietario.attivoIdx];
+            proprietario.attivoIdx = azione.nuovoIdx;
+            const nuovoPk = proprietario.squadra[proprietario.attivoIdx];
+            
+            // Messaggio differenziato a seconda di chi sostituisce
+            this.logs.push(`${proprietario.id === this.p1.id ? 'Hai' : "L'allenatore avversario"} ritirato ${vecchioPk.nome}!`);
+            this.logs.push(`Vai, ${nuovoPk.nome}!`);
+            
+            // Il nuovo Pokémon subentra, ma ovviamente non attaccherà in questo turno
+            nuovoPk.haGiaAgito = true; 
+            return;
+        }
+
+        // Recuperiamo il target corretto. Se l'avversario ha appena switchato, 
+        // colpiremo automaticamente il nuovo Pokémon appena entrato!
         let targetPk = bersaglio.squadra[bersaglio.attivoIdx];
 
         if (pk.hp <= 0 || targetPk.hp <= 0) return;

@@ -3,21 +3,28 @@
 // ==============================================================================
 
 class PokemonEntity {
-    constructor(name, dbData) {
+    constructor(name, dbData, moveDB) {
         this.name = dbData.nome;
         this.types = dbData.tipi;
         this.stats = {
             hp: Math.floor(dbData.statistiche.hp.base_stat * 1.5),
-            attack: dbData.statistiche.attack.base_stat,
-            defense: dbData.statistiche.defense.base_stat,
-            spAttack: dbData.statistiche['special-attack'].base_stat,
-            spDefense: dbData.statistiche['special-defense'].base_stat,
-            speed: dbData.statistiche.speed.base_stat
+            attacco: dbData.statistiche.attack.base_stat,
+            difesa: dbData.statistiche.defense.base_stat,
+            attaccoSpeciale: dbData.statistiche['special-attack'].base_stat,
+            difesaSpeciale: dbData.statistiche['special-defense'].base_stat,
+            velocita: dbData.statistiche.speed.base_stat
         };
         this.maxHp = this.stats.hp;
         this.hp = this.maxHp;
-        let mosseMischiate = [...dbData.mosse].sort(() => 0.5 - Math.random());
-        this.moves = mosseMischiate.slice(0, 4);
+        let mosseMischiate = [...dbData.mosse]
+            .sort(() => 0.5 - Math.random())
+            .slice(0, 4)
+            .map(mName => {
+                let mData = moveDB[mName] || Object.values(moveDB).find(m => m.Nome.toLowerCase() === mName.toLowerCase());
+                return mData ? { ...mData, ppAttuali: mData.PP, ppMassimi: mData.PP } : null;
+            })
+            .filter(m => m);
+        this.moves = mosseMischiate;
         this.alive = true;
         this.sprites = dbData.sprite;
     }
@@ -352,22 +359,12 @@ class BattleScene extends Phaser.Scene {
         this.load.image(this.bgKey, `DB/Immagini/Sfondi/${this.bgKey}.png`);
     }
 
-        create() {
-            this.currentTurn = 1;
-            this.moveDB = this.registry.get('moveDB');
-            this.pEntity = new PokemonEntity(this.pName, this.pkmnDB[this.pName]);
-            this.eEntity = new PokemonEntity(this.eName, this.pkmnDB[this.eName]);
-    
-            // FIX: Trasformiamo subito le mosse da stringhe a oggetti completi con i PP!
-            let initMoves = (entity) => {
-                entity.moves = entity.moves.map(mName => {
-                    let mData = this.moveDB[mName] || Object.values(this.moveDB).find(m => m.Nome.toLowerCase() === mName.toLowerCase());
-                    return mData ? { ...mData, ppAttuali: mData.PP, ppMassimi: mData.PP } : null;
-                }).filter(m => m);
-            };
-            initMoves(this.pEntity);
-            initMoves(this.eEntity);
-    
+    create() {
+        this.currentTurn = 1;
+        this.moveDB = this.registry.get('moveDB');
+        this.pEntity = new PokemonEntity(this.pName, this.pkmnDB[this.pName], this.moveDB);
+        this.eEntity = new PokemonEntity(this.eName, this.pkmnDB[this.eName], this.moveDB);
+
         this.add.image(0, 0, this.bgKey).setOrigin(0, 0).setDisplaySize(1000, 665);
         this.pSprite = this.add.dom(250, 500).createFromHTML(`<img src="${this.pkmnDB[this.pName].sprite?.normal}" style="transform: scale(2.5); image-rendering: pixelated;">`);
         this.eSprite = this.add.dom(750, 230).createFromHTML(`<img src="${this.pkmnDB[this.eName].sprite?.normal}" style="transform: scale(2.2); image-rendering: pixelated;">`);
@@ -379,19 +376,11 @@ class BattleScene extends Phaser.Scene {
         // NUOVO LOG "STILE GBA RETRÒ" (Fighissimo)
         // ==========================================
 
-        // 1. Sfondo scuro principale che riempie il fondo (da Y:665 a 800)
         this.add.rectangle(0, 665, 1000, 135, 0x2b2b2b).setOrigin(0, 0);
-
-        // 2. Bordo principale (rosso/arancio stile gioco originale)
         this.add.rectangle(3, 668, 994, 129).setOrigin(0, 0).setStrokeStyle(6, 0xd05050);
-
-        // 3. Bordo interno sottile per dare profondità 3D
         this.add.rectangle(6, 671, 988, 123).setOrigin(0, 0).setStrokeStyle(2, 0x555555);
-
-        // 4. Divisorio verticale tra le frasi e i bottoni
         this.add.rectangle(590, 668, 6, 129, 0xd05050).setOrigin(0, 0);
 
-        // 5. Testo del log formattato come i veri giochi
         this.logText = this.add.text(30, 690, '', {
             fontSize: '26px',
             fill: '#ffffff',
@@ -399,7 +388,6 @@ class BattleScene extends Phaser.Scene {
             fontStyle: 'bold',
             wordWrap: { width: 530 },
             lineSpacing: 8,
-            // L'ombra nera dietro le scritte bianche è il tocco magico
             shadow: { offsetX: 2, offsetY: 2, color: '#000000', blur: 0, fill: true }
         });
 
@@ -416,36 +404,39 @@ class BattleScene extends Phaser.Scene {
         this.infoPotLabel = this.add.text(840, 765, 'POT:', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
         this.infoPotVal = this.add.text(910, 765, '90', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
 
-        // Mettiamo tutto in un array per poterli nascondere/mostrare facilmente
         this.moveInfoUI = [this.infoTipoLabel, this.infoTipoVal, this.infoCatLabel, this.infoCatVal, this.infoPPLabel, this.infoPPVal, this.infoPotLabel, this.infoPotVal];
-        
+
         this.createButtons();
 
         if (this.isWild) {
-            let creaSquadra = (id, entity) => ({
-                id: id,
-                squadra: [{
-                    nome: entity.name,
-                    hp: entity.hp,
-                    hpMax: entity.maxHp,
-                    statistiche: {
-                        attacco: entity.stats.attack,
-                        difesa: entity.stats.defense,
-                        attaccoSpeciale: entity.stats.spAttack,
-                        difesaSpeciale: entity.stats.spDefense,
-                        velocita: entity.stats.speed
-                    },
-                    modificatori: {},
-                    tipi: entity.types,
-                    livello: 50,
-                    stato: null,
-                    // FIX: Passiamo direttamente le mosse che sono GIA' oggetti completi!
-                    mosse: [...entity.moves]
-                }],
-                attivoIdx: 0
-            });
-            let p1 = creaSquadra('player', this.pEntity);
-            let p2 = creaSquadra('bot', this.eEntity);
+            let pkmnNames = Object.keys(this.pkmnDB);
+            let creaSquadra = (id, mainEntity, extraCount) => {
+                let team = [];
+                team.push({
+                    nome: mainEntity.name, hp: mainEntity.hp, hpMax: mainEntity.maxHp, statistiche: { ...mainEntity.stats },
+                    modificatori: {}, tipi: mainEntity.types, livello: 50, stato: null,
+                    mosse: mainEntity.moves.map(m => ({ ...m }))
+                });
+
+                for (let i = 0; i < extraCount; i++) {
+                    let randomPkmnData = this.pkmnDB[Phaser.Utils.Array.GetRandom(pkmnNames)];
+                    let newPkmnEntity = new PokemonEntity(randomPkmnData.nome, randomPkmnData, this.moveDB);
+                    team.push({
+                        nome: newPkmnEntity.name, hp: newPkmnEntity.hp, hpMax: newPkmnEntity.maxHp, statistiche: { ...newPkmnEntity.stats },
+                        modificatori: {}, tipi: newPkmnEntity.types, livello: 50, stato: null,
+                        mosse: newPkmnEntity.moves.map(m => ({ ...m }))
+                    });
+                }
+
+                return {
+                    id: id,
+                    squadra: team,
+                    attivoIdx: 0
+                };
+            };
+
+            let p1 = creaSquadra('player', this.pEntity, 3);
+            let p2 = creaSquadra('bot', this.eEntity, 2);
             this.partita = new gestionePartita(p1, p2);
         }
 
@@ -457,7 +448,6 @@ class BattleScene extends Phaser.Scene {
     }
 
     createUIBox(x, y, entity) {
-        // Salviamo il riferimento al testo del nome per posizionarci sopra lo stato
         let nameTxt = this.add.text(x, y, entity.name.toUpperCase(), {
             fontSize: '24px', fill: '#000', fontStyle: 'bold', backgroundColor: '#fff8'
         });
@@ -467,7 +457,6 @@ class BattleScene extends Phaser.Scene {
         this.add.rectangle(x, y + 60, 200, 15, 0x555555).setOrigin(0, 0);
         let bar = this.add.rectangle(x, y + 60, 200, 15, 0x00ff00).setOrigin(0, 0);
 
-        // Aggiungiamo nameText al ritorno per usarlo dopo
         return { nameText: nameTxt, text: hpTxt, bar: bar };
     }
 
@@ -484,65 +473,107 @@ class BattleScene extends Phaser.Scene {
         this.btns = [];
         this.selectedMoveIndex = 0;
         this.isInputActive = false;
+        this.menuState = 'MAIN';
 
         this.moveKeys = this.input.keyboard.createCursorKeys();
         this.confirmKey = this.input.keyboard.addKey('ENTER');
+        this.cancelKey = this.input.keyboard.addKey('ESC');
 
         for (let i = 0; i < 4; i++) {
-            // SPOSTATI A SINISTRA! (Dove normalmente c'è il log)
-            let bx = 40 + (i % 2) * 260; 
+            let bx = 40 + (i % 2) * 260;
             let by = 690 + Math.floor(i / 2) * 45;
 
             let b = this.add.text(bx, by, '', {
-                fontSize: '24px', // Ora che hanno spazio a sinistra possiamo farli grandi
+                fontSize: '24px',
                 fill: '#ffffff',
                 fontFamily: '"Courier New", Courier, monospace',
                 fontStyle: 'bold',
                 shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true },
                 padding: { x: 2, y: 5 }
             })
-            .setInteractive()
-            .on('pointerdown', () => { 
-                if (this.isInputActive && this.pEntity.moves[i]) this.handleMoveClick(this.pEntity.moves[i].Nome); 
-            })
-            .on('pointerover', () => {
-                if (this.isInputActive && this.pEntity.moves[i]) {
-                    this.selectedMoveIndex = i;
-                    this.updateMoveSelection();
-                }
-            });
+                .setInteractive()
+                .on('pointerdown', () => {
+                    if (this.isInputActive) this.handleButtonClick(i);
+                })
+                .on('pointerover', () => {
+                    if (this.isInputActive) {
+                        this.selectedMoveIndex = i;
+                        this.updateMenuSelection();
+                    }
+                });
 
-            b.setVisible(false); // Partono invisibili
+            b.setVisible(false);
             this.btns.push(b);
         }
     }
-    updateMoveSelection() {
-        // Aggiorna i cursori e i colori base dei bottoni
-        this.btns.forEach((b, i) => {
-            let m = this.pEntity.moves[i];
-            if (m) {
-                let moveName = m.Nome.toUpperCase();
-                if (i === this.selectedMoveIndex) {
-                    b.setText("▶ " + moveName);
-                    b.setStyle({ fill: '#ffcc00' }); // Giallo evidenziato
-                } else {
-                    b.setText("  " + moveName);
-                    b.setStyle({ fill: '#ffffff' }); // Bianco normale
-                }
-            }
-        });
 
-        // Aggiornamento Pannello Info Destra (Tipo, PP, ecc.)
-        let m = this.pEntity.moves[this.selectedMoveIndex];
-        if (m) {
-            this.infoTipoVal.setText(m.Tipo.toUpperCase()).setColor(this.getColorForType(m.Tipo));
-            this.infoCatVal.setText(m.Categoria.toUpperCase()).setColor(m.Categoria === "Fisico" ? '#ff4444' : (m.Categoria === "Speciale" ? '#4444ff' : '#aaaaaa'));
-            this.infoPPVal.setText(`${m.ppAttuali}/${m.ppMassimi}`).setColor(m.ppAttuali <= 0 ? '#ff4444' : '#ffffff');
-            this.infoPotVal.setText(m.Potenza > 0 ? m.Potenza : '-').setColor('#ffffff');
+    updateMenuSelection() {
+        if (this.menuState === 'MAIN') {
+            const mainOptions = ['LOTTA', this.isWild ? 'POKÉBALL' : 'ZAINO', 'POKÉMON', 'FUGA'];
+            this.btns.forEach((b, i) => {
+                b.setVisible(true);
+                b.setText((i === this.selectedMoveIndex ? "▶ " : "  ") + mainOptions[i]);
+                b.setStyle({ fill: i === this.selectedMoveIndex ? '#ffcc00' : '#ffffff' });
+            });
+            this.moveInfoUI.forEach(element => element.setVisible(false));
+        } else if (this.menuState === 'MOVES') {
+            this.btns.forEach((b, i) => {
+                let m = this.pEntity.moves[i];
+                if (m) {
+                    b.setVisible(true);
+                    b.setText((i === this.selectedMoveIndex ? "▶ " : "  ") + m.Nome.toUpperCase());
+                    b.setStyle({ fill: i === this.selectedMoveIndex ? '#ffcc00' : '#ffffff' });
+                } else {
+                    b.setVisible(false);
+                }
+            });
+
+            let m = this.pEntity.moves[this.selectedMoveIndex];
+            if (m) {
+                this.infoTipoVal.setText(m.Tipo.toUpperCase()).setColor(this.getColorForType(m.Tipo));
+                this.infoCatVal.setText(m.Categoria.toUpperCase()).setColor(m.Categoria === "Fisico" ? '#ff4444' : (m.Categoria === "Speciale" ? '#4444ff' : '#aaaaaa'));
+                this.infoPPVal.setText(`${m.ppAttuali}/${m.ppMassimi}`).setColor(m.ppAttuali <= 0 ? '#ff4444' : '#ffffff');
+                this.infoPotVal.setText(m.Potenza > 0 ? m.Potenza : '-').setColor('#ffffff');
+                this.moveInfoUI.forEach(element => element.setVisible(true));
+            } else {
+                this.moveInfoUI.forEach(element => element.setVisible(false));
+            }
+        } else if (this.menuState === 'TEAM_LIST') {
+            let teamOptions = [];
+            if (this.isWild && this.partita && this.partita.p1) {
+                teamOptions = this.partita.p1.squadra.map(p => p.nome.toUpperCase());
+            } else {
+                teamOptions = [this.pEntity.name.toUpperCase()];
+            }
+
+            let displayOptions = teamOptions.slice(0, 3);
+            displayOptions.push('INDIETRO');
+
+            this.btns.forEach((b, i) => {
+                if (i < displayOptions.length) {
+                    b.setVisible(true);
+                    b.setText((i === this.selectedMoveIndex ? "▶ " : "  ") + displayOptions[i]);
+                    b.setStyle({ fill: i === this.selectedMoveIndex ? '#ffcc00' : '#ffffff' });
+                } else {
+                    b.setVisible(false);
+                }
+            });
+            this.moveInfoUI.forEach(element => element.setVisible(false));
+        } else if (this.menuState === 'TEAM_ACTION') {
+            const actionOptions = ['SOSTITUISCI', 'SOMMARIO', 'INDIETRO'];
+            this.btns.forEach((b, i) => {
+                if (i < actionOptions.length) {
+                    b.setVisible(true);
+                    b.setText((i === this.selectedMoveIndex ? "▶ " : "  ") + actionOptions[i]);
+                    b.setStyle({ fill: i === this.selectedMoveIndex ? '#ffcc00' : '#ffffff' });
+                } else {
+                    b.setVisible(false);
+                }
+            });
+            this.moveInfoUI.forEach(element => element.setVisible(false));
         }
     }
 
-    // Funzione helper per i colori
     getColorForType(tipo) {
         const colori = {
             'Normale': '#A8A878', 'Fuoco': '#F08030', 'Acqua': '#6890F0', 'Elettro': '#F8D030',
@@ -553,40 +584,55 @@ class BattleScene extends Phaser.Scene {
         };
         return colori[tipo] || '#ffffff';
     }
+
     update() {
         if (!this.isInputActive) return;
 
         if (Phaser.Input.Keyboard.JustDown(this.moveKeys.left)) {
             if (this.selectedMoveIndex % 2 !== 0) this.selectedMoveIndex--;
-            this.updateMoveSelection();
+            this.updateMenuSelection();
         } else if (Phaser.Input.Keyboard.JustDown(this.moveKeys.right)) {
             if (this.selectedMoveIndex % 2 === 0) this.selectedMoveIndex++;
-            this.updateMoveSelection();
+            this.updateMenuSelection();
         } else if (Phaser.Input.Keyboard.JustDown(this.moveKeys.up)) {
             if (this.selectedMoveIndex >= 2) this.selectedMoveIndex -= 2;
-            this.updateMoveSelection();
+            this.updateMenuSelection();
         } else if (Phaser.Input.Keyboard.JustDown(this.moveKeys.down)) {
             if (this.selectedMoveIndex <= 1) this.selectedMoveIndex += 2;
-            this.updateMoveSelection();
+            this.updateMenuSelection();
         }
 
         if (Phaser.Input.Keyboard.JustDown(this.confirmKey)) {
-            this.handleMoveClick(this.pEntity.moves[this.selectedMoveIndex].Nome);
+            this.handleButtonClick(this.selectedMoveIndex);
+        }
+
+        if (Phaser.Input.Keyboard.JustDown(this.cancelKey)) {
+            if (this.menuState === 'MOVES' || this.menuState === 'TEAM_LIST') {
+                this.menuState = 'MAIN';
+                this.selectedMoveIndex = 0;
+                this.updateMenuSelection();
+            } else if (this.menuState === 'TEAM_ACTION') {
+                this.menuState = 'TEAM_LIST';
+                this.selectedMoveIndex = 0;
+                this.updateMenuSelection();
+            }
         }
     }
+
     startTurn() {
         this.logText.setVisible(false);
         this.isInputActive = true;
+        this.menuState = 'MAIN';
+        this.selectedMoveIndex = 0;
 
-        // Gestione mosse forzate (Carica, Ricarica, Ripeti)
         if (this.pEntity.mossaForzata) {
             let forcedMoveData = this.pEntity.moves.find(m => m && m.Nome === this.pEntity.mossaForzata);
             if (forcedMoveData && forcedMoveData.ppAttuali <= 0 && this.pEntity.mossaForzata !== "Ricarica") {
-                this.pEntity.mossaForzata = null; // Annulla la costrizione se non ha PP
+                this.pEntity.mossaForzata = null;
             } else {
                 this.btns.forEach(b => b.setVisible(false));
                 this.moveInfoUI.forEach(element => element.setVisible(false));
-                
+
                 this.time.delayedCall(1000, () => {
                     this.handleMoveClick(this.pEntity.mossaForzata);
                 });
@@ -594,41 +640,25 @@ class BattleScene extends Phaser.Scene {
             }
         }
 
-        // Controllo: se il giocatore non ha più PP in nessuna mossa, forza Scontro
         let haMosseDisponibili = this.pEntity.moves.some(m => m && m.ppAttuali > 0);
         if (!haMosseDisponibili) {
             this.pEntity.moves = [{ ...this.moveDB["Scontro"] }];
             this.selectedMoveIndex = 0;
         }
 
-        // 1. PRIMA aggiorniamo i testi e i colori delle mosse
-        this.updateMoveSelection();
-
-        // 2. POI mostriamo i bottoni (solo se esiste la mossa corrispondente in quell'indice)
-        this.btns.forEach((b, i) => { 
-            if (this.pEntity.moves[i]) {
-                b.setVisible(true); 
-            } else {
-                b.setVisible(false);
-            }
-        });
-        
-        // 3. Mostriamo le statistiche laterali
-        this.moveInfoUI.forEach(element => element.setVisible(true));
+        this.updateMenuSelection();
     }
 
     handleMoveClick(moveName) {
         let myMoveData = this.pEntity.moves.find(m => m.Nome === moveName);
-        
-        // Mossa finta dal backend per i Pokemon che devono saltare il turno a causa di stanchezza
+
         if (moveName === "Ricarica") {
             myMoveData = { Nome: "Ricarica", Tipo: "Normale", Categoria: "Stato", Potenza: 0, Precisione: 100, CodiceFunzione: [] };
         }
 
-        // Blocca l'uso della mossa se i PP sono finiti e non è Scontro
-        if (myMoveData && myMoveData.ppAttuali <= 0 && myMoveData.Nome !== "Scontro" && myMoveData.Nome !== "Ricarica") {
+        if (myMoveData && myMoveData.ppAttuali !== undefined && myMoveData.ppAttuali <= 0 && myMoveData.Nome !== "Scontro" && myMoveData.Nome !== "Ricarica") {
             let warningText = this.add.text(500, 400, "PP ESAURITI!", {
-                fontSize: '40px', fill: '#ff0000', fontStyle: 'bold', stroke: '#000', strokeThickness: 6 
+                fontSize: '40px', fill: '#ff0000', fontStyle: 'bold', stroke: '#000', strokeThickness: 6
             }).setOrigin(0.5);
             this.tweens.add({
                 targets: warningText, y: 350, alpha: 0, duration: 1500, onComplete: () => warningText.destroy()
@@ -638,7 +668,6 @@ class BattleScene extends Phaser.Scene {
 
         this.isInputActive = false;
 
-        // Nascondi le mosse e le info, e rimostra il log text!
         this.btns.forEach(b => b.setVisible(false));
         this.moveInfoUI.forEach(element => element.setVisible(false));
         this.logText.setVisible(true);
@@ -673,19 +702,122 @@ class BattleScene extends Phaser.Scene {
         }
     }
 
+    handleButtonClick(index) {
+        if (this.menuState === 'MAIN') {
+            if (index === 0) { // LOTTA
+                this.menuState = 'MOVES';
+                this.selectedMoveIndex = 0;
+                this.updateMenuSelection();
+            } else if (index === 1) { // ZAINO / POKÉBALL
+                this.isInputActive = false;
+                this.btns.forEach(b => b.setVisible(false));
+                this.logText.setVisible(true);
+                this.logText.setText("Non puoi catturare i Pokémon altrui!");
+                this.time.delayedCall(1500, () => this.startTurn());
+            } else if (index === 2) { // POKÉMON (Menu Squadra)
+                this.menuState = 'TEAM_LIST';
+                this.selectedMoveIndex = 0;
+                this.updateMenuSelection();
+            } else if (index === 3) { // FUGA
+                this.isInputActive = false;
+                this.btns.forEach(b => b.setVisible(false));
+                this.logText.setVisible(true);
+                if (this.isWild) {
+                    this.logText.setText("Sei fuggito con successo!");
+                    this.time.delayedCall(1500, () => {
+                        if (this.socket) this.socket.emit('setInBattle', false);
+                        this.scene.stop();
+                        this.scene.resume('WorldScene');
+                    });
+                } else {
+                    this.logText.setText("Non puoi fuggire da una lotta tra allenatori!");
+                    this.time.delayedCall(1500, () => this.startTurn());
+                }
+            }
+        } else if (this.menuState === 'MOVES') {
+            let m = this.pEntity.moves[index];
+            if (m) this.handleMoveClick(m.Nome);
+        } else if (this.menuState === 'TEAM_LIST') {
+            let teamCount = (this.isWild && this.partita && this.partita.p1) ? this.partita.p1.squadra.length : 1;
+            let displayCount = Math.min(3, teamCount);
+
+            if (index < displayCount) { // Cliccato su uno dei Pokémon
+                this.menuState = 'TEAM_ACTION';
+                this.selectedTeamIndex = index; // Salviamo l'indice del pokemon selezionato
+                this.selectedMoveIndex = 0;
+                this.updateMenuSelection();
+            } else if (index === displayCount || index === 3) { // Tasto Indietro
+                this.menuState = 'MAIN';
+                this.selectedMoveIndex = 0;
+                this.updateMenuSelection();
+            }
+        } else if (this.menuState === 'TEAM_ACTION') {
+            if (index === 0) { // SOSTITUISCI
+                this.isInputActive = false;
+                this.btns.forEach(b => b.setVisible(false));
+                this.logText.setVisible(true);
+
+                if (this.selectedTeamIndex === 0) {
+                    this.logText.setText(`${this.pEntity.name} è già in campo!`);
+                    this.time.delayedCall(1500, () => {
+                        this.logText.setVisible(false);
+                        this.isInputActive = true;
+                        this.updateMenuSelection();
+                    });
+                } else {
+                    const switchAction = { tipo: 'switch', nuovoIdx: this.selectedTeamIndex };
+
+                    if (this.isWild) {
+                        let botMoves = this.eEntity.moves.filter(m => m.ppAttuali > 0);
+                        let botMove = Phaser.Utils.Array.GetRandom(botMoves) || this.moveDB["Scontro"];
+                        let stato = this.partita.processaTurno(switchAction, { mossa: botMove });
+                        this.applicaStatoPartita(stato, false);
+                    } else {
+                        this.logText.setText("In attesa dell'avversario...");
+                        this.socket.emit('pvpUseMove', { roomId: this.roomId, ...switchAction });
+                    }
+                }
+            } else if (index === 1) { // SOMMARIO
+                this.isInputActive = false;
+                this.btns.forEach(b => b.setVisible(false));
+                this.logText.setVisible(true);
+                this.logText.setText("Apertura sommario... (Da implementare in futuro)");
+                this.time.delayedCall(1500, () => {
+                    this.logText.setVisible(false);
+                    this.isInputActive = true;
+                    this.updateMenuSelection();
+                });
+            } else if (index === 2) { // INDIETRO
+                this.menuState = 'TEAM_LIST';
+                this.selectedMoveIndex = 0;
+                this.updateMenuSelection();
+            }
+        }
+    }
+
     resolveTurn(turnData) {
         this.applicaStatoPartita(turnData.stato, turnData.inverti);
     }
 
     applicaStatoPartita(stato, inverti) {
-        // Aggiorniamo il numero del turno ricevuto dal server
         this.currentTurn = stato.turno;
         let p1Data = inverti ? stato.p2 : stato.p1;
-        // Aggiorniamo le mosse (che ora sono oggetti completi)
+        let p2Data = inverti ? stato.p1 : stato.p2;
+
+        if (p1Data.nome !== this.pEntity.name) {
+            this.pEntity = new PokemonEntity(p1Data.nome, this.pkmnDB[p1Data.nome], this.moveDB);
+            if (this.pSprite.node) this.pSprite.node.querySelector('img').src = this.pkmnDB[p1Data.nome].sprite.normal;
+            this.pUI.nameText.setText(p1Data.nome.toUpperCase());
+        }
+
+        if (p2Data.nome !== this.eEntity.name) {
+            this.eEntity = new PokemonEntity(p2Data.nome, this.pkmnDB[p2Data.nome], this.moveDB);
+            if (this.eSprite.node) this.eSprite.node.querySelector('img').src = this.pkmnDB[p2Data.nome].sprite.normal;
+            this.eUI.nameText.setText(p2Data.nome.toUpperCase());
+        }
+
         this.pEntity.moves = [...p1Data.mosse];
         this.pEntity.mossaForzata = p1Data.mossaForzata;
-
-        let p2Data = inverti ? stato.p1 : stato.p2;
         this.eEntity.mossaForzata = p2Data.mossaForzata;
 
         this.pEntity.hp = p1Data.hp;
@@ -693,12 +825,11 @@ class BattleScene extends Phaser.Scene {
         if (this.pEntity.hp <= 0) this.pEntity.alive = false;
         if (this.eEntity.hp <= 0) this.eEntity.alive = false;
 
-        // --- Aggiorniamo lo Sprite se si trasformano (es. Ditto, Mew) ---
         if (p1Data.trasformato && this.pSprite.node) {
-            this.pSprite.node.querySelector('img').src = this.pkmnDB[this.eName].sprite.normal;
+            this.pSprite.node.querySelector('img').src = this.pkmnDB[this.eEntity.name].sprite.normal;
         }
         if (p2Data.trasformato && this.eSprite.node) {
-            this.eSprite.node.querySelector('img').src = this.pkmnDB[this.pName].sprite.normal;
+            this.eSprite.node.querySelector('img').src = this.pkmnDB[this.pEntity.name].sprite.normal;
         }
 
         this.mostraLogsSequenziali(stato.logs, () => {
@@ -817,7 +948,6 @@ class BattleScene extends Phaser.Scene {
     updateStatusOverlay(isPlayer, stato) {
         let ui = isPlayer ? this.pUI : this.eUI;
         if (!ui.statusLabel) {
-            // Posizioniamo lo stato sopra il nome (y - 25)
             ui.statusLabel = this.add.text(ui.nameText.x, ui.nameText.y - 25, '', {
                 fontSize: '16px', fontStyle: 'bold', padding: { x: 4, y: 2 }
             });
