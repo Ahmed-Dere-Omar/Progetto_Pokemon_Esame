@@ -29,7 +29,7 @@ class gestionePartita {
         this.turno = 1;
         this.logs = [];
         this.finito = false;
-        
+
         if (this.p1.attivoIdx === undefined) this.p1.attivoIdx = 0;
         if (this.p2.attivoIdx === undefined) this.p2.attivoIdx = 0;
 
@@ -41,10 +41,18 @@ class gestionePartita {
         this.meteo = null;
         this.turniMeteo = 0;
         this.ultimaMossaGlobale = null;
+
+        // TRUCCO MAGICO: Sovrascriviamo il push per "fotografare" gli HP in tempo reale ad ogni log!
+        let origPush = this.logs.push.bind(this.logs);
+        this.logs.push = (testo) => {
+            let p1Hp = this.p1 && this.p1.squadra && this.p1.squadra[this.p1.attivoIdx] ? this.p1.squadra[this.p1.attivoIdx].hp : 0;
+            let p2Hp = this.p2 && this.p2.squadra && this.p2.squadra[this.p2.attivoIdx] ? this.p2.squadra[this.p2.attivoIdx].hp : 0;
+            origPush({ testo: testo, p1Hp: p1Hp, p2Hp: p2Hp });
+        };
     }
 
     processaTurno(azioneP1, azioneP2) {
-        this.logs = [];
+        this.logs.length = 0; 
         this.statiTurno = {}; 
         
         // Reset flag di inizio turno per tentennamenti e protezioni
@@ -84,31 +92,31 @@ class gestionePartita {
     }
 
     determinaOrdine(a1, a2) {
-    const pkP1 = this.p1.squadra[this.p1.attivoIdx];
-    const pkP2 = this.p2.squadra[this.p2.attivoIdx];
+        const pkP1 = this.p1.squadra[this.p1.attivoIdx];
+        const pkP2 = this.p2.squadra[this.p2.attivoIdx];
 
-    const azioni = [
-        { ...a1, proprietario: this.p1, bersaglio: this.p2, pk: pkP1 },
-        { ...a2, proprietario: this.p2, bersaglio: this.p1, pk: pkP2 }
-    ];
+        const azioni = [
+            { ...a1, proprietario: this.p1, bersaglio: this.p2, pk: pkP1 },
+            { ...a2, proprietario: this.p2, bersaglio: this.p1, pk: pkP2 }
+        ];
 
-    return azioni.sort((a, b) => {
-        // 1. Priorità massima alla sostituzione
-        if (a.tipo === 'switch' && b.tipo !== 'switch') return -1;
-        if (a.tipo !== 'switch' && b.tipo === 'switch') return 1;
-        if (a.tipo === 'switch' && b.tipo === 'switch') return 0;
+        return azioni.sort((a, b) => {
+            // 1. Priorità massima alla sostituzione
+            if (a.tipo === 'switch' && b.tipo !== 'switch') return -1;
+            if (a.tipo !== 'switch' && b.tipo === 'switch') return 1;
+            if (a.tipo === 'switch' && b.tipo === 'switch') return 0;
 
-        // 2. Priorità delle mosse (se entrambi non stanno switchando)
-        let prioA = a.mossa ? (a.mossa.Priorità || 0) : 0;
-        let prioB = b.mossa ? (b.mossa.Priorità || 0) : 0;
-        if (prioA !== prioB) return prioB - prioA;
+            // 2. Priorità delle mosse (se entrambi non stanno switchando)
+            let prioA = a.mossa ? (a.mossa.Priorità || 0) : 0;
+            let prioB = b.mossa ? (b.mossa.Priorità || 0) : 0;
+            if (prioA !== prioB) return prioB - prioA;
 
-        // 3. Velocità
-        const velA = this.calcolaVelocitaCorrente(a.pk);
-        const velB = this.calcolaVelocitaCorrente(b.pk);
-        return velB - velA;
-    });
-}
+            // 3. Velocità
+            const velA = this.calcolaVelocitaCorrente(a.pk);
+            const velB = this.calcolaVelocitaCorrente(b.pk);
+            return velB - velA;
+        });
+    }
 
     eseguiAzione(azione) {
         const { pk, bersaglio, mossa, proprietario } = azione;
@@ -116,20 +124,22 @@ class gestionePartita {
         // 0. GESTIONE SOSTITUZIONE (SWITCH)
         if (azione.tipo === 'switch') {
             const vecchioPk = proprietario.squadra[proprietario.attivoIdx];
+            
+            // FIX: Cambiamo subito l'indice e azzeriamo gli stati in silenzio!
+            if(vecchioPk) vecchioPk.statiVolatili = {}; 
             proprietario.attivoIdx = azione.nuovoIdx;
             const nuovoPk = proprietario.squadra[proprietario.attivoIdx];
             
-            // Messaggio differenziato a seconda di chi sostituisce
+            // ORA registriamo i log testuali. Il "fotografo" catturerà la barra della vita 
+            // del NUOVO Pokémon per entrambe le righe, eliminando il ritardo visivo e sistemando i nomi!
             this.logs.push(`${proprietario.id === this.p1.id ? 'Hai' : "L'allenatore avversario"} ritirato ${vecchioPk.nome}!`);
             this.logs.push(`Vai, ${nuovoPk.nome}!`);
             
-            // Il nuovo Pokémon subentra, ma ovviamente non attaccherà in questo turno
             nuovoPk.haGiaAgito = true; 
             return;
         }
 
-        // Recuperiamo il target corretto. Se l'avversario ha appena switchato, 
-        // colpiremo automaticamente il nuovo Pokémon appena entrato!
+        // Recuperiamo il target corretto (perché se ha appena switchato dobbiamo colpire il nuovo!)
         let targetPk = bersaglio.squadra[bersaglio.attivoIdx];
 
         if (pk.hp <= 0 || targetPk.hp <= 0) return;
@@ -303,7 +313,6 @@ class gestionePartita {
                    if (eff.Parametri && eff.Parametri.Turno === 1 && EffettiModulo[eff.NomeFunzione]) {
                        let reqTarget = (eff.Parametri.Bersaglio === "Utente") ? pk : targetPk;
                        
-                       // FIX: Questa è la chiamata corretta al modulo degli effetti!
                        EffettiModulo[eff.NomeFunzione]({
                            ...eff.Parametri,
                            Utente: pk,
@@ -381,7 +390,7 @@ class gestionePartita {
             }
 
             if (effectiveness > 0) {
-                this.logs.push(`Inflitti ${dannoInflittoReale} danni a ${targetPk.nome}!`);
+                this.logs.push(`Inflitti ${dannoInflittoReale} danni a ${targetPk.nome}!|HP:${targetPk.hp}`);
             } else {
                 pk.haGiaAgito = true;
                 return; // Interrompe il turno senza applicare effetti secondari
@@ -423,7 +432,7 @@ class gestionePartita {
                     Mossa: mossa
                 };
 
-                // FIX: Evitiamo di sovrascrivere l'oggetto Bersaglio con una stringa,
+                // Evitiamo di sovrascrivere l'oggetto Bersaglio con una stringa,
                 // a meno che non sia una delle pochissime funzioni che legge esplicitamente il testo!
                 let effettiConStringa = ["ResettaStatistiche", "RimuoviStato", "ProteggiDaArea", "BloccaPriorità"];
                 
@@ -457,7 +466,7 @@ class gestionePartita {
     calcolaDanno(a, d, m, targetPlayer) {
         const livello = a.livello || 50;
         const isFisico = m.Categoria === 'Fisico';
-        
+
         let att = isFisico ? a.statistiche.attacco : a.statistiche.attaccoSpeciale;
         let dif = isFisico ? d.statistiche.difesa : d.statistiche.difesaSpeciale;
 
@@ -468,13 +477,13 @@ class gestionePartita {
 
         let attMod = a.modificatori[isFisico ? 'attacco' : 'attaccospeciale'] || 0;
         let difMod = d.modificatori[m.CodiceFunzione && m.CodiceFunzione.some(e => e.NomeFunzione === "CalcolaDannoSuDifesaFisica") ? 'difesa' : (isFisico ? 'difesa' : 'difesaspeciale')] || 0;
-        
+
         let isCrit = false;
         let critStage = a.modificatori.tassoCritico || 0;
         if (m.Flags && m.Flags.includes("AltoTassoCritico")) critStage += 1;
         if (a.statiVolatili && a.statiVolatili.prossimoColpoCritico) critStage = 100;
         if (m.CodiceFunzione && m.CodiceFunzione.some(e => e.NomeFunzione === "ColpoCriticoSicuro")) critStage = 100;
-        
+
         if (critStage >= 3) isCrit = true;
         else if (critStage === 2) isCrit = Math.random() < 0.5;
         else if (critStage === 1) isCrit = Math.random() < 0.125;
@@ -490,7 +499,7 @@ class gestionePartita {
         att = Math.floor(att * (attMod >= 0 ? (2 + attMod) / 2 : 2 / (2 - attMod)));
         dif = Math.floor(dif * (difMod >= 0 ? (2 + difMod) / 2 : 2 / (2 - difMod)));
         if (dif === 0) dif = 1;
-        
+
         let potenzaReale = m.Potenza || 0;
         let moltiplicatoreDanno = 1;
         let dannoFisso = null;
@@ -578,12 +587,12 @@ class gestionePartita {
                 effectiveness *= EfficaciaTipi[m.Tipo][tipoDifesa];
             }
         });
-        
+
         if (effectiveness === 0) return { danno: 0, effectiveness, isCrit: false };
         if (dannoFisso !== null) return { danno: dannoFisso, effectiveness, isCrit };
 
         let dannoBase = (((2 * livello / 5 + 2) * potenzaReale * att / dif) / 50) + 2;
-        
+
         const stab = a.tipi.includes(m.Tipo) ? 1.5 : 1;
         const random = (Math.floor(Math.random() * (100 - 85 + 1)) + 85) / 100;
 
@@ -657,7 +666,7 @@ class gestionePartita {
                 let dannoTrap = Math.max(1, Math.floor(pk.hpMax * pk.statiVolatili.dannoIntrappolamento.dannoPerTurno));
                 pk.hp = Math.max(0, pk.hp - dannoTrap);
                 this.logs.push(`${pk.nome} subisce danni perché è intrappolato!`);
-                
+
                 pk.statiVolatili.dannoIntrappolamento.turniRimanenti--;
                 if (pk.statiVolatili.dannoIntrappolamento.turniRimanenti <= 0) {
                     pk.statiVolatili.dannoIntrappolamento = null;
@@ -671,7 +680,7 @@ class gestionePartita {
                 let effDanno = Math.min(pk.hp, dannoLeech);
                 pk.hp = Math.max(0, pk.hp - effDanno);
                 this.logs.push(`I semi rubano energia a ${pk.nome}!`);
-                
+
                 let pAvversario = (p === this.p1) ? this.p2 : this.p1;
                 let avversario = pAvversario.squadra[pAvversario.attivoIdx];
                 if (avversario && avversario.hp > 0) {
@@ -716,11 +725,11 @@ class gestionePartita {
                     this.logs.push(`${pk.nome} subisce l'attacco previsto!`);
                     let mossaFutura = pk.statiVolatili.dannoFuturo.mossa;
                     let origine = pk.statiVolatili.dannoFuturo.origineAttacco;
-                    
+
                     let dmgRes = this.calcolaDanno(origine || pk, pk, mossaFutura, null);
                     pk.hp = Math.max(0, pk.hp - dmgRes.danno);
                     this.logs.push(`Inflitti ${dmgRes.danno} danni a ${pk.nome}!`);
-                    
+
                     pk.statiVolatili.dannoFuturo = null;
                 }
             }
@@ -765,25 +774,33 @@ class gestionePartita {
     ottieniStatoAggiornato() {
         let p1Pk = this.p1.squadra[this.p1.attivoIdx];
         let p2Pk = this.p2.squadra[this.p2.attivoIdx];
-    
+
+        // Inviamo la lista completa della squadra e l'indice di chi sta lottando!
+        let teamP1 = this.p1.squadra.map(p => ({ nome: p.nome, hp: p.hp, maxHp: p.hpMax }));
+        let teamP2 = this.p2.squadra.map(p => ({ nome: p.nome, hp: p.hp, maxHp: p.hpMax }));
+
         return {
-            p1: { 
-                hp: p1Pk.hp, 
+            p1: {
+                hp: p1Pk.hp,
                 nome: p1Pk.nome,
-                mosse: p1Pk.mosse, // Invia gli oggetti completi con ppAttuali
+                mosse: p1Pk.mosse,
                 trasformato: !!(p1Pk.statiVolatili && p1Pk.statiVolatili.trasformato),
-                mossaForzata: this.getMossaForzata(p1Pk)
+                mossaForzata: this.getMossaForzata(p1Pk),
+                attivoIdx: this.p1.attivoIdx,
+                squadra: teamP1
             },
-            p2: { 
-                hp: p2Pk.hp, 
+            p2: {
+                hp: p2Pk.hp,
                 nome: p2Pk.nome,
                 mosse: p2Pk.mosse,
                 trasformato: !!(p2Pk.statiVolatili && p2Pk.statiVolatili.trasformato),
-                mossaForzata: this.getMossaForzata(p2Pk)
+                mossaForzata: this.getMossaForzata(p2Pk),
+                attivoIdx: this.p2.attivoIdx,
+                squadra: teamP2
             },
             logs: this.logs,
             finito: this.finito,
-            turno: this.turno // Inviato per gestire il camuffamento del turno 1
+            turno: this.turno
         };
     }
 }

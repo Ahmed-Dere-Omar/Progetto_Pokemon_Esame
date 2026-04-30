@@ -361,6 +361,11 @@ class BattleScene extends Phaser.Scene {
 
     create() {
         this.currentTurn = 1;
+        
+        // FIX: Puliamo la memoria dalla battaglia precedente!
+        this.myTeamData = null; 
+        this.myActiveIdx = 0;   
+
         this.moveDB = this.registry.get('moveDB');
         this.pEntity = new PokemonEntity(this.pName, this.pkmnDB[this.pName], this.moveDB);
         this.eEntity = new PokemonEntity(this.eName, this.pkmnDB[this.eName], this.moveDB);
@@ -371,10 +376,6 @@ class BattleScene extends Phaser.Scene {
 
         this.pUI = this.createUIBox(100, 360, this.pEntity);
         this.eUI = this.createUIBox(600, 100, this.eEntity);
-
-        // ==========================================
-        // NUOVO LOG "STILE GBA RETRÒ" (Fighissimo)
-        // ==========================================
 
         this.add.rectangle(0, 665, 1000, 135, 0x2b2b2b).setOrigin(0, 0);
         this.add.rectangle(3, 668, 994, 129).setOrigin(0, 0).setStrokeStyle(6, 0xd05050);
@@ -391,7 +392,6 @@ class BattleScene extends Phaser.Scene {
             shadow: { offsetX: 2, offsetY: 2, color: '#000000', blur: 0, fill: true }
         });
 
-        // --- UI INFO MOSSA (A Destra del divisorio) ---
         this.infoTipoLabel = this.add.text(610, 685, 'TIPO:', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
         this.infoTipoVal = this.add.text(700, 685, 'NORMALE', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
 
@@ -428,16 +428,15 @@ class BattleScene extends Phaser.Scene {
                     });
                 }
 
-                return {
-                    id: id,
-                    squadra: team,
-                    attivoIdx: 0
-                };
+                return { id: id, squadra: team, attivoIdx: 0 };
             };
 
             let p1 = creaSquadra('player', this.pEntity, 3);
             let p2 = creaSquadra('bot', this.eEntity, 2);
             this.partita = new gestionePartita(p1, p2);
+            
+            // FIX: Nelle lotte PvE, salviamo subito la squadra al turno 1 così puoi fare switch!
+            this.myTeamData = this.partita.p1.squadra; 
         }
 
         if (!this.isWild) {
@@ -540,8 +539,12 @@ class BattleScene extends Phaser.Scene {
             }
         } else if (this.menuState === 'TEAM_LIST') {
             let teamOptions = [];
-            if (this.isWild && this.partita && this.partita.p1) {
-                teamOptions = this.partita.p1.squadra.map(p => p.nome.toUpperCase());
+
+            // FIX: Usiamo (p.maxHp || p.hpMax) per evitare l'undefined!
+            if (this.myTeamData) {
+                teamOptions = this.myTeamData.map(p => `${p.nome.toUpperCase()} (${p.hp}/${p.maxHp || p.hpMax})`);
+            } else if (this.isWild && this.partita && this.partita.p1) {
+                teamOptions = this.partita.p1.squadra.map(p => `${p.nome.toUpperCase()} (${p.hp}/${p.hpMax || p.maxHp})`);
             } else {
                 teamOptions = [this.pEntity.name.toUpperCase()];
             }
@@ -625,24 +628,31 @@ class BattleScene extends Phaser.Scene {
         this.menuState = 'MAIN';
         this.selectedMoveIndex = 0;
 
+        // GESTIONE MOSSE FORZATE O RICARICA
         if (this.pEntity.mossaForzata) {
-            let forcedMoveData = this.pEntity.moves.find(m => m && m.Nome === this.pEntity.mossaForzata);
-            if (forcedMoveData && forcedMoveData.ppAttuali <= 0 && this.pEntity.mossaForzata !== "Ricarica") {
+            let forcedMoveName = this.pEntity.mossaForzata;
+            let forcedMoveData = this.pEntity.moves.find(m => m && m.Nome === forcedMoveName);
+
+            if (forcedMoveData && forcedMoveData.ppAttuali <= 0 && forcedMoveName !== "Ricarica") {
                 this.pEntity.mossaForzata = null;
             } else {
                 this.btns.forEach(b => b.setVisible(false));
                 this.moveInfoUI.forEach(element => element.setVisible(false));
+                this.isInputActive = false;
 
+                // Ritardo cosmetico, poi lanciamo l'attacco in automatico
                 this.time.delayedCall(1000, () => {
-                    this.handleMoveClick(this.pEntity.mossaForzata);
+                    this.handleMoveClick(forcedMoveName);
                 });
                 return;
             }
         }
 
+        // GESTIONE FINE PP (SCONTRO)
         let haMosseDisponibili = this.pEntity.moves.some(m => m && m.ppAttuali > 0);
         if (!haMosseDisponibili) {
-            this.pEntity.moves = [{ ...this.moveDB["Scontro"] }];
+            // FIX: Assicurati che "Scontro" esista nel moveDB del client e passagli i dati minimi!
+            this.pEntity.moves = [this.moveDB["Scontro"] || { Nome: "Scontro", Tipo: "Normale", Categoria: "Fisico", ppAttuali: 1, ppMassimi: 1 }];
             this.selectedMoveIndex = 0;
         }
 
@@ -652,11 +662,8 @@ class BattleScene extends Phaser.Scene {
     handleMoveClick(moveName) {
         let myMoveData = this.pEntity.moves.find(m => m.Nome === moveName);
 
-        if (moveName === "Ricarica") {
-            myMoveData = { Nome: "Ricarica", Tipo: "Normale", Categoria: "Stato", Potenza: 0, Precisione: 100, CodiceFunzione: [] };
-        }
-
-        if (myMoveData && myMoveData.ppAttuali !== undefined && myMoveData.ppAttuali <= 0 && myMoveData.Nome !== "Scontro" && myMoveData.Nome !== "Ricarica") {
+        // Controllo PP esauriti per mosse normali
+        if (moveName !== "Ricarica" && moveName !== "Scontro" && myMoveData && myMoveData.ppAttuali !== undefined && myMoveData.ppAttuali <= 0) {
             let warningText = this.add.text(500, 400, "PP ESAURITI!", {
                 fontSize: '40px', fill: '#ff0000', fontStyle: 'bold', stroke: '#000', strokeThickness: 6
             }).setOrigin(0.5);
@@ -673,6 +680,7 @@ class BattleScene extends Phaser.Scene {
         this.logText.setVisible(true);
 
         if (this.isWild) {
+            // ... (logica bot invariata)
             let mosseDisponibiliBot = this.eEntity.moves.filter(m => m.ppAttuali > 0);
             let botMoveData;
 
@@ -682,11 +690,7 @@ class BattleScene extends Phaser.Scene {
                     botMoveData = { Nome: "Ricarica", Tipo: "Normale", Categoria: "Stato", Potenza: 0, Precisione: 100, CodiceFunzione: [] };
                 } else if (botMoveData && botMoveData.ppAttuali <= 0) {
                     this.eEntity.mossaForzata = null;
-                    if (mosseDisponibiliBot.length > 0) {
-                        botMoveData = Phaser.Utils.Array.GetRandom(mosseDisponibiliBot);
-                    } else {
-                        botMoveData = this.moveDB["Scontro"];
-                    }
+                    botMoveData = (mosseDisponibiliBot.length > 0) ? Phaser.Utils.Array.GetRandom(mosseDisponibiliBot) : this.moveDB["Scontro"];
                 }
             } else if (mosseDisponibiliBot.length > 0) {
                 botMoveData = Phaser.Utils.Array.GetRandom(mosseDisponibiliBot);
@@ -694,11 +698,16 @@ class BattleScene extends Phaser.Scene {
                 botMoveData = this.moveDB["Scontro"];
             }
 
+            // Fallback per sicurezza su botMoveData se per caso "Scontro" o la mossa fallisce a caricarsi
+            if (!botMoveData) botMoveData = { Nome: "Scontro", Tipo: "Normale", Categoria: "Fisico" };
+            if (!myMoveData) myMoveData = { Nome: moveName, Tipo: "Normale", Categoria: "Fisico" };
+
             let statoAggiornato = this.partita.processaTurno({ mossa: myMoveData }, { mossa: botMoveData });
             this.applicaStatoPartita(statoAggiornato, false);
         } else {
+            // FIX: Assicurati di inviare SEMPRE un messaggio al server!
             this.logText.setText("In attesa dell'avversario...");
-            this.socket.emit('pvpUseMove', { roomId: this.roomId, moveName });
+            this.socket.emit('pvpUseMove', { roomId: this.roomId, moveName: moveName });
         }
     }
 
@@ -757,7 +766,10 @@ class BattleScene extends Phaser.Scene {
                 this.btns.forEach(b => b.setVisible(false));
                 this.logText.setVisible(true);
 
-                if (this.selectedTeamIndex === 0) {
+                // FIX SOSTITUZIONE: Leggiamo myActiveIdx invece dello "0" hardcodato!
+                let activeIdx = this.myActiveIdx !== undefined ? this.myActiveIdx : 0;
+
+                if (this.selectedTeamIndex === activeIdx) {
                     this.logText.setText(`${this.pEntity.name} è già in campo!`);
                     this.time.delayedCall(1500, () => {
                         this.logText.setVisible(false);
@@ -800,30 +812,34 @@ class BattleScene extends Phaser.Scene {
     }
 
     applicaStatoPartita(stato, inverti) {
+        this.invertiLogs = inverti; // Ci serve per il parsing dei log
         this.currentTurn = stato.turno;
         let p1Data = inverti ? stato.p2 : stato.p1;
         let p2Data = inverti ? stato.p1 : stato.p2;
+
+        this.myActiveIdx = p1Data.attivoIdx;
+        this.myTeamData = p1Data.squadra;
 
         if (p1Data.nome !== this.pEntity.name) {
             this.pEntity = new PokemonEntity(p1Data.nome, this.pkmnDB[p1Data.nome], this.moveDB);
             if (this.pSprite.node) this.pSprite.node.querySelector('img').src = this.pkmnDB[p1Data.nome].sprite.normal;
             this.pUI.nameText.setText(p1Data.nome.toUpperCase());
+            this.updateStatusOverlay(true, null);
         }
 
         if (p2Data.nome !== this.eEntity.name) {
             this.eEntity = new PokemonEntity(p2Data.nome, this.pkmnDB[p2Data.nome], this.moveDB);
             if (this.eSprite.node) this.eSprite.node.querySelector('img').src = this.pkmnDB[p2Data.nome].sprite.normal;
             this.eUI.nameText.setText(p2Data.nome.toUpperCase());
+            this.updateStatusOverlay(false, null);
         }
 
         this.pEntity.moves = [...p1Data.mosse];
         this.pEntity.mossaForzata = p1Data.mossaForzata;
         this.eEntity.mossaForzata = p2Data.mossaForzata;
 
-        this.pEntity.hp = p1Data.hp;
-        this.eEntity.hp = p2Data.hp;
-        if (this.pEntity.hp <= 0) this.pEntity.alive = false;
-        if (this.eEntity.hp <= 0) this.eEntity.alive = false;
+        if (p1Data.hp <= 0) this.pEntity.alive = false;
+        if (p2Data.hp <= 0) this.eEntity.alive = false;
 
         if (p1Data.trasformato && this.pSprite.node) {
             this.pSprite.node.querySelector('img').src = this.pkmnDB[this.eEntity.name].sprite.normal;
@@ -835,6 +851,7 @@ class BattleScene extends Phaser.Scene {
         this.mostraLogsSequenziali(stato.logs, () => {
             this.updateUI();
             if (stato.finito || !this.pEntity.alive || !this.eEntity.alive) {
+                // ... (animazioni di sconfitta/vittoria) ...
                 this.time.delayedCall(1500, () => {
                     this.logText.setText(!this.pEntity.alive ? 'HAI PERSO... 💀' : 'HAI VINTO! 🎉');
                     let loserSprite = !this.pEntity.alive ? this.pSprite : this.eSprite;
@@ -862,21 +879,55 @@ class BattleScene extends Phaser.Scene {
         }
         let index = 0;
         let ultimoAttaccanteEraPlayer = null;
+
         let mostraProssimo = () => {
             if (index < logs.length) {
-                let riga = logs[index];
+                let logObj = logs[index];
+
+                // 1. GESTIONE POLIMORFICA DEL LOG (Stringa o Oggetto con HP)
+                // Se il log è un oggetto {testo, p1Hp, p2Hp}, estraiamo i dati
+                let riga = typeof logObj === 'object' ? logObj.testo : logObj;
+
+                // 2. SINCRONIZZAZIONE HP IN TEMPO REALE
+                // Se abbiamo i dati HP salvati in questo log, aggiorniamo le entità prima di mostrare il testo
+                if (typeof logObj === 'object') {
+                    this.pEntity.hp = this.invertiLogs ? logObj.p2Hp : logObj.p1Hp;
+                    this.eEntity.hp = this.invertiLogs ? logObj.p1Hp : logObj.p2Hp;
+                    // Aggiorniamo subito la grafica per riflettere lo stato esatto di questo log
+                    this.updateUI();
+                }
+
+                // 3. PARSING VECCHIO STILE (Fallback per log con stringa |HP:)
+                let targetHp = null;
+                if (typeof riga === 'string' && riga.includes("|HP:")) {
+                    let parts = riga.split("|HP:");
+                    riga = parts[0];
+                    targetHp = parseInt(parts[1]);
+                }
+
                 this.logText.setText(riga);
 
                 let isPlayerTarget = riga.includes(this.pEntity.name);
                 let isEnemyTarget = riga.includes(this.eEntity.name);
 
+                // Gestione animazione attacco (Dash)
                 if (riga.includes(" usa ")) {
                     ultimoAttaccanteEraPlayer = riga.includes(this.pEntity.name);
                     this.playDash(ultimoAttaccanteEraPlayer);
                 }
 
+                // Gestione calo HP e animazione danno
                 if (riga.includes("Inflitti") || riga.includes("efficace") || riga.includes("subisce danni") || riga.includes("rubano energia") || riga.includes("recupera") || riga.includes("rigenera") || riga.includes("contraccolpo")) {
-                    this.updateUI();
+
+                    let targetEnt = isPlayerTarget ? this.pEntity : (isEnemyTarget ? this.eEntity : null);
+
+                    // Se stiamo usando il vecchio sistema |HP:, aggiorniamo qui
+                    if (targetEnt && targetHp !== null) {
+                        targetEnt.hp = targetHp;
+                    }
+
+                    this.updateUI(targetEnt);
+
                     if (riga.includes("Inflitti") || riga.includes("efficace")) {
                         if (ultimoAttaccanteEraPlayer !== null) {
                             this.playDamage(!ultimoAttaccanteEraPlayer);
@@ -886,6 +937,7 @@ class BattleScene extends Phaser.Scene {
                     }
                 }
 
+                // --- ANIMAZIONI STATISTICHE E STATO ---
                 if (riga.includes("aumenta")) {
                     this.playStatAnim(isPlayerTarget, true);
                 } else if (riga.includes("diminuisce")) {
@@ -912,6 +964,8 @@ class BattleScene extends Phaser.Scene {
                 index++;
                 this.time.delayedCall(1500, mostraProssimo);
             } else {
+                // Fine dei log: assicuriamoci che l'interfaccia sia sincronizzata al 100%
+                this.updateUI();
                 if (onComplete) onComplete();
             }
         };
