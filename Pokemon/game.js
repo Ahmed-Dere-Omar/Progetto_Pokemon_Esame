@@ -477,7 +477,7 @@ class BattleScene extends Phaser.Scene {
 
         this.moveKeys = this.input.keyboard.createCursorKeys();
         this.confirmKey = this.input.keyboard.addKey('ENTER');
-        this.cancelKey = this.input.keyboard.addKey('ESC');
+        this.cancelKey = this.input.keyboard.addKey('BACKSPACE');
 
         for (let i = 0; i < 4; i++) {
             let bx = 40 + (i % 2) * 260;
