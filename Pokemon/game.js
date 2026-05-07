@@ -1,3 +1,15 @@
+// 1. INIZIALIZZA SUPABASE
+const supabaseUrl = 'https://zlmjvbtmzkphkdfspcht.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpsbWp2YnRtemtwaGtkZnNwY2h0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3NDA4NDUsImV4cCI6MjA5MjMxNjg0NX0.j6aRmC3tTrFiZj62WrEmSKkuICoBHagFzKS3b8_adeM';
+const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+// ==============================================================================
+// TRUCCO GLOBALE ANTI-RACE CONDITION
+// Memorizziamo SE QUESTA SPECIFICA SCHEDA è quella aperta dalla mail.
+// ==============================================================================
+window.isRecoveryLink = window.location.href.includes('type=recovery');
+
+
 // ==============================================================================
 // PARTE 1: CLASSI E UTILITY GLOBALI (Il "Motore" del gioco)
 // ==============================================================================
@@ -66,28 +78,285 @@ class BootScene extends Phaser.Scene {
     }
 }
 
-// 2. LOGIN SCENE: Solo UI HTML
+// 2. LOGIN SCENE
 class LoginScene extends Phaser.Scene {
     constructor() { super({ key: 'LoginScene' }); }
+
     create() {
+        this.isLoginMode = true;
+        this.isStarting = false;
+        this.authEventBlocked = false;
+        // NUOVO SCUDO: Dice alla vecchia scheda di farsi gli affari suoi!
+        this.isWaitingForReset = false;
+
         const html = `
             <div id="login-container">
-                <h1 class="text-shadows" style="font-size: 5rem; margin-bottom: 0;">POKEMON</h1>
+                <h1 class="text-shadows" style="font-size: 5rem; margin-bottom: 0;">NEOMON</h1>
                 <h2 style="font-size: 2rem; letter-spacing: 10px; margin-top: 0; color: #fff;">MULTIPLAYER</h2>
-                <input type="text" id="username-input" placeholder="IL TUO NOME..." maxlength="10" autocomplete="off" style="margin-top: 20px;">
-                <button id="start-btn" style="margin-top: 10px;">INIZIA AVVENTURA</button>
+                
+                <div id="form-box" style="display: flex; flex-direction: column; align-items: center;">
+                    <input type="text" id="username-input" placeholder="NICKNAME..." autocomplete="off" 
+                        style="display: none; width: 300px; padding: 15px; font-size: 1.2rem; font-family: 'Courier New', monospace; font-weight: bold; text-align: center; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; margin-top: 20px; outline: none;">
+                    
+                    <input type="email" id="email-input" placeholder="EMAIL..." autocomplete="off" 
+                        style="width: 300px; padding: 15px; font-size: 1.2rem; font-family: 'Courier New', monospace; font-weight: bold; text-align: center; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; margin-top: 20px; outline: none;">
+                    
+                    <input type="password" id="password-input" placeholder="PASSWORD..." 
+                        style="width: 300px; padding: 15px; font-size: 1.2rem; font-family: 'Courier New', monospace; font-weight: bold; text-align: center; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; margin-top: 10px; outline: none;">
+                    
+                    <p id="forgot-btn" style="color: #b5d6d6; font-family: 'Courier New', monospace; font-size: 0.9rem; margin-top: 5px; cursor: pointer; text-decoration: underline;">Hai dimenticato la password?</p>
+
+                    <button id="main-btn" style="width: 338px; padding: 15px; margin-top: 15px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">ACCEDI</button>
+                    
+                    <button id="google-btn" style="width: 338px; padding: 15px; margin-top: 10px; font-size: 1.2rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #ffffff; color: #4285F4; border: 4px solid #4285F4; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #a0c1f9; display: flex; align-items: center; justify-content: center;">
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" style="width: 20px; margin-right: 10px;"> ACCEDI CON GOOGLE
+                    </button>
+
+                    <p id="toggle-mode" style="color: #fff; font-family: 'Courier New', monospace; font-weight: bold; margin-top: 20px; cursor: pointer; text-decoration: underline;">Nuovo allenatore? Registrati</p>
+                    
+                    <p id="auth-msg" style="color: #ffcc00; font-family: 'Courier New', monospace; font-weight: bold; margin-top: 10px; text-align: center;"></p>
+                </div>
             </div>`;
+
         let dom = this.add.dom(500, 400).createFromHTML(html);
 
-        dom.addListener('click').on('click', (e) => {
-            if (e.target.id === 'start-btn') {
-                let name = dom.getChildByID('username-input').value.trim().toUpperCase();
-                if (name !== '') {
-                    dom.destroy();
-                    this.scene.start('WorldScene', { name: name });
+        if (window.location.href.includes('error=')) {
+            let params = new URLSearchParams(window.location.hash.substring(1) || window.location.search.substring(1));
+            let errorMsg = params.get('error_description') || "Link non valido o scaduto.";
+            dom.getChildByID('auth-msg').innerText = "ERRORE: " + errorMsg.replace(/\+/g, ' ') + "\nRichiedi un nuovo link.";
+            window.history.replaceState(null, null, window.location.pathname);
+            return;
+        }
+
+        if (window.isRecoveryLink) {
+            this.mostraSchermataRecupero(dom);
+        }
+
+        const { data: authListener } = supabaseClient.auth.onAuthStateChange((event, session) => {
+            if (event === 'PASSWORD_RECOVERY') {
+                if (window.isRecoveryLink) {
+                    this.authEventBlocked = true;
+                    if (!this.isStarting) this.mostraSchermataRecupero(dom);
+                }
+            }
+            else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+                if (session && !window.isRecoveryLink && !this.isStarting) {
+                    // LA MAGIA E' QUI: Se la vecchia scheda stava aspettando il reset, ignora la sessione!
+                    if (this.isWaitingForReset) return;
+
+                    this.mostraTestoCaricamento();
+                    this.avviaGioco(session.user, dom);
                 }
             }
         });
+        this.authSubscription = authListener.subscription;
+
+        if (!window.isRecoveryLink) {
+            supabaseClient.auth.getSession().then(({ data }) => {
+                if (data.session && !window.isRecoveryLink && !this.isStarting && !this.isWaitingForReset) {
+                    this.mostraTestoCaricamento();
+                    this.avviaGioco(data.session.user, dom);
+                }
+            });
+        }
+
+        dom.addListener('click').on('click', async (e) => {
+            if (!['main-btn', 'google-btn', 'toggle-mode', 'forgot-btn'].includes(e.target.id) && e.target.parentElement?.id !== 'google-btn') return;
+
+            let msgLabel = dom.getChildByID('auth-msg');
+            let emailEl = dom.getChildByID('email-input');
+            let emailInput = emailEl ? emailEl.value.trim() : '';
+
+            // --- PASSWORD DIMENTICATA ---
+            if (e.target.id === 'forgot-btn') {
+                if (!emailInput) { msgLabel.innerText = "Inserisci l'email qui sopra per recuperarla!"; return; }
+                const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+                if (!emailRegex.test(emailInput)) { msgLabel.innerText = "Formato email non valido!"; return; }
+
+                // ALZIAMO LO SCUDO: Da questo momento, questa scheda ignorerà ogni login automatico!
+                this.isWaitingForReset = true;
+
+                msgLabel.innerText = "Verifica account...";
+                e.target.disabled = true;
+
+                const { error } = await supabaseClient.auth.resetPasswordForEmail(emailInput);
+
+                if (error) {
+                    if (error.message.includes('rate limit')) msgLabel.innerText = "Troppi tentativi. Riprova tra un'ora!";
+                    else if (error.message.includes('not found') || error.message.includes('User not')) msgLabel.innerText = "Nessun allenatore trovato con questa email.";
+                    else msgLabel.innerText = "Errore: " + error.message;
+                } else {
+                    msgLabel.innerText = "Se l'email esiste, riceverai un link a breve!";
+                }
+                setTimeout(() => { e.target.disabled = false; }, 3000);
+                return;
+            }
+
+            // ABBASSANO LO SCUDO SE L'UTENTE CAMBIA IDEA E CLICCA UN ALTRO TASTO:
+            if (e.target.id === 'google-btn' || e.target.parentElement.id === 'google-btn') {
+                this.isWaitingForReset = false;
+                msgLabel.innerText = "Reindirizzamento a Google...";
+                await supabaseClient.auth.signInWithOAuth({ provider: 'google' });
+                return;
+            }
+
+            if (e.target.id === 'toggle-mode') {
+                this.isWaitingForReset = false;
+                this.isLoginMode = !this.isLoginMode;
+                dom.getChildByID('username-input').style.display = this.isLoginMode ? 'none' : 'block';
+                dom.getChildByID('forgot-btn').style.display = this.isLoginMode ? 'block' : 'none';
+
+                let btn = dom.getChildByID('main-btn');
+                btn.innerText = this.isLoginMode ? 'ACCEDI' : 'REGISTRATI';
+                btn.style.backgroundColor = this.isLoginMode ? '#f6eedf' : '#e69597';
+                btn.style.color = this.isLoginMode ? '#ff7477' : '#fff';
+                dom.getChildByID('toggle-mode').innerText = this.isLoginMode ? 'Nuovo allenatore? Registrati' : 'Hai già un account? Accedi';
+                msgLabel.innerText = '';
+                return;
+            }
+
+            if (e.target.id === 'main-btn') {
+                this.isWaitingForReset = false;
+                let pwdEl = dom.getChildByID('password-input');
+                let usrEl = dom.getChildByID('username-input');
+                let password = pwdEl ? pwdEl.value.trim() : '';
+                let username = usrEl ? usrEl.value.trim() : '';
+
+                if (!emailInput || !password) { msgLabel.innerText = "Inserisci email e password!"; return; }
+                if (!this.isLoginMode && !username) { msgLabel.innerText = "Scegli un Nickname per giocare!"; return; }
+
+                msgLabel.innerText = "Attendere...";
+
+                if (!this.isLoginMode) {
+                    const { error } = await supabaseClient.auth.signUp({
+                        email: emailInput, password: password, options: { data: { username: username } }
+                    });
+                    if (error) msgLabel.innerText = "Errore: " + error.message;
+                    else {
+                        msgLabel.innerText = "Registrazione OK! Ora accedi.";
+                        dom.getChildByID('toggle-mode').click();
+                    }
+                } else {
+                    const { error } = await supabaseClient.auth.signInWithPassword({ email: emailInput, password: password });
+                    if (error) msgLabel.innerText = "Errore: Credenziali errate.";
+                    // Se OK, la "spia" di onAuthStateChange rileverà SIGNED_IN e ti butterà in gioco.
+                }
+            }
+        });
+    }
+
+    mostraTestoCaricamento() {
+        let container = document.getElementById('login-container');
+        if (container) {
+            container.innerHTML = `
+                <h1 class="text-shadows" style="font-size: 5rem; margin-bottom: 0;">NEOMON</h1>
+                <h2 style="font-size: 2rem; color: #fff; font-family: 'Courier New';">Bentornato! Accesso in corso...</h2>
+            `;
+        }
+    }
+
+    mostraSchermataRecupero(dom) {
+        let container = document.getElementById('login-container');
+        container.innerHTML = `
+            <h1 class="text-shadows" style="font-size: 4rem; margin-bottom: 0;">RECUPERO</h1>
+            <h2 style="font-size: 1.5rem; color: #fff; font-family: 'Courier New'; text-align: center; margin-top: 10px;">Inserisci la tua nuova password:</h2>
+            <input type="password" id="new-password-input" placeholder="NUOVA PASSWORD..." autocomplete="off" 
+                style="width: 300px; padding: 15px; font-size: 1.2rem; font-family: 'Courier New', monospace; font-weight: bold; text-align: center; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; margin-top: 20px; outline: none;">
+            <button id="save-pwd-btn" style="width: 338px; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">SALVA</button>
+            <p id="pwd-msg" style="color: #ffcc00; font-family: 'Courier New', monospace; font-weight: bold; margin-top: 15px; text-align: center;"></p>
+        `;
+
+        let btn = document.getElementById('save-pwd-btn');
+        btn.addEventListener('click', async () => {
+            let newPwd = document.getElementById('new-password-input').value.trim();
+            let msg = document.getElementById('pwd-msg');
+
+            if (newPwd.length < 6) { msg.innerText = "La password deve avere almeno 6 caratteri!"; return; }
+
+            msg.innerText = "Salvataggio in corso...";
+            const { error } = await supabaseClient.auth.updateUser({ password: newPwd });
+
+            if (error) {
+                msg.innerText = "Errore: " + error.message;
+            } else {
+                msg.innerText = "Password aggiornata! Accesso in corso...";
+
+                // Puliamo l'URL e abbassiamo il semaforo globale
+                window.history.replaceState(null, null, window.location.pathname);
+                window.isRecovery = false;
+
+                setTimeout(() => {
+                    supabaseClient.auth.getSession().then(({ data }) => {
+                        if (data.session) this.avviaGioco(data.session.user, dom);
+                    });
+                }, 1500);
+            }
+        });
+    }
+
+    async avviaGioco(user, dom) {
+        if (this.isStarting) return;
+        this.isStarting = true;
+
+        if (this.authSubscription) {
+            this.authSubscription.unsubscribe();
+            this.authSubscription = null;
+        }
+
+        let nomeGiocatore = user.email.split('@')[0];
+
+        for (let i = 0; i < 3; i++) {
+            const { data: profile } = await supabaseClient
+                .from('profilo')
+                .select('username')
+                .eq('id_utente', user.id)
+                .single();
+
+            if (profile && profile.username) {
+                nomeGiocatore = profile.username;
+                break;
+            }
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        let isAutoGenerated = /_\d+$/.test(nomeGiocatore);
+
+        if (isAutoGenerated) {
+            if (dom) dom.destroy();
+            let nameHtml = `
+                <div id="login-container">
+                    <h1 class="text-shadows" style="font-size: 3rem; margin-bottom: 0;">BENVENUTO!</h1>
+                    <h2 style="font-size: 1.5rem; color: #fff; font-family: 'Courier New'; text-align: center;">Visto che hai usato Google,<br>scegli il tuo Nickname da Allenatore:</h2>
+                    <input type="text" id="new-username" autocomplete="off" style="width: 300px; padding: 15px; font-size: 1.2rem; font-family: 'Courier New', monospace; font-weight: bold; text-align: center; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; outline: none; margin-top: 20px;">
+                    <button id="save-name-btn" style="width: 338px; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">CONFERMA</button>
+                    <p id="name-msg" style="color: #ffcc00; font-family: 'Courier New', monospace; font-weight: bold; margin-top: 10px;"></p>
+                </div>`;
+
+            let nameDom = this.add.dom(500, 400).createFromHTML(nameHtml);
+
+            nameDom.addListener('click').on('click', async (e) => {
+                if (e.target.id === 'save-name-btn') {
+                    let newName = nameDom.getChildByID('new-username').value.trim();
+                    let msg = nameDom.getChildByID('name-msg');
+                    if (!newName) { msg.innerText = "Inserisci un nome!"; return; }
+
+                    msg.innerText = "Salvataggio...";
+                    const { error } = await supabaseClient.from('profilo').update({ username: newName }).eq('id_utente', user.id);
+
+                    if (error) {
+                        msg.innerText = "Nome già in uso o errore!";
+                    } else {
+                        nameDom.destroy();
+                        this.scene.start('WorldScene', { name: newName.toUpperCase(), user: user });
+                    }
+                }
+            });
+        } else {
+            setTimeout(() => {
+                if (dom) dom.destroy();
+                this.scene.start('WorldScene', { name: nomeGiocatore.toUpperCase(), user: user });
+            }, 200);
+        }
     }
 }
 
@@ -104,6 +373,11 @@ class WorldScene extends Phaser.Scene {
 
         this.cursors = this.input.keyboard.createCursorKeys();
         this.enterKey = this.input.keyboard.addKey('ENTER');
+
+        // NUOVO: Aggiungiamo il tasto ESC e il controllo della pausa
+        this.escKey = this.input.keyboard.addKey('ESC');
+        this.isPaused = false;
+        this.pauseMenuDom = null;
 
         this.canEncounter = true;
         this.isTransitioning = false;
@@ -151,7 +425,7 @@ class WorldScene extends Phaser.Scene {
             Object.values(players).forEach(p => p.playerId === this.socket.id ? this.addPlayer(p) : this.addOtherPlayer(p));
         });
         this.socket.on('newPlayer', (p) => this.addOtherPlayer(p));
-        this.socket.on('disconnect', (id) => {
+        this.socket.on('playerDisconnected', (id) => {
             this.otherPlayers.getChildren().forEach(op => {
                 if (op.playerId === id) { op.nameText.destroy(); op.destroy(); }
             });
@@ -205,7 +479,13 @@ class WorldScene extends Phaser.Scene {
     }
 
     update() {
-        if (this.isTransitioning || !this.player) return;
+        // NUOVO: Controllo del tasto ESC per aprire/chiudere il menu
+        if (Phaser.Input.Keyboard.JustDown(this.escKey) && !this.isTransitioning) {
+            this.togglePauseMenu();
+        }
+
+        // FIX: Se il gioco è in transizione, non c'è il player, o siamo in PAUSA, blocca tutto!
+        if (this.isTransitioning || !this.player || this.isPaused) return;
 
         const speed = 160;
         let isMoving = false;
@@ -251,7 +531,47 @@ class WorldScene extends Phaser.Scene {
             if (closest) this.socket.emit('challengePlayer', closest.playerId);
         }
     }
+    togglePauseMenu() {
+        if (this.isPaused) {
+            // Se è già in pausa, chiudi il menu e riprendi a giocare
+            this.isPaused = false;
+            if (this.pauseMenuDom) {
+                this.pauseMenuDom.destroy();
+                this.pauseMenuDom = null;
+            }
+        } else {
+            // Attiva la pausa e ferma il giocatore
+            this.isPaused = true;
+            this.player.body.setVelocity(0);
+            this.player.anims.stop();
 
+            const html = `
+                <div class="selection-overlay">
+                    <div class="selection-box" id="pause-box">
+                        <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 30px;">MENU PAUSA</h2>
+                        
+                        <button id="logout-btn" style="width: 300px; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">ESCI DAL GIOCO</button>
+                        
+                        <p style="color: #fff; margin-top: 30px; font-family: 'Courier New'; font-weight: bold;">Premi ESC per tornare al gioco</p>
+                    </div>
+                </div>`;
+
+            this.pauseMenuDom = this.add.dom(500, 400).createFromHTML(html);
+
+            this.pauseMenuDom.addListener('click').on('click', async (e) => {
+                if (e.target.id === 'logout-btn') {
+                    e.target.innerText = "USCITA IN CORSO...";
+
+                    // Disconnette l'utente da Supabase
+                    await supabaseClient.auth.signOut();
+
+                    // Riavvia l'intera pagina: questo distrugge Phaser, scollega il server Node 
+                    // e ci riporta puliti alla pagina di Login iniziale!
+                    window.location.reload();
+                }
+            });
+        }
+    }
     startEncounter(battleData, testo = "BATTAGLIA!") {
         this.isTransitioning = true;
         this.player.body.setVelocity(0);
@@ -361,10 +681,10 @@ class BattleScene extends Phaser.Scene {
 
     create() {
         this.currentTurn = 1;
-        
+
         // FIX: Puliamo la memoria dalla battaglia precedente!
-        this.myTeamData = null; 
-        this.myActiveIdx = 0;   
+        this.myTeamData = null;
+        this.myActiveIdx = 0;
 
         this.moveDB = this.registry.get('moveDB');
         this.pEntity = new PokemonEntity(this.pName, this.pkmnDB[this.pName], this.moveDB);
@@ -434,9 +754,9 @@ class BattleScene extends Phaser.Scene {
             let p1 = creaSquadra('player', this.pEntity, 3);
             let p2 = creaSquadra('bot', this.eEntity, 2);
             this.partita = new gestionePartita(p1, p2);
-            
+
             // FIX: Nelle lotte PvE, salviamo subito la squadra al turno 1 così puoi fare switch!
-            this.myTeamData = this.partita.p1.squadra; 
+            this.myTeamData = this.partita.p1.squadra;
         }
 
         if (!this.isWild) {

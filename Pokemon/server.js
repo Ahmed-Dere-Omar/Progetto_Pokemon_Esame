@@ -59,7 +59,7 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         if (players[socket.id]) {
             delete players[socket.id];
-            io.emit('disconnect', socket.id);
+            io.emit('playerDisconnected', socket.id);
         }
     });
 

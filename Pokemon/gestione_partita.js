@@ -119,7 +119,7 @@ class gestionePartita {
     }
 
     eseguiAzione(azione) {
-        const { pk, bersaglio, mossa, proprietario } = azione;
+        let { pk, bersaglio, mossa, proprietario } = azione;
         
         // 0. GESTIONE SOSTITUZIONE (SWITCH)
         if (azione.tipo === 'switch') {

@@ -74,6 +74,24 @@ CREATE TRIGGER al_nuovo_utente
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.crea_profilo_automatico();
 
+
+
+
+CREATE OR REPLACE FUNCTION public.crea_profilo_automatico()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  INSERT INTO public.profilo (id_utente, username, avatar_sprite)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'username', SPLIT_PART(NEW.email, '@', 1) || '_' || floor(random() * 1000)::int),
+    1 
+  );
+  RETURN NEW;
+END;
+$$;
 /*
 -- =========================================
 -- TABELLA POKEMON CATTURATI (ISTANZE)
