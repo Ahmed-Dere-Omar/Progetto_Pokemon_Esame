@@ -835,6 +835,7 @@ class BattleScene extends Phaser.Scene {
                 b.setStyle({ fill: i === this.selectedMoveIndex ? '#ffcc00' : '#ffffff' });
             });
             this.moveInfoUI.forEach(element => element.setVisible(false));
+
         } else if (this.menuState === 'MOVES') {
             this.btns.forEach((b, i) => {
                 let m = this.pEntity.moves[i];
@@ -857,55 +858,19 @@ class BattleScene extends Phaser.Scene {
             } else {
                 this.moveInfoUI.forEach(element => element.setVisible(false));
             }
-        } else if (this.menuState === 'TEAM_LIST') {
-            let teamOptions = [];
-
-            // FIX: Usiamo (p.maxHp || p.hpMax) per evitare l'undefined!
-            if (this.myTeamData) {
-                teamOptions = this.myTeamData.map(p => `${p.nome.toUpperCase()} (${p.hp}/${p.maxHp || p.hpMax})`);
-            } else if (this.isWild && this.partita && this.partita.p1) {
-                teamOptions = this.partita.p1.squadra.map(p => `${p.nome.toUpperCase()} (${p.hp}/${p.hpMax || p.maxHp})`);
-            } else {
-                teamOptions = [this.pEntity.name.toUpperCase()];
-            }
-
-            let displayOptions = teamOptions.slice(0, 3);
-            displayOptions.push('INDIETRO');
-
-            this.btns.forEach((b, i) => {
-                if (i < displayOptions.length) {
-                    b.setVisible(true);
-                    b.setText((i === this.selectedMoveIndex ? "▶ " : "  ") + displayOptions[i]);
-                    b.setStyle({ fill: i === this.selectedMoveIndex ? '#ffcc00' : '#ffffff' });
-                } else {
-                    b.setVisible(false);
-                }
-            });
-            this.moveInfoUI.forEach(element => element.setVisible(false));
-        } else if (this.menuState === 'TEAM_ACTION') {
-            const actionOptions = ['SOSTITUISCI', 'SOMMARIO', 'INDIETRO'];
-            this.btns.forEach((b, i) => {
-                if (i < actionOptions.length) {
-                    b.setVisible(true);
-                    b.setText((i === this.selectedMoveIndex ? "▶ " : "  ") + actionOptions[i]);
-                    b.setStyle({ fill: i === this.selectedMoveIndex ? '#ffcc00' : '#ffffff' });
-                } else {
-                    b.setVisible(false);
-                }
-            });
-            this.moveInfoUI.forEach(element => element.setVisible(false));
         }
     }
 
     getColorForType(tipo) {
-        const colori = {
-            'Normale': '#A8A878', 'Fuoco': '#F08030', 'Acqua': '#6890F0', 'Elettro': '#F8D030',
-            'Erba': '#78C850', 'Ghiaccio': '#98D8D8', 'Lotta': '#C03028', 'Veleno': '#A040A0',
-            'Terra': '#E0C068', 'Volante': '#A890F0', 'Psico': '#F85888', 'Coleottero': '#A8B820',
-            'Roccia': '#B8A038', 'Spettro': '#705898', 'Drago': '#7038F8', 'Buio': '#705848',
-            'Acciaio': '#B8B8D0', 'Folletto': '#EE99AC'
+        const typeColors = {
+            "Normale": "#A8A878", "Fuoco": "#F08030", "Acqua": "#6890F0",
+            "Elettro": "#F8D030", "Erba": "#78C850", "Ghiaccio": "#98D8D8",
+            "Lotta": "#C03028", "Veleno": "#A040A0", "Terra": "#E0C068",
+            "Volante": "#A890F0", "Psico": "#F85888", "Coleottero": "#A8B820",
+            "Roccia": "#B8A038", "Spettro": "#705898", "Drago": "#7038F8",
+            "Buio": "#705848", "Acciaio": "#B8B8D0", "Folletto": "#EE99AC"
         };
-        return colori[tipo] || '#ffffff';
+        return typeColors[tipo] || "#777777";
     }
 
     update() {
@@ -930,12 +895,8 @@ class BattleScene extends Phaser.Scene {
         }
 
         if (Phaser.Input.Keyboard.JustDown(this.cancelKey)) {
-            if (this.menuState === 'MOVES' || this.menuState === 'TEAM_LIST') {
+            if (this.menuState === 'MOVES') {
                 this.menuState = 'MAIN';
-                this.selectedMoveIndex = 0;
-                this.updateMenuSelection();
-            } else if (this.menuState === 'TEAM_ACTION') {
-                this.menuState = 'TEAM_LIST';
                 this.selectedMoveIndex = 0;
                 this.updateMenuSelection();
             }
@@ -1044,9 +1005,7 @@ class BattleScene extends Phaser.Scene {
                 this.logText.setText("Non puoi catturare i Pokémon altrui!");
                 this.time.delayedCall(1500, () => this.startTurn());
             } else if (index === 2) { // POKÉMON (Menu Squadra)
-                this.menuState = 'TEAM_LIST';
-                this.selectedMoveIndex = 0;
-                this.updateMenuSelection();
+                this.openTeamModal(); // Apre il nostro nuovo modal HTML
             } else if (index === 3) { // FUGA
                 this.isInputActive = false;
                 this.btns.forEach(b => b.setVisible(false));
@@ -1066,64 +1025,6 @@ class BattleScene extends Phaser.Scene {
         } else if (this.menuState === 'MOVES') {
             let m = this.pEntity.moves[index];
             if (m) this.handleMoveClick(m.Nome);
-        } else if (this.menuState === 'TEAM_LIST') {
-            let teamCount = (this.isWild && this.partita && this.partita.p1) ? this.partita.p1.squadra.length : 1;
-            let displayCount = Math.min(3, teamCount);
-
-            if (index < displayCount) { // Cliccato su uno dei Pokémon
-                this.menuState = 'TEAM_ACTION';
-                this.selectedTeamIndex = index; // Salviamo l'indice del pokemon selezionato
-                this.selectedMoveIndex = 0;
-                this.updateMenuSelection();
-            } else if (index === displayCount || index === 3) { // Tasto Indietro
-                this.menuState = 'MAIN';
-                this.selectedMoveIndex = 0;
-                this.updateMenuSelection();
-            }
-        } else if (this.menuState === 'TEAM_ACTION') {
-            if (index === 0) { // SOSTITUISCI
-                this.isInputActive = false;
-                this.btns.forEach(b => b.setVisible(false));
-                this.logText.setVisible(true);
-
-                // FIX SOSTITUZIONE: Leggiamo myActiveIdx invece dello "0" hardcodato!
-                let activeIdx = this.myActiveIdx !== undefined ? this.myActiveIdx : 0;
-
-                if (this.selectedTeamIndex === activeIdx) {
-                    this.logText.setText(`${this.pEntity.name} è già in campo!`);
-                    this.time.delayedCall(1500, () => {
-                        this.logText.setVisible(false);
-                        this.isInputActive = true;
-                        this.updateMenuSelection();
-                    });
-                } else {
-                    const switchAction = { tipo: 'switch', nuovoIdx: this.selectedTeamIndex };
-
-                    if (this.isWild) {
-                        let botMoves = this.eEntity.moves.filter(m => m.ppAttuali > 0);
-                        let botMove = Phaser.Utils.Array.GetRandom(botMoves) || this.moveDB["Scontro"];
-                        let stato = this.partita.processaTurno(switchAction, { mossa: botMove });
-                        this.applicaStatoPartita(stato, false);
-                    } else {
-                        this.logText.setText("In attesa dell'avversario...");
-                        this.socket.emit('pvpUseMove', { roomId: this.roomId, ...switchAction });
-                    }
-                }
-            } else if (index === 1) { // SOMMARIO
-                this.isInputActive = false;
-                this.btns.forEach(b => b.setVisible(false));
-                this.logText.setVisible(true);
-                this.logText.setText("Apertura sommario... (Da implementare in futuro)");
-                this.time.delayedCall(1500, () => {
-                    this.logText.setVisible(false);
-                    this.isInputActive = true;
-                    this.updateMenuSelection();
-                });
-            } else if (index === 2) { // INDIETRO
-                this.menuState = 'TEAM_LIST';
-                this.selectedMoveIndex = 0;
-                this.updateMenuSelection();
-            }
         }
     }
 
@@ -1351,6 +1252,320 @@ class BattleScene extends Phaser.Scene {
         let targetY = isPlayer ? 500 : 230;
         let trap = this.add.text(targetX, targetY, '🔗', { fontSize: '100px' }).setOrigin(0.5);
         this.tweens.add({ targets: trap, scale: { from: 2, to: 1 }, alpha: { from: 1, to: 0 }, duration: 1500, onComplete: () => trap.destroy() });
+    }
+    openTeamModal() {
+        this.isInputActive = false;
+        this.modalSelection = 0; // Indice per navigare la lista o i bottoni
+        this.currentView = 'list'; // 'list', 'actions', 'summary'
+        this.summaryPage = 0; // 0 = Statistiche, 1 = Mosse
+
+        let teamData = this.myTeamData || (this.partita ? this.partita.p1.squadra : [this.pEntity]);
+
+        const html = `
+            <div class="modal-overlay" id="team-modal">
+                <div class="modal-content">
+                    <div id="modal-list-view" style="display: block; width: 100%;">
+                        <div class="modal-header">SQUADRA POKÉMON</div>
+                        <div class="pokemon-list" id="pkmn-list-container"></div>
+                        <div class="action-buttons">
+                            <button class="action-btn" id="btn-close-modal">CHIUDI</button>
+                        </div>
+                    </div>
+    
+                    <div id="modal-action-view" class="summary-view" style="display: none; width: 100%;">
+                        <div class="modal-header" id="action-title">AZIONI</div>
+                        <div class="action-buttons-container">
+                            <button class="action-btn" id="btn-switch">SOSTITUISCI</button>
+                            <button class="action-btn" id="btn-summary">SUMMARY</button>
+                            <button class="action-btn" id="btn-back-to-list">INDIETRO</button>
+                        </div>
+                    </div>
+    
+                    <div id="modal-summary-view" class="summary-view" style="display: none; width: 100%;">
+                        <div class="modal-header" style="font-size: 1.5rem;" id="summary-page-indicator">◀ INFO E STATISTICHE ▶</div>
+                        
+                        <div class="summary-layout" style="display: flex; gap: 20px; width: 100%;">
+                            <div class="summary-left" style="flex: 1; text-align: center; border-right: 4px dashed var(--color-quaternary);">
+                                <div class="pkmn-name" id="summary-name" style="margin-bottom: 10px;">NOME</div>
+                                <img id="summary-sprite" src="" style="width: 160px; height: 160px; image-rendering: pixelated;">
+                                <div class="summary-types" id="summary-types" style="display: flex; justify-content: center; gap: 10px; margin-top: 10px;"></div>
+                            </div>
+                            
+                            <div class="summary-right" style="flex: 1.5; padding-left: 10px;">
+                                <div id="summary-page-0" class="stats-grid"></div>
+                                <div id="summary-page-1" class="moves-grid" style="display: none;"></div>
+                            </div>
+                        </div>
+    
+                        <div class="action-buttons" style="margin-top: 20px;">
+                            <button class="action-btn selected" id="btn-back-to-action">INDIETRO</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+
+        this.teamModalDom = this.add.dom(500, 400).createFromHTML(html);
+        this.populateTeamList(teamData);
+        this.setupModalNavigation(teamData);
+    }
+
+    populateTeamList(teamData) {
+        let container = document.getElementById('pkmn-list-container');
+        if (!container) return;
+
+        let listHTML = '';
+        teamData.forEach((pkmn, index) => {
+            // SICUREZZA: Se pkmn.sprite non esiste (perché arriva dal server semplificato),
+            // lo cerchiamo nel database locale tramite il nome.
+            let localData = (this.pkmnDB && this.pkmnDB[pkmn.nome]) ? this.pkmnDB[pkmn.nome] : null;
+            let spriteUrl = pkmn.sprite?.normal || localData?.sprite?.normal || '';
+
+            let hp = pkmn.hp;
+            let maxHp = pkmn.maxHp || pkmn.hpMax || (localData ? localData.statistiche.hp.base_stat : 100);
+            let hpPercent = (hp / maxHp) * 100;
+            let hpColor = hpPercent > 50 ? '#4caf50' : (hpPercent > 20 ? '#ffeb3b' : '#f44336');
+
+            listHTML += `
+                <div class="pokemon-item" data-index="${index}">
+                    <img src="${spriteUrl}" style="width: 64px; height: 64px; display: block; image-rendering: pixelated;">
+                    <div class="pkmn-info" style="flex-grow: 1; margin-left: 15px;">
+                        <div class="pkmn-name">${pkmn.nome.toUpperCase()} ${index === (this.myActiveIdx || 0) ? '★' : ''}</div>
+                        <div class="pkmn-hp">HP: ${hp}/${maxHp}</div>
+                        <div class="hp-bar-bg"><div class="hp-bar-fill" style="width: ${hpPercent}%; background-color: ${hpColor};"></div></div>
+                    </div>
+                </div>`;
+        });
+        container.innerHTML = listHTML;
+        this.updateModalVisuals();
+    }
+    setupModalNavigation(teamData) {
+        this.modalKeyListener = (event) => {
+            if (this.isInputActive) return;
+            const key = event.key;
+
+            // Movimento Verticale (Lista e Azioni)
+            if (key === 'ArrowDown' || key === 's') {
+                let max = this.currentView === 'list' ? teamData.length + 1 : 3;
+                this.modalSelection = (this.modalSelection + 1) % max;
+                this.updateModalVisuals();
+            }
+            if (key === 'ArrowUp' || key === 'w') {
+                let max = this.currentView === 'list' ? teamData.length + 1 : 3;
+                this.modalSelection = (this.modalSelection - 1 + max) % max;
+                this.updateModalVisuals();
+            }
+
+            // Movimento Orizzontale (Solo in Summary per cambiare pagina)
+            if (this.currentView === 'summary') {
+                if (this.summaryPage === 1 && (key === 'ArrowDown' || key === 'ArrowUp' || key === 's' || key === 'w')) {
+                    let numMoves = document.querySelectorAll('.move-entry').length;
+                    if (numMoves > 0) {
+                        if (key === 'ArrowDown' || key === 's') this.moveSelectionIdx = (this.moveSelectionIdx + 1) % numMoves;
+                        if (key === 'ArrowUp' || key === 'w') this.moveSelectionIdx = (this.moveSelectionIdx - 1 + numMoves) % numMoves;
+                        this.updateModalVisuals();
+                    }
+                }
+
+                if (key === 'ArrowRight' || key === 'ArrowLeft' || key === 'd' || key === 'a') {
+                    this.summaryPage = this.summaryPage === 0 ? 1 : 0;
+                    this.updateSummaryPage();
+                    this.updateModalVisuals();
+                }
+            }
+            if (this.currentView === 'summary' && this.summaryPage === 1) {
+                if (key === 'ArrowDown' || key === 's') this.moveSelectionIdx = Math.min(this.moveSelectionIdx + 2, 3);
+                if (key === 'ArrowUp' || key === 'w') this.moveSelectionIdx = Math.max(this.moveSelectionIdx - 2, 0);
+                if (key === 'ArrowRight' || key === 'd') this.moveSelectionIdx = Math.min(this.moveSelectionIdx + 1, 3);
+                if (key === 'ArrowLeft' || key === 'a') this.moveSelectionIdx = Math.max(this.moveSelectionIdx - 1, 0);
+                this.updateModalVisuals();
+            }
+            // Conferma (Enter)
+            if (key === 'Enter' || key === ' ') {
+                this.confirmModalSelection(teamData);
+            }
+
+            // Indietro (Esc / Backspace)
+            if (key === 'Escape' || key === 'Backspace') {
+                this.cancelModalSelection();
+            }
+        };
+
+        window.addEventListener('keydown', this.modalKeyListener);
+
+        // Supporto Click Mouse
+        this.teamModalDom.addListener('click').on('click', (e) => {
+            // Se clicco CHIUDI, chiudi tutto e basta
+            if (e.target.id === 'btn-close-modal') {
+                this.cancelModalSelection(true);
+                return;
+            }
+
+            let item = e.target.closest('.pokemon-item');
+            if (item && this.currentView === 'list') {
+                this.modalSelection = parseInt(item.dataset.index);
+                this.confirmModalSelection(teamData);
+                return;
+            }
+
+            // Gestione altri bottoni azioni
+            if (e.target.id === 'btn-switch') this.executeSwitch(this.selectedPkmnIdx);
+            if (e.target.id === 'btn-summary') this.openSummary(teamData[this.selectedPkmnIdx]);
+            if (e.target.id === 'btn-back-to-list' || e.target.id === 'btn-back-to-action') {
+                this.cancelModalSelection();
+            }
+        });
+    }
+    updateModalVisuals() {
+        document.querySelectorAll('.pokemon-item, .action-btn, .move-entry').forEach(el => el.classList.remove('selected'));
+
+        if (this.currentView === 'list') {
+            const items = document.querySelectorAll('.pokemon-item');
+            if (this.modalSelection < items.length) items[this.modalSelection].classList.add('selected');
+            else document.getElementById('btn-close-modal').classList.add('selected');
+        }
+        else if (this.currentView === 'actions') {
+            const btns = document.querySelectorAll('#modal-action-view .action-btn');
+            if (btns[this.modalSelection]) btns[this.modalSelection].classList.add('selected');
+        }
+        else if (this.currentView === 'summary' && this.summaryPage === 1) {
+            const moves = document.querySelectorAll('.move-entry');
+            if (moves[this.moveSelectionIdx]) {
+                moves[this.moveSelectionIdx].classList.add('selected');
+                // Aggiorna la descrizione dinamicamente
+                const desc = moves[this.moveSelectionIdx].getAttribute('data-desc');
+                document.getElementById('summary-move-desc').innerText = desc;
+            }
+        }
+    }
+
+    confirmModalSelection(teamData) {
+        const items = document.querySelectorAll('.pokemon-item');
+
+        if (this.currentView === 'list') {
+            // Se sono oltre la lista (sul tasto CHIUDI)
+            if (this.modalSelection >= items.length) {
+                this.cancelModalSelection(true); // CHIUDE il modal
+            } else {
+                this.selectedPkmnIdx = this.modalSelection;
+                this.currentView = 'actions';
+                this.modalSelection = 0;
+                document.getElementById('modal-list-view').style.display = 'none';
+                document.getElementById('modal-action-view').style.display = 'flex';
+            }
+        } else if (this.currentView === 'actions') {
+            if (this.modalSelection === 0) this.executeSwitch(this.selectedPkmnIdx);
+            if (this.modalSelection === 1) this.openSummary(teamData[this.selectedPkmnIdx]);
+            if (this.modalSelection === 2) this.cancelModalSelection();
+        }
+        this.updateModalVisuals();
+    }
+    cancelModalSelection(forceClose = false) {
+        if (forceClose) {
+            window.removeEventListener('keydown', this.modalKeyListener);
+            if (this.teamModalDom) this.teamModalDom.destroy();
+            this.isInputActive = true;
+            this.updateMenuSelection();
+            return;
+        }
+
+        if (this.currentView === 'summary') {
+            this.currentView = 'actions';
+            this.modalSelection = 1; 
+            document.getElementById('modal-summary-view').style.display = 'none';
+            document.getElementById('modal-action-view').style.display = 'flex';
+        } else if (this.currentView === 'actions') {
+            this.currentView = 'list';
+            this.modalSelection = this.selectedPkmnIdx;
+            document.getElementById('modal-action-view').style.display = 'none';
+            document.getElementById('modal-list-view').style.display = 'block';
+        } else {
+            window.removeEventListener('keydown', this.modalKeyListener);
+            if (this.teamModalDom) this.teamModalDom.destroy();
+            this.isInputActive = true;
+            this.updateMenuSelection();
+            return; // <--- AGGIUNGI QUESTO RETURN
+        }
+        this.updateModalVisuals();
+    }
+    openSummary(pkmn) {
+        this.currentView = 'summary';
+        this.summaryPage = 0;
+        this.moveSelectionIdx = 0; // Nuovo indice per le mosse
+        document.getElementById('modal-action-view').style.display = 'none';
+        document.getElementById('modal-summary-view').style.display = 'flex';
+        this.updateSummaryPage();
+
+        let localData = (this.pkmnDB && this.pkmnDB[pkmn.nome]) ? this.pkmnDB[pkmn.nome] : null;
+        document.getElementById('summary-name').innerText = pkmn.nome.toUpperCase();
+        document.getElementById('summary-sprite').src = pkmn.sprite?.normal || (localData?.sprite?.normal) || '';
+
+        // Tipi
+        document.getElementById('summary-types').innerHTML = (pkmn.tipi || localData?.tipi || []).map(t =>
+            `<div class="type-badge" style="background-color: ${this.getColorForType(t)}">${t.toUpperCase()}</div>`
+        ).join('');
+
+        // Pagina Statistiche (come prima...)
+        // [Inserisci qui il codice delle statistiche che avevi]
+
+        // Pagina Mosse con Box Descrizione
+        let mosseRaw = pkmn.mosse || localData?.mosse || [];
+        let movesHtml = `<div class="moves-grid">`;
+        mosseRaw.slice(0, 4).forEach((mRaw, i) => {
+            let nomeMossa = typeof mRaw === 'object' ? mRaw.Nome : mRaw;
+            const m = this.moveDB[nomeMossa] || { Nome: nomeMossa, Tipo: '???', PP: '--', Potenza: '--', Precisione: '--', Descrizione: 'Nessuna descrizione.' };
+            const catColor = m.Categoria === "Fisico" ? '#ff7477' : (m.Categoria === "Speciale" ? '#6874e8' : '#aaaaaa');
+
+            movesHtml += `
+            <div class="move-entry" id="move-item-${i}" data-desc="${m.Descrizione}">
+                <div class="move-name-line">
+                    <span>${String(m.Nome).toUpperCase()}</span>
+                    <span>PP ${m.PP}/${m.PP}</span>
+                </div>
+                <div class="move-summary-badges">
+                    <span class="badge" style="background:${this.getColorForType(m.Tipo)}">${String(m.Tipo).toUpperCase()}</span>
+                    <span class="badge" style="background:${catColor}">${(m.Categoria || '???').toUpperCase()}</span>
+                    <span class="badge-info">POT: ${m.Potenza > 0 ? m.Potenza : '--'}</span>
+                    <span class="badge-info">PREC: ${m.Precisione > 0 ? m.Precisione : '--'}</span>
+                </div>
+            </div>`;
+        });
+        movesHtml += `</div><div class="move-description-box" id="summary-move-desc">Seleziona una mossa...</div>`;
+
+        document.getElementById('summary-page-1').innerHTML = movesHtml;
+        this.updateModalVisuals();
+    }
+    updateSummaryPage() {
+        let ind = document.getElementById('summary-page-indicator');
+        ind.innerText = this.summaryPage === 0 ? '◀ INFO E STATISTICHE ▶' : '◀ MOSSE ▶';
+        document.getElementById('summary-page-0').style.display = this.summaryPage === 0 ? 'grid' : 'none';
+        document.getElementById('summary-page-1').style.display = this.summaryPage === 1 ? 'grid' : 'none';
+    }
+
+    executeSwitch(index) {
+        let activeIdx = this.myActiveIdx !== undefined ? this.myActiveIdx : 0;
+
+        if (index === activeIdx) {
+            this.logText.setText(`${this.pEntity.name} è già in campo!`).setVisible(true);
+            this.cancelModalSelection(true); // Forza chiusura modal per leggere il log
+            return;
+        }
+
+        if (this.teamModalDom) this.teamModalDom.destroy();
+        window.removeEventListener('keydown', this.modalKeyListener);
+        this.btns.forEach(b => b.setVisible(false));
+        this.logText.setVisible(true);
+
+        const switchAction = { tipo: 'switch', nuovoIdx: index };
+
+        if (this.isWild) {
+            let botMoves = this.eEntity.moves.filter(m => m.ppAttuali > 0);
+            let botMove = botMoves.length > 0 ? Phaser.Utils.Array.GetRandom(botMoves) : (this.moveDB["Scontro"] || { Nome: "Scontro" });
+            let stato = this.partita.processaTurno(switchAction, { mossa: botMove });
+            this.applicaStatoPartita(stato, false);
+        } else {
+            this.logText.setText("In attesa dell'avversario...");
+            this.socket.emit('pvpUseMove', { roomId: this.roomId, ...switchAction });
+        }
     }
 }
 
