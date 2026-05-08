@@ -2,3 +2,5 @@ dentro la cartella Pokemon:npm install express socket.io nodemon
 
 Per avviare in locale utilizzare: npx nodemon server
 (nel caso le modifiche non vengano applicate scrivere nel terminale rs)
+
+Problema in partita le mosse ne visualizza alcune❕❕❕

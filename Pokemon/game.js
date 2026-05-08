@@ -1255,68 +1255,47 @@ class BattleScene extends Phaser.Scene {
     }
     openTeamModal() {
         this.isInputActive = false;
-        this.modalSelection = 0; // Indice per navigare la lista o i bottoni
-        this.currentView = 'list'; // 'list', 'actions', 'summary'
-        this.summaryPage = 0; // 0 = Statistiche, 1 = Mosse
+        this.modalSelection = 0;
+        this.currentView = 'list';
+        this.summaryPage = 0;
 
         let teamData = this.myTeamData || (this.partita ? this.partita.p1.squadra : [this.pEntity]);
 
         const html = `
-            <div class="modal-overlay" id="team-modal">
-                <div class="modal-content">
-                    <div id="modal-list-view" style="display: block; width: 100%;">
-                        <div class="modal-header">SQUADRA POKÉMON</div>
-                        <div class="pokemon-list" id="pkmn-list-container"></div>
-                        <div class="action-buttons">
-                            <button class="action-btn" id="btn-close-modal">CHIUDI</button>
-                        </div>
-                    </div>
-    
-                    <div id="modal-action-view" class="summary-view" style="display: none; width: 100%;">
-                        <div class="modal-header" id="action-title">AZIONI</div>
-                        <div class="action-buttons-container">
-                            <button class="action-btn" id="btn-switch">SOSTITUISCI</button>
-                            <button class="action-btn" id="btn-summary">SUMMARY</button>
-                            <button class="action-btn" id="btn-back-to-list">INDIETRO</button>
-                        </div>
-                    </div>
-    
-                    <div id="modal-summary-view" class="summary-view" style="display: none; width: 100%;">
-                        <div class="modal-header" style="font-size: 1.5rem;" id="summary-page-indicator">◀ INFO E STATISTICHE ▶</div>
-                        
-                        <div class="summary-layout" style="display: flex; gap: 20px; width: 100%;">
-                            <div class="summary-left" style="flex: 1; text-align: center; border-right: 4px dashed var(--color-quaternary);">
-                                <div class="pkmn-name" id="summary-name" style="margin-bottom: 10px;">NOME</div>
-                                <img id="summary-sprite" src="" style="width: 160px; height: 160px; image-rendering: pixelated;">
-                                <div class="summary-types" id="summary-types" style="display: flex; justify-content: center; gap: 10px; margin-top: 10px;"></div>
+                        <div class="modal-overlay" id="team-modal">
+                            <div class="modal-content">
+                                <div id="modal-list-view" style="display: block; width: 100%;">
+                                    <div class="modal-header">SQUADRA POKÉMON</div>
+                                    <div class="pokemon-list" id="pkmn-list-container"></div>
+                                </div>
+
+                                <div id="modal-summary-view" class="summary-view" style="display: none; width: 100%;">
+                                    <div class="modal-header" style="font-size: 1.5rem;" id="summary-page-indicator">◀ INFO E STATISTICHE ▶</div>
+                                    <div class="summary-layout" style="display: flex; gap: 20px; width: 100%;">
+                                        <div class="summary-left" style="flex: 1; text-align: center; border-right: 4px dashed var(--color-quaternary);">
+                                            <div class="pkmn-name" id="summary-name" style="margin-bottom: 10px;">NOME</div>
+                                            <img id="summary-sprite" src="" style="width: 160px; height: 160px; image-rendering: pixelated;">
+                                            <div class="summary-types" id="summary-types" style="display: flex; justify-content: center; gap: 10px; margin-top: 10px;"></div>
+                                        </div>
+                                        <div class="summary-right" style="flex: 1.5; padding-left: 10px;">
+                                            <div id="summary-page-0" class="stats-grid"></div>
+                                            <div id="summary-page-1" class="moves-grid" style="display: none;"></div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            
-                            <div class="summary-right" style="flex: 1.5; padding-left: 10px;">
-                                <div id="summary-page-0" class="stats-grid"></div>
-                                <div id="summary-page-1" class="moves-grid" style="display: none;"></div>
-                            </div>
-                        </div>
-    
-                        <div class="action-buttons" style="margin-top: 20px;">
-                            <button class="action-btn selected" id="btn-back-to-action">INDIETRO</button>
-                        </div>
-                    </div>
-                </div>
-            </div>`;
+                        </div>`;
 
         this.teamModalDom = this.add.dom(500, 400).createFromHTML(html);
         this.populateTeamList(teamData);
         this.setupModalNavigation(teamData);
     }
-
     populateTeamList(teamData) {
         let container = document.getElementById('pkmn-list-container');
         if (!container) return;
 
         let listHTML = '';
         teamData.forEach((pkmn, index) => {
-            // SICUREZZA: Se pkmn.sprite non esiste (perché arriva dal server semplificato),
-            // lo cerchiamo nel database locale tramite il nome.
             let localData = (this.pkmnDB && this.pkmnDB[pkmn.nome]) ? this.pkmnDB[pkmn.nome] : null;
             let spriteUrl = pkmn.sprite?.normal || localData?.sprite?.normal || '';
 
@@ -1326,14 +1305,25 @@ class BattleScene extends Phaser.Scene {
             let hpColor = hpPercent > 50 ? '#4caf50' : (hpPercent > 20 ? '#ffeb3b' : '#f44336');
 
             listHTML += `
-                <div class="pokemon-item" data-index="${index}">
-                    <img src="${spriteUrl}" style="width: 64px; height: 64px; display: block; image-rendering: pixelated;">
-                    <div class="pkmn-info" style="flex-grow: 1; margin-left: 15px;">
-                        <div class="pkmn-name">${pkmn.nome.toUpperCase()} ${index === (this.myActiveIdx || 0) ? '★' : ''}</div>
-                        <div class="pkmn-hp">HP: ${hp}/${maxHp}</div>
-                        <div class="hp-bar-bg"><div class="hp-bar-fill" style="width: ${hpPercent}%; background-color: ${hpColor};"></div></div>
-                    </div>
-                </div>`;
+                        <div class="pokemon-item" data-index="${index}">
+                            <img src="${spriteUrl}" style="width: 70px; height: 70px; display: block; image-rendering: pixelated; filter: drop-shadow(2px 2px 0 rgba(0,0,0,0.5));">
+                            <div class="pkmn-info">
+                                <div class="pkmn-name-line">
+                                    <span class="pkmn-name">${pkmn.nome.toUpperCase()} ${index === (this.myActiveIdx || 0) ? '★' : ''}</span>
+                                </div>
+                                <div class="hp-container">
+                                    <span class="hp-label">HP</span>
+                                    <div class="hp-bar-bg"><div class="hp-bar-fill" style="width: ${hpPercent}%; background-color: ${hpColor};"></div></div>
+                                </div>
+                                <div class="pkmn-hp-text">${hp}/${maxHp}</div>
+                            </div>
+                            
+                            <div class="inline-actions" id="actions-${index}">
+                                <div class="action-btn-inline">SOSTITUISCI</div>
+                                <div class="action-btn-inline">SUMMARY</div>
+                                <div class="action-btn-inline">INDIETRO</div>
+                            </div>
+                        </div>`;
         });
         container.innerHTML = listHTML;
         this.updateModalVisuals();
@@ -1343,42 +1333,56 @@ class BattleScene extends Phaser.Scene {
             if (this.isInputActive) return;
             const key = event.key;
 
-            // Movimento Verticale (Lista e Azioni)
-            if (key === 'ArrowDown' || key === 's') {
-                let max = this.currentView === 'list' ? teamData.length + 1 : 3;
-                this.modalSelection = (this.modalSelection + 1) % max;
-                this.updateModalVisuals();
-            }
-            if (key === 'ArrowUp' || key === 'w') {
-                let max = this.currentView === 'list' ? teamData.length + 1 : 3;
-                this.modalSelection = (this.modalSelection - 1 + max) % max;
-                this.updateModalVisuals();
-            }
-
-            // Movimento Orizzontale (Solo in Summary per cambiare pagina)
-            if (this.currentView === 'summary') {
-                if (this.summaryPage === 1 && (key === 'ArrowDown' || key === 'ArrowUp' || key === 's' || key === 'w')) {
-                    let numMoves = document.querySelectorAll('.move-entry').length;
-                    if (numMoves > 0) {
-                        if (key === 'ArrowDown' || key === 's') this.moveSelectionIdx = (this.moveSelectionIdx + 1) % numMoves;
-                        if (key === 'ArrowUp' || key === 'w') this.moveSelectionIdx = (this.moveSelectionIdx - 1 + numMoves) % numMoves;
+            if (this.currentView === 'list') {
+                let max = document.querySelectorAll('.pokemon-item').length;
+                if (max > 0) {
+                    if (key === 'ArrowDown' || key === 's') {
+                        this.modalSelection = (this.modalSelection + 1) % max;
+                        this.updateModalVisuals();
+                    }
+                    if (key === 'ArrowUp' || key === 'w') {
+                        this.modalSelection = (this.modalSelection - 1 + max) % max;
                         this.updateModalVisuals();
                     }
                 }
+            }
 
-                if (key === 'ArrowRight' || key === 'ArrowLeft' || key === 'd' || key === 'a') {
+            // 2. MENU AZIONI (Sostituisci, Summary, Indietro)
+            else if (this.currentView === 'inline-actions') {
+                let max = 3; // 3 bottoni (Sostituisci, Summary, Indietro)
+                if (key === 'ArrowDown' || key === 's') {
+                    this.actionSelectionIdx = (this.actionSelectionIdx + 1) % max;
+                    this.updateModalVisuals();
+                }
+                if (key === 'ArrowUp' || key === 'w') {
+                    this.actionSelectionIdx = (this.actionSelectionIdx - 1 + max) % max;
+                    this.updateModalVisuals();
+                }
+            }
+
+            // 3. MENU SUMMARY (Pagine e Mosse)
+            else if (this.currentView === 'summary') {
+                if (this.summaryPage === 1) { // Pagina Mosse
+                    let numMoves = document.querySelectorAll('.move-entry').length;
+                    if (numMoves > 0) {
+                        if (key === 'ArrowDown' || key === 's') {
+                            this.moveSelectionIdx = (this.moveSelectionIdx + 1) % numMoves;
+                            this.updateModalVisuals();
+                        }
+                        if (key === 'ArrowUp' || key === 'w') {
+                            this.moveSelectionIdx = (this.moveSelectionIdx - 1 + numMoves) % numMoves;
+                            this.updateModalVisuals();
+                        }
+                    }
+                }
+                // Cambio Pagina con Destra/Sinistra
+                if (key === 'ArrowRight' || key === 'd' || key === 'ArrowLeft' || key === 'a') {
                     this.summaryPage = this.summaryPage === 0 ? 1 : 0;
                     this.updateSummaryPage();
                     this.updateModalVisuals();
                 }
             }
-            if (this.currentView === 'summary' && this.summaryPage === 1) {
-                if (key === 'ArrowDown' || key === 's') this.moveSelectionIdx = Math.min(this.moveSelectionIdx + 2, 3);
-                if (key === 'ArrowUp' || key === 'w') this.moveSelectionIdx = Math.max(this.moveSelectionIdx - 2, 0);
-                if (key === 'ArrowRight' || key === 'd') this.moveSelectionIdx = Math.min(this.moveSelectionIdx + 1, 3);
-                if (key === 'ArrowLeft' || key === 'a') this.moveSelectionIdx = Math.max(this.moveSelectionIdx - 1, 0);
-                this.updateModalVisuals();
-            }
+
             // Conferma (Enter)
             if (key === 'Enter' || key === ' ') {
                 this.confirmModalSelection(teamData);
@@ -1386,7 +1390,14 @@ class BattleScene extends Phaser.Scene {
 
             // Indietro (Esc / Backspace)
             if (key === 'Escape' || key === 'Backspace') {
-                this.cancelModalSelection();
+                if (this.currentView === 'inline-actions') {
+                    this.currentView = 'list';
+                    this.updateModalVisuals();
+                } else if (this.currentView === 'summary') {
+                    this.cancelModalSelection(); // Torna alla lista
+                } else {
+                    this.cancelModalSelection(true); // Chiude tutto
+                }
             }
         };
 
@@ -1394,12 +1405,15 @@ class BattleScene extends Phaser.Scene {
 
         // Supporto Click Mouse
         this.teamModalDom.addListener('click').on('click', (e) => {
-            // Se clicco CHIUDI, chiudi tutto e basta
-            if (e.target.id === 'btn-close-modal') {
-                this.cancelModalSelection(true);
+            // 1. Click sull'header per switchare le pagine (Statistiche <-> Mosse)
+            if (e.target.id === 'summary-page-indicator') {
+                this.summaryPage = this.summaryPage === 0 ? 1 : 0;
+                this.updateSummaryPage();
+                this.updateModalVisuals();
                 return;
             }
 
+            // 2. Click su un Pokémon nella lista per aprire i bottoni inline
             let item = e.target.closest('.pokemon-item');
             if (item && this.currentView === 'list') {
                 this.modalSelection = parseInt(item.dataset.index);
@@ -1407,33 +1421,73 @@ class BattleScene extends Phaser.Scene {
                 return;
             }
 
-            // Gestione altri bottoni azioni
-            if (e.target.id === 'btn-switch') this.executeSwitch(this.selectedPkmnIdx);
-            if (e.target.id === 'btn-summary') this.openSummary(teamData[this.selectedPkmnIdx]);
-            if (e.target.id === 'btn-back-to-list' || e.target.id === 'btn-back-to-action') {
+            // 3. Click sui bottoni inline
+            if (e.target.classList.contains('action-btn-inline')) {
+                let actionText = e.target.innerText.trim();
+                let parentItem = e.target.closest('.pokemon-item');
+                this.modalSelection = parseInt(parentItem.dataset.index);
+
+                if (actionText === 'SOSTITUISCI') {
+                    this.executeSwitch(this.modalSelection);
+                } else if (actionText === 'SUMMARY') {
+                    this.openSummary(teamData[this.modalSelection]);
+                } else if (actionText === 'INDIETRO') {
+                    this.currentView = 'list';
+                    this.updateModalVisuals();
+                }
+                return;
+            }
+
+            // 4. Bottone Indietro nel Summary
+            if (e.target.id === 'btn-back-to-action') {
                 this.cancelModalSelection();
             }
         });
     }
     updateModalVisuals() {
-        document.querySelectorAll('.pokemon-item, .action-btn, .move-entry').forEach(el => el.classList.remove('selected'));
+        // 1. Pulizia totale: togliamo 'selected' da ogni possibile elemento
+        document.querySelectorAll('.move-entry').forEach(el => el.classList.remove('selected'));
+        document.querySelectorAll('.pokemon-item, .action-btn, .move-entry').forEach(el => {
+            el.classList.remove('selected');
+        });
+        if (this.currentView === 'list' || this.currentView === 'inline-actions') {
+            document.querySelectorAll('.pokemon-item').forEach((el, index) => {
+                el.classList.remove('selected', 'show-actions');
+                el.querySelectorAll('.action-btn-inline').forEach(btn => btn.classList.remove('selected'));
 
-        if (this.currentView === 'list') {
-            const items = document.querySelectorAll('.pokemon-item');
-            if (this.modalSelection < items.length) items[this.modalSelection].classList.add('selected');
-            else document.getElementById('btn-close-modal').classList.add('selected');
+                if (index === this.modalSelection) {
+                    el.classList.add('selected');
+
+                    if (this.currentView === 'inline-actions') {
+                        el.classList.add('show-actions');
+                        let btns = el.querySelectorAll('.action-btn-inline');
+                        if (btns[this.actionSelectionIdx]) {
+                            btns[this.actionSelectionIdx].classList.add('selected');
+                        }
+                    }
+                }
+            });
         }
-        else if (this.currentView === 'actions') {
-            const btns = document.querySelectorAll('#modal-action-view .action-btn');
-            if (btns[this.modalSelection]) btns[this.modalSelection].classList.add('selected');
-        }
+
+        // Logica per il SUMMARY (Mosse)
         else if (this.currentView === 'summary' && this.summaryPage === 1) {
             const moves = document.querySelectorAll('.move-entry');
             if (moves[this.moveSelectionIdx]) {
                 moves[this.moveSelectionIdx].classList.add('selected');
-                // Aggiorna la descrizione dinamicamente
+                // Aggiorna box descrizione (già implementato prima)
                 const desc = moves[this.moveSelectionIdx].getAttribute('data-desc');
-                document.getElementById('summary-move-desc').innerText = desc;
+                const pot = moves[this.moveSelectionIdx].getAttribute('data-pot');
+                const prec = moves[this.moveSelectionIdx].getAttribute('data-prec');
+                const descBox = document.getElementById('summary-move-desc');
+                if (descBox) {
+                    descBox.innerHTML = `
+                    <div style="flex: 1; padding-right: 15px;">${desc}</div>
+                    <div style="width: 120px; text-align: right; border-left: 2px dashed #ff7477; padding-left: 15px; font-size: 1rem; color: #fff;">
+                        <div style="margin-bottom: 5px; color: #ffcc00;">POT: <span style="color:#fff;">${pot}</span></div>
+                        <div style="color: #ffcc00;">PREC: <span style="color:#fff;">${prec}</span></div>
+                    </div>
+                `;
+                }
             }
         }
     }
@@ -1442,81 +1496,84 @@ class BattleScene extends Phaser.Scene {
         const items = document.querySelectorAll('.pokemon-item');
 
         if (this.currentView === 'list') {
-            // Se sono oltre la lista (sul tasto CHIUDI)
-            if (this.modalSelection >= items.length) {
-                this.cancelModalSelection(true); // CHIUDE il modal
-            } else {
-                this.selectedPkmnIdx = this.modalSelection;
-                this.currentView = 'actions';
-                this.modalSelection = 0;
-                document.getElementById('modal-list-view').style.display = 'none';
-                document.getElementById('modal-action-view').style.display = 'flex';
+            this.currentView = 'inline-actions';
+            this.actionSelectionIdx = 0;
+            this.updateModalVisuals();
+        }
+        else if (this.currentView === 'inline-actions') {
+            if (this.actionSelectionIdx === 0) { // SOSTITUISCI
+                this.executeSwitch(this.modalSelection);
+            } else if (this.actionSelectionIdx === 1) { // SUMMARY
+                this.openSummary(teamData[this.modalSelection]);
+            } else if (this.actionSelectionIdx === 2) { // INDIETRO
+                this.currentView = 'list';
+                this.updateModalVisuals();
             }
-        } else if (this.currentView === 'actions') {
-            if (this.modalSelection === 0) this.executeSwitch(this.selectedPkmnIdx);
-            if (this.modalSelection === 1) this.openSummary(teamData[this.selectedPkmnIdx]);
-            if (this.modalSelection === 2) this.cancelModalSelection();
         }
         this.updateModalVisuals();
     }
     cancelModalSelection(forceClose = false) {
         if (forceClose) {
             window.removeEventListener('keydown', this.modalKeyListener);
-            if (this.teamModalDom) this.teamModalDom.destroy();
+            if (this.teamModalDom) {
+                this.teamModalDom.destroy();
+                this.teamModalDom = null;
+            }
             this.isInputActive = true;
-            this.updateMenuSelection();
-            return;
-        }
-
-        if (this.currentView === 'summary') {
-            this.currentView = 'actions';
-            this.modalSelection = 1; 
-            document.getElementById('modal-summary-view').style.display = 'none';
-            document.getElementById('modal-action-view').style.display = 'flex';
-        } else if (this.currentView === 'actions') {
-            this.currentView = 'list';
-            this.modalSelection = this.selectedPkmnIdx;
-            document.getElementById('modal-action-view').style.display = 'none';
-            document.getElementById('modal-list-view').style.display = 'block';
+            if (typeof this.updateMenuSelection === 'function') this.updateMenuSelection();
         } else {
-            window.removeEventListener('keydown', this.modalKeyListener);
-            if (this.teamModalDom) this.teamModalDom.destroy();
-            this.isInputActive = true;
-            this.updateMenuSelection();
-            return; // <--- AGGIUNGI QUESTO RETURN
+            // Torna alla lista con i bottoni inline aperti
+            this.currentView = 'inline-actions';
+            document.getElementById('modal-summary-view').style.display = 'none';
+            document.getElementById('modal-list-view').style.display = 'block';
+            this.updateModalVisuals();
         }
-        this.updateModalVisuals();
     }
+
     openSummary(pkmn) {
         this.currentView = 'summary';
         this.summaryPage = 0;
-        this.moveSelectionIdx = 0; // Nuovo indice per le mosse
-        document.getElementById('modal-action-view').style.display = 'none';
+        this.moveSelectionIdx = 0;
+
+        // MODIFICA CRITICA: Nascondiamo la lista, non il vecchio action-view
+        document.getElementById('modal-list-view').style.display = 'none';
         document.getElementById('modal-summary-view').style.display = 'flex';
-        this.updateSummaryPage();
 
         let localData = (this.pkmnDB && this.pkmnDB[pkmn.nome]) ? this.pkmnDB[pkmn.nome] : null;
         document.getElementById('summary-name').innerText = pkmn.nome.toUpperCase();
-        document.getElementById('summary-sprite').src = pkmn.sprite?.normal || (localData?.sprite?.normal) || '';
+        document.getElementById('summary-sprite').src = pkmn.sprite?.normal || localData?.sprite?.normal || '';
 
-        // Tipi
         document.getElementById('summary-types').innerHTML = (pkmn.tipi || localData?.tipi || []).map(t =>
             `<div class="type-badge" style="background-color: ${this.getColorForType(t)}">${t.toUpperCase()}</div>`
         ).join('');
 
-        // Pagina Statistiche (come prima...)
-        // [Inserisci qui il codice delle statistiche che avevi]
+        let maxHp = pkmn.maxHp || pkmn.hpMax || (localData ? localData.statistiche.hp.base_stat : 100);
+        let stats = pkmn.statistiche || (localData ? {
+            attacco: localData.statistiche.attack.base_stat,
+            difesa: localData.statistiche.defense.base_stat,
+            attaccoSpeciale: localData.statistiche['special-attack'].base_stat,
+            difesaSpeciale: localData.statistiche['special-defense'].base_stat,
+            velocita: localData.statistiche.speed.base_stat
+        } : {});
 
-        // Pagina Mosse con Box Descrizione
+        document.getElementById('summary-page-0').innerHTML = `
+            <div class="stat-row"><span class="stat-label">HP</span><span class="stat-value">${pkmn.hp}/${maxHp}</span></div>
+            <div class="stat-row"><span class="stat-label">ATTACCO</span><span class="stat-value">${stats.attacco || 0}</span></div>
+            <div class="stat-row"><span class="stat-label">DIFESA</span><span class="stat-value">${stats.difesa || 0}</span></div>
+            <div class="stat-row"><span class="stat-label">ATT. SP.</span><span class="stat-value">${stats.attaccoSpeciale || 0}</span></div>
+            <div class="stat-row"><span class="stat-label">DIF. SP.</span><span class="stat-value">${stats.difesaSpeciale || 0}</span></div>
+            <div class="stat-row"><span class="stat-label">VELOCITÀ</span><span class="stat-value">${stats.velocita || 0}</span></div>
+        `;
+
         let mosseRaw = pkmn.mosse || localData?.mosse || [];
-        let movesHtml = `<div class="moves-grid">`;
+        let movesHtml = `<div class="moves-grid" style="width: 100%;">`;
         mosseRaw.slice(0, 4).forEach((mRaw, i) => {
             let nomeMossa = typeof mRaw === 'object' ? mRaw.Nome : mRaw;
             const m = this.moveDB[nomeMossa] || { Nome: nomeMossa, Tipo: '???', PP: '--', Potenza: '--', Precisione: '--', Descrizione: 'Nessuna descrizione.' };
             const catColor = m.Categoria === "Fisico" ? '#ff7477' : (m.Categoria === "Speciale" ? '#6874e8' : '#aaaaaa');
 
             movesHtml += `
-            <div class="move-entry" id="move-item-${i}" data-desc="${m.Descrizione}">
+            <div class="move-entry" id="move-item-${i}" data-desc="${m.Descrizione}" data-pot="${m.Potenza > 0 ? m.Potenza : '--'}" data-prec="${m.Precisione > 0 ? m.Precisione : '--'}">
                 <div class="move-name-line">
                     <span>${String(m.Nome).toUpperCase()}</span>
                     <span>PP ${m.PP}/${m.PP}</span>
@@ -1524,21 +1581,27 @@ class BattleScene extends Phaser.Scene {
                 <div class="move-summary-badges">
                     <span class="badge" style="background:${this.getColorForType(m.Tipo)}">${String(m.Tipo).toUpperCase()}</span>
                     <span class="badge" style="background:${catColor}">${(m.Categoria || '???').toUpperCase()}</span>
-                    <span class="badge-info">POT: ${m.Potenza > 0 ? m.Potenza : '--'}</span>
-                    <span class="badge-info">PREC: ${m.Precisione > 0 ? m.Precisione : '--'}</span>
                 </div>
             </div>`;
         });
         movesHtml += `</div><div class="move-description-box" id="summary-move-desc">Seleziona una mossa...</div>`;
 
         document.getElementById('summary-page-1').innerHTML = movesHtml;
+
+        this.updateSummaryPage();
         this.updateModalVisuals();
     }
     updateSummaryPage() {
         let ind = document.getElementById('summary-page-indicator');
         ind.innerText = this.summaryPage === 0 ? '◀ INFO E STATISTICHE ▶' : '◀ MOSSE ▶';
+
+        // Correzione dei display: page-0 è grid, page-1 è flex (per accomodare moves-grid e la description-box in colonna)
         document.getElementById('summary-page-0').style.display = this.summaryPage === 0 ? 'grid' : 'none';
-        document.getElementById('summary-page-1').style.display = this.summaryPage === 1 ? 'grid' : 'none';
+        document.getElementById('summary-page-1').style.display = this.summaryPage === 1 ? 'flex' : 'none';
+
+        if (this.summaryPage === 1) {
+            document.getElementById('summary-page-1').style.flexDirection = 'column';
+        }
     }
 
     executeSwitch(index) {
