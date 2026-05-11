@@ -75,8 +75,6 @@ CREATE TRIGGER al_nuovo_utente
   FOR EACH ROW EXECUTE PROCEDURE public.crea_profilo_automatico();
 
 
-
-
 CREATE OR REPLACE FUNCTION public.crea_profilo_automatico()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -92,32 +90,17 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-/*
--- =========================================
--- TABELLA POKEMON CATTURATI (ISTANZE)
--- =========================================
-CREATE TABLE pokemon_catturati (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    utente_id UUID REFERENCES utenti(id) ON DELETE CASCADE,
-    
-    -- Referenza al file JSON: deve combaciare con la chiave "nome" del tuo DB_pokemon.json
-    specie_nome VARCHAR(100) NOT NULL, 
-    
-    nickname VARCHAR(50),                    -- Eventuale soprannome
-    livello INTEGER DEFAULT 1 CHECK (livello BETWEEN 1 AND 100),
-    punti_esperienza INTEGER DEFAULT 0,
-    ps_attuali INTEGER NOT NULL,             -- Punti Salute rimanenti (da salvare a fine battaglia)
-    
-    -- Le mosse scelte. PostgreSQL permette gli Array nativi, perfetto per un limite di 4 mosse
-    -- I valori qui dentro combaceranno con la chiave "Nome" nel tuo DB_mosse.json
-    mosse_equipaggiate TEXT[] NOT NULL DEFAULT '{}' CHECK (array_length(mosse_equipaggiate, 1) <= 4),
-    
-    -- Dati opzionali per IV ed EV (se decidi di implementarli per statistiche uniche)
-    -- Usiamo JSONB per mantenere la flessibilità
-    
-    data_cattura TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
 
--- Indice univoco per assicurare che un utente possa avere un solo Pokémon per specie (nessun doppione)
-CREATE UNIQUE INDEX idx_utente_specie_univoca ON pokemon_catturati(utente_id, specie_nome);
-*/
+-- CARICAMENTO ASSOCIAZIONE POKEMON PROFILO
+-- Abilitiamo la sicurezza
+ALTER TABLE public.pokemon ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Un utente può gestire solo i Pokémon legati al proprio profilo
+CREATE POLICY "Gli utenti gestiscono i propri pokemon" 
+ON public.pokemon 
+FOR ALL 
+USING (
+  id_profilo_proprietario IN (
+    SELECT id_profilo FROM public.profilo WHERE id_utente = auth.uid()
+  )
+); 
