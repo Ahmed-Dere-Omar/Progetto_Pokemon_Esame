@@ -8,45 +8,50 @@ const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 // Memorizziamo SE QUESTA SPECIFICA SCHEDA è quella aperta dalla mail.
 // ==============================================================================
 window.isRecoveryLink = window.location.href.includes('type=recovery');
-
-
 // ==============================================================================
-// PARTE 1: CLASSI E UTILITY GLOBALI (Il "Motore" del gioco)
+// BANNER GLOBALE (Per avvisi in tutte le scene)
 // ==============================================================================
+window.showBanner = function (testo, isError = true) {
+    let old = document.getElementById('global-banner');
+    if (old) old.remove();
 
-class PokemonEntity {
-    constructor(name, dbData, moveDB) {
-        this.name = dbData.nome;
-        this.types = dbData.tipi;
-        this.stats = {
-            hp: Math.floor(dbData.statistiche.hp.base_stat * 1.5),
-            attacco: dbData.statistiche.attack.base_stat,
-            difesa: dbData.statistiche.defense.base_stat,
-            attaccoSpeciale: dbData.statistiche['special-attack'].base_stat,
-            difesaSpeciale: dbData.statistiche['special-defense'].base_stat,
-            velocita: dbData.statistiche.speed.base_stat
-        };
-        this.maxHp = this.stats.hp;
-        this.hp = this.maxHp;
-        let mosseMischiate = [...dbData.mosse]
-            .sort(() => 0.5 - Math.random())
-            .slice(0, 4)
-            .map(mName => {
-                let mData = moveDB[mName] || Object.values(moveDB).find(m => m.Nome.toLowerCase() === mName.toLowerCase());
-                return mData ? { ...mData, ppAttuali: mData.PP, ppMassimi: mData.PP } : null;
-            })
-            .filter(m => m);
-        this.moves = mosseMischiate;
-        this.alive = true;
-        this.sprites = dbData.sprite;
-    }
+    let banner = document.createElement('div');
+    banner.id = 'global-banner';
+    banner.style.position = 'absolute';
+    banner.style.top = '20px';
+    banner.style.left = '50%';
+    banner.style.transform = 'translateX(-50%) translateY(-20px)';
+    banner.style.backgroundColor = isError ? '#ff7477' : '#4caf50'; // Rosso o verde
+    banner.style.color = '#fff';
+    banner.style.padding = '15px 30px';
+    banner.style.border = '4px solid #fff';
+    banner.style.borderRadius = '8px';
+    banner.style.fontFamily = "'Courier New', Courier, monospace";
+    banner.style.fontWeight = 'bold';
+    banner.style.fontSize = '1.3rem';
+    banner.style.zIndex = '10000';
+    banner.style.boxShadow = '4px 4px 0 rgba(0,0,0,0.5)';
+    banner.style.transition = 'all 0.3s ease-out';
+    banner.style.opacity = '0';
+    banner.innerText = testo;
 
-    takeDamage(amount) {
-        this.hp = Math.max(0, this.hp - amount);
-        if (this.hp === 0) this.alive = false;
-    }
-}
+    document.getElementById('game-container').appendChild(banner);
 
+    // Animazione entrata
+    setTimeout(() => {
+        banner.style.transform = 'translateX(-50%) translateY(0)';
+        banner.style.opacity = '1';
+    }, 10);
+
+    // Animazione uscita
+    setTimeout(() => {
+        if (document.body.contains(banner)) {
+            banner.style.opacity = '0';
+            banner.style.transform = 'translateX(-50%) translateY(-20px)';
+            setTimeout(() => banner.remove(), 300);
+        }
+    }, 2500);
+};
 // ==============================================================================
 // PARTE 2: SCENE DI PHASER
 // ==============================================================================
@@ -544,7 +549,7 @@ class WorldScene extends Phaser.Scene {
         });
 
         this.socket.on('challengeReceived', (id) => this.socket.emit('acceptChallenge', id));
-        this.socket.on('opponentBusy', () => alert("Questo allenatore è occupato!"));
+        this.socket.on('opponentBusy', () => window.showBanner("Questo allenatore è già impegnato!"));
 
         this.socket.on('startPvP', (data) => {
             data.socket = this.socket;
@@ -638,7 +643,8 @@ class WorldScene extends Phaser.Scene {
             let distToNpc = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.npc.x, this.npc.y);
             if (distToNpc < 50) {
                 this.player.anims.stop();
-                this.startEncounter({ isWild: true, socket: this.socket }, "SFIDA CONTRO NPC!");
+                // AGGIUNTO isNPC: true per distinguerlo dall'erba alta!
+                this.startEncounter({ isWild: true, isNPC: true, socket: this.socket }, "SFIDA CONTRO NPC!");
                 return;
             }
 
@@ -663,7 +669,7 @@ class WorldScene extends Phaser.Scene {
             let overlay = document.createElement('div');
             overlay.id = 'pause-menu-overlay';
             overlay.className = 'modal-overlay'; // Usiamo lo stesso magico blur del PC!
-            
+
             overlay.innerHTML = `
                 <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
                     <h2 class="text-shadows" style="font-size: 4rem; margin-bottom: 30px;">MENU PAUSA</h2>
@@ -925,103 +931,145 @@ class WorldScene extends Phaser.Scene {
             overlay.remove();
             this.isTransitioning = false;
             this.scene.pause();
-            this.scene.launch('SelectionScene', battleData);
-        });
-    }
-}
 
-// 4. SELECTION SCENE: Scegli il Pokemon
-class SelectionScene extends Phaser.Scene {
-    constructor() { super({ key: 'SelectionScene' }); }
-    init(data) {
-        this.roomId = data.roomId;
-        this.socket = data.socket;
-        this.isWild = data.isWild;
-        this.isLaunching = false;
-    }
-    create() {
-        if (this.socket) this.socket.emit('setInBattle', true);
-
-        let pkmnNames = Object.keys(this.registry.get('pokemonDB'));
-        let options = [Phaser.Utils.Array.GetRandom(pkmnNames), Phaser.Utils.Array.GetRandom(pkmnNames), Phaser.Utils.Array.GetRandom(pkmnNames)];
-
-        if (!this.isWild) {
-            this.socket.off('pvpBothSelected');
-            this.socket.on('pvpBothSelected', (selections) => {
-                if (this.isLaunching) return;
-                this.isLaunching = true;
-                let myChoice = selections[this.socket.id];
-                let oppChoice = Object.values(selections).find(n => n !== myChoice) || myChoice;
-                this.launchBattle(myChoice, oppChoice);
-            });
-        }
-
-        const html = `
-            <div class="selection-overlay">
-                <div class="selection-box" id="sel-box">
-                    <h2 class="selection-title">CHI MANDI IN CAMPO?</h2>
-                    ${options.map(p => `<button class="pkmn-btn" data-pkmn="${p}">${p.toUpperCase()}</button>`).join('')}
-                </div>
-            </div>`;
-
-        let dom = this.add.dom(500, 400).createFromHTML(html);
-        dom.addListener('click').on('click', (e) => {
-            if (e.target.classList.contains('pkmn-btn')) {
-                let chosen = e.target.getAttribute('data-pkmn');
-                if (this.isWild) {
-                    this.launchBattle(chosen, Phaser.Utils.Array.GetRandom(pkmnNames));
-                } else {
-                    document.getElementById('sel-box').innerHTML = `<h2 class="selection-title">IN ATTESA...</h2>`;
-                    this.socket.emit('pvpSelectPokemon', { roomId: this.roomId, pkmnName: chosen });
-                }
+            let myDbTeam = this.registry.get('userPokemon').filter(p => p.in_squadra).sort((a, b) => a.posizione_slot - b.posizione_slot);
+            if (myDbTeam.length === 0) {
+                alert("Non hai Pokémon in squadra! Visita il PC.");
+                this.scene.resume('WorldScene');
+                if (battleData.socket) battleData.socket.emit('setInBattle', false);
+                return;
             }
-        });
-    }
 
-    launchBattle(myPkmn, oppPkmn) {
-        this.scene.stop();
-        this.scene.launch('BattleScene', {
-            playerPkmn: myPkmn, enemyPkmn: oppPkmn,
-            roomId: this.roomId, socket: this.socket, isWild: this.isWild
+            // Bypassiamo SelectionScene e andiamo dritti alla lotta!
+            this.scene.launch('BattleScene', battleData);
         });
     }
 }
 
-// 5. BATTLE SCENE: Il motore grafico della battaglia
+// ==============================================================================
+// 4. BATTLE SCENE: Il motore grafico della battaglia
+// ==============================================================================
 class BattleScene extends Phaser.Scene {
     constructor() { super({ key: 'BattleScene' }); }
     init(data) {
-        this.pName = data.playerPkmn; this.eName = data.enemyPkmn;
-        this.isWild = data.isWild; this.roomId = data.roomId; this.socket = data.socket;
+        this.isWild = data.isWild;
+        this.isNPC = data.isNPC; // Leggiamo se è un allenatore controllato dal computer
+        this.roomId = data.roomId;
+        this.socket = data.socket;
+        this.isForcedSwitch = false;
     }
 
     preload() {
-        this.pkmnDB = this.registry.get('pokemonDB');
-        let pData = this.pkmnDB[this.pName];
-        let eData = this.pkmnDB[this.eName];
-        let pSpriteUrl = pData.sprite?.normal;
-        let eSpriteUrl = eData.sprite?.normal;
-
         this.bgKey = `background_${Phaser.Math.Between(0, 11)}`;
-        if (pSpriteUrl) this.load.image(this.pName, pSpriteUrl);
-        if (eSpriteUrl) this.load.image(this.eName, eSpriteUrl);
         this.load.image(this.bgKey, `DB/Immagini/Sfondi/${this.bgKey}.png`);
+    }
+
+    buildTeamData(dbTeam) {
+        let pkmnDB = this.registry.get('pokemonDB');
+        let moveDB = this.registry.get('moveDB');
+
+        return dbTeam.map(dbPkmn => {
+            let pData = pkmnDB[dbPkmn.id_specie];
+            let mosseScelte = dbPkmn.mosse && dbPkmn.mosse.length > 0 ? dbPkmn.mosse : [...pData.mosse].sort(() => 0.5 - Math.random()).slice(0, 4);
+            let baseHp = Math.floor(pData.statistiche.hp.base_stat * 1.5);
+
+            return {
+                nome: pData.nome,
+                hp: baseHp, maxHp: baseHp, hpMax: baseHp, // DOPPIA SICUREZZA PER GLI HP!
+                statistiche: {
+                    attacco: pData.statistiche.attack.base_stat, difesa: pData.statistiche.defense.base_stat,
+                    attaccoSpeciale: pData.statistiche['special-attack'].base_stat, difesaSpeciale: pData.statistiche['special-defense'].base_stat,
+                    velocita: pData.statistiche.speed.base_stat
+                },
+                modificatori: {}, tipi: pData.tipi, livello: 50, stato: null,
+                mosse: mosseScelte.map(mName => {
+                    let nomeReal = typeof mName === 'object' ? mName.Nome : mName;
+                    let mData = moveDB[nomeReal];
+                    return mData ? { ...mData, ppAttuali: mData.PP, ppMassimi: mData.PP } : null;
+                }).filter(m => m)
+            };
+        });
     }
 
     create() {
         this.currentTurn = 1;
-
-        // FIX: Puliamo la memoria dalla battaglia precedente!
-        this.myTeamData = null;
-        this.myActiveIdx = 0;
-
         this.moveDB = this.registry.get('moveDB');
-        this.pEntity = new PokemonEntity(this.pName, this.pkmnDB[this.pName], this.moveDB);
-        this.eEntity = new PokemonEntity(this.eName, this.pkmnDB[this.eName], this.moveDB);
+        this.pkmnDB = this.registry.get('pokemonDB');
+
+        let myDbTeam = this.registry.get('userPokemon').filter(p => p.in_squadra).sort((a, b) => a.posizione_slot - b.posizione_slot);
+        this.myTeamData = this.buildTeamData(myDbTeam);
+        this.myActiveIdx = 0; // Si parte sempre col primo!
+
+        if (this.socket) this.socket.emit('setInBattle', true);
+
+        if (this.isWild) {
+            let pkmnNames = Object.keys(this.pkmnDB);
+
+            if (this.isNPC) {
+                // SQUADRA NPC 3vs3 (Generiamo 3 selvatici a caso)
+                this.oppTeamData = this.buildTeamData([
+                    { id_specie: Phaser.Utils.Array.GetRandom(pkmnNames) },
+                    { id_specie: Phaser.Utils.Array.GetRandom(pkmnNames) },
+                    { id_specie: Phaser.Utils.Array.GetRandom(pkmnNames) }
+                ]);
+            } else {
+                // POKEMON SELVATICO SINGOLO (3vs1)
+                let wildPkmn = Phaser.Utils.Array.GetRandom(pkmnNames);
+                this.oppTeamData = this.buildTeamData([{ id_specie: wildPkmn }]);
+            }
+
+            this.oppActiveIdx = 0;
+            this.startBattleLogic();
+        } else {
+            this.socket.off('pvpBothSelected');
+            this.socket.on('pvpBothSelected', (selections) => {
+                let oppId = Object.keys(selections).find(id => id !== this.socket.id) || this.socket.id;
+                let oppData = selections[oppId];
+                this.oppTeamData = oppData.team;
+                this.oppActiveIdx = oppData.activeIdx;
+                this.startBattleLogic();
+            });
+
+            this.socket.emit('pvpSelectPokemon', { roomId: this.roomId, team: this.myTeamData, activeIdx: 0 });
+            this.showWaitingScreen();
+        }
+    }
+
+    showWaitingScreen() {
+        this.waitingDom = this.add.dom(500, 400).createFromHTML(`
+            <div class="selection-overlay">
+                <div class="selection-box">
+                    <h2 class="selection-title">IN ATTESA DELL'AVVERSARIO...</h2>
+                </div>
+            </div>
+        `);
+    }
+
+    startBattleLogic() {
+        if (this.waitingDom) {
+            this.waitingDom.destroy();
+            this.waitingDom = null;
+        }
+
+        if (this.isWild) {
+            let p1 = { id: 'player', squadra: this.myTeamData, attivoIdx: this.myActiveIdx };
+            let p2 = { id: 'bot', squadra: this.oppTeamData, attivoIdx: this.oppActiveIdx };
+            this.partita = new gestionePartita(p1, p2);
+            this.myTeamData = this.partita.p1.squadra;
+        }
+
+        let myActive = this.myTeamData[this.myActiveIdx];
+        let oppActive = this.isWild ? this.partita.p2.squadra[this.oppActiveIdx] : this.oppTeamData[this.oppActiveIdx];
+
+        this.pEntity = { name: myActive.nome, types: myActive.tipi, hp: myActive.hp, maxHp: myActive.hpMax, moves: myActive.mosse, alive: myActive.hp > 0 };
+        this.eEntity = { name: oppActive.nome, types: oppActive.tipi, hp: oppActive.hp, maxHp: oppActive.hpMax, moves: oppActive.mosse, alive: oppActive.hp > 0 };
 
         this.add.image(0, 0, this.bgKey).setOrigin(0, 0).setDisplaySize(1000, 665);
-        this.pSprite = this.add.dom(250, 500).createFromHTML(`<img src="${this.pkmnDB[this.pName].sprite?.normal}" style="transform: scale(2.5); image-rendering: pixelated;">`);
-        this.eSprite = this.add.dom(750, 230).createFromHTML(`<img src="${this.pkmnDB[this.eName].sprite?.normal}" style="transform: scale(2.2); image-rendering: pixelated;">`);
+
+        let pSpriteUrl = this.pkmnDB[this.pEntity.name]?.sprite?.normal || '';
+        let eSpriteUrl = this.pkmnDB[this.eEntity.name]?.sprite?.normal || '';
+        this.pSprite = this.add.dom(250, 500).createFromHTML(`<img src="${pSpriteUrl}" style="transform: scale(2.5); image-rendering: pixelated;">`);
+        this.eSprite = this.add.dom(750, 230).createFromHTML(`<img src="${eSpriteUrl}" style="transform: scale(2.2); image-rendering: pixelated;">`);
 
         this.pUI = this.createUIBox(100, 360, this.pEntity);
         this.eUI = this.createUIBox(600, 100, this.eEntity);
@@ -1032,61 +1080,21 @@ class BattleScene extends Phaser.Scene {
         this.add.rectangle(590, 668, 6, 129, 0xd05050).setOrigin(0, 0);
 
         this.logText = this.add.text(30, 690, '', {
-            fontSize: '26px',
-            fill: '#ffffff',
-            fontFamily: '"Courier New", Courier, monospace',
-            fontStyle: 'bold',
-            wordWrap: { width: 530 },
-            lineSpacing: 8,
-            shadow: { offsetX: 2, offsetY: 2, color: '#000000', blur: 0, fill: true }
+            fontSize: '26px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', wordWrap: { width: 530 }, lineSpacing: 8, shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true }
         });
 
         this.infoTipoLabel = this.add.text(610, 685, 'TIPO:', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
         this.infoTipoVal = this.add.text(700, 685, 'NORMALE', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
-
         this.infoCatLabel = this.add.text(610, 725, 'CAT.:', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
         this.infoCatVal = this.add.text(700, 725, 'FISICO', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
-
         this.infoPPLabel = this.add.text(610, 765, 'PP:', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
         this.infoPPVal = this.add.text(700, 765, '15/15', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
-
         this.infoPotLabel = this.add.text(840, 765, 'POT:', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
         this.infoPotVal = this.add.text(910, 765, '90', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
 
         this.moveInfoUI = [this.infoTipoLabel, this.infoTipoVal, this.infoCatLabel, this.infoCatVal, this.infoPPLabel, this.infoPPVal, this.infoPotLabel, this.infoPotVal];
 
         this.createButtons();
-
-        if (this.isWild) {
-            let pkmnNames = Object.keys(this.pkmnDB);
-            let creaSquadra = (id, mainEntity, extraCount) => {
-                let team = [];
-                team.push({
-                    nome: mainEntity.name, hp: mainEntity.hp, hpMax: mainEntity.maxHp, statistiche: { ...mainEntity.stats },
-                    modificatori: {}, tipi: mainEntity.types, livello: 50, stato: null,
-                    mosse: mainEntity.moves.map(m => ({ ...m }))
-                });
-
-                for (let i = 0; i < extraCount; i++) {
-                    let randomPkmnData = this.pkmnDB[Phaser.Utils.Array.GetRandom(pkmnNames)];
-                    let newPkmnEntity = new PokemonEntity(randomPkmnData.nome, randomPkmnData, this.moveDB);
-                    team.push({
-                        nome: newPkmnEntity.name, hp: newPkmnEntity.hp, hpMax: newPkmnEntity.maxHp, statistiche: { ...newPkmnEntity.stats },
-                        modificatori: {}, tipi: newPkmnEntity.types, livello: 50, stato: null,
-                        mosse: newPkmnEntity.moves.map(m => ({ ...m }))
-                    });
-                }
-
-                return { id: id, squadra: team, attivoIdx: 0 };
-            };
-
-            let p1 = creaSquadra('player', this.pEntity, 3);
-            let p2 = creaSquadra('bot', this.eEntity, 2);
-            this.partita = new gestionePartita(p1, p2);
-
-            // FIX: Nelle lotte PvE, salviamo subito la squadra al turno 1 così puoi fare switch!
-            this.myTeamData = this.partita.p1.squadra;
-        }
 
         if (!this.isWild) {
             this.socket.off('resolveTurn');
@@ -1096,15 +1104,10 @@ class BattleScene extends Phaser.Scene {
     }
 
     createUIBox(x, y, entity) {
-        let nameTxt = this.add.text(x, y, entity.name.toUpperCase(), {
-            fontSize: '24px', fill: '#000', fontStyle: 'bold', backgroundColor: '#fff8'
-        });
-        let hpTxt = this.add.text(x, y + 30, `HP: ${entity.hp}/${entity.maxHp}`, {
-            fontSize: '20px', fill: '#000', backgroundColor: '#fff8'
-        });
+        let nameTxt = this.add.text(x, y, entity.name.toUpperCase(), { fontSize: '24px', fill: '#000', fontStyle: 'bold', backgroundColor: '#fff8' });
+        let hpTxt = this.add.text(x, y + 30, `HP: ${entity.hp}/${entity.maxHp}`, { fontSize: '20px', fill: '#000', backgroundColor: '#fff8' });
         this.add.rectangle(x, y + 60, 200, 15, 0x555555).setOrigin(0, 0);
         let bar = this.add.rectangle(x, y + 60, 200, 15, 0x00ff00).setOrigin(0, 0);
-
         return { nameText: nameTxt, text: hpTxt, bar: bar };
     }
 
@@ -1132,23 +1135,10 @@ class BattleScene extends Phaser.Scene {
             let by = 690 + Math.floor(i / 2) * 45;
 
             let b = this.add.text(bx, by, '', {
-                fontSize: '24px',
-                fill: '#ffffff',
-                fontFamily: '"Courier New", Courier, monospace',
-                fontStyle: 'bold',
-                shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true },
-                padding: { x: 2, y: 5 }
-            })
-                .setInteractive()
-                .on('pointerdown', () => {
-                    if (this.isInputActive) this.handleButtonClick(i);
-                })
-                .on('pointerover', () => {
-                    if (this.isInputActive) {
-                        this.selectedMoveIndex = i;
-                        this.updateMenuSelection();
-                    }
-                });
+                fontSize: '24px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true }, padding: { x: 2, y: 5 }
+            }).setInteractive()
+                .on('pointerdown', () => { if (this.isInputActive) this.handleButtonClick(i); })
+                .on('pointerover', () => { if (this.isInputActive) { this.selectedMoveIndex = i; this.updateMenuSelection(); } });
 
             b.setVisible(false);
             this.btns.push(b);
@@ -1191,14 +1181,7 @@ class BattleScene extends Phaser.Scene {
     }
 
     getColorForType(tipo) {
-        const typeColors = {
-            "Normale": "#A8A878", "Fuoco": "#F08030", "Acqua": "#6890F0",
-            "Elettro": "#F8D030", "Erba": "#78C850", "Ghiaccio": "#98D8D8",
-            "Lotta": "#C03028", "Veleno": "#A040A0", "Terra": "#E0C068",
-            "Volante": "#A890F0", "Psico": "#F85888", "Coleottero": "#A8B820",
-            "Roccia": "#B8A038", "Spettro": "#705898", "Drago": "#7038F8",
-            "Buio": "#705848", "Acciaio": "#B8B8D0", "Folletto": "#EE99AC"
-        };
+        const typeColors = { "Normale": "#A8A878", "Fuoco": "#F08030", "Acqua": "#6890F0", "Elettro": "#F8D030", "Erba": "#78C850", "Ghiaccio": "#98D8D8", "Lotta": "#C03028", "Veleno": "#A040A0", "Terra": "#E0C068", "Volante": "#A890F0", "Psico": "#F85888", "Coleottero": "#A8B820", "Roccia": "#B8A038", "Spettro": "#705898", "Drago": "#7038F8", "Buio": "#705848", "Acciaio": "#B8B8D0", "Folletto": "#EE99AC" };
         return typeColors[tipo] || "#777777";
     }
 
@@ -1238,7 +1221,6 @@ class BattleScene extends Phaser.Scene {
         this.menuState = 'MAIN';
         this.selectedMoveIndex = 0;
 
-        // GESTIONE MOSSE FORZATE O RICARICA
         if (this.pEntity.mossaForzata) {
             let forcedMoveName = this.pEntity.mossaForzata;
             let forcedMoveData = this.pEntity.moves.find(m => m && m.Nome === forcedMoveName);
@@ -1249,19 +1231,13 @@ class BattleScene extends Phaser.Scene {
                 this.btns.forEach(b => b.setVisible(false));
                 this.moveInfoUI.forEach(element => element.setVisible(false));
                 this.isInputActive = false;
-
-                // Ritardo cosmetico, poi lanciamo l'attacco in automatico
-                this.time.delayedCall(1000, () => {
-                    this.handleMoveClick(forcedMoveName);
-                });
+                this.time.delayedCall(1000, () => this.handleMoveClick(forcedMoveName));
                 return;
             }
         }
 
-        // GESTIONE FINE PP (SCONTRO)
         let haMosseDisponibili = this.pEntity.moves.some(m => m && m.ppAttuali > 0);
         if (!haMosseDisponibili) {
-            // FIX: Assicurati che "Scontro" esista nel moveDB del client e passagli i dati minimi!
             this.pEntity.moves = [this.moveDB["Scontro"] || { Nome: "Scontro", Tipo: "Normale", Categoria: "Fisico", ppAttuali: 1, ppMassimi: 1 }];
             this.selectedMoveIndex = 0;
         }
@@ -1272,30 +1248,24 @@ class BattleScene extends Phaser.Scene {
     handleMoveClick(moveName) {
         let myMoveData = this.pEntity.moves.find(m => m.Nome === moveName);
 
-        // Controllo PP esauriti per mosse normali
         if (moveName !== "Ricarica" && moveName !== "Scontro" && myMoveData && myMoveData.ppAttuali !== undefined && myMoveData.ppAttuali <= 0) {
-            let warningText = this.add.text(500, 400, "PP ESAURITI!", {
-                fontSize: '40px', fill: '#ff0000', fontStyle: 'bold', stroke: '#000', strokeThickness: 6
-            }).setOrigin(0.5);
-            this.tweens.add({
-                targets: warningText, y: 350, alpha: 0, duration: 1500, onComplete: () => warningText.destroy()
-            });
+            let warningText = this.add.text(500, 400, "PP ESAURITI!", { fontSize: '40px', fill: '#ff0000', fontStyle: 'bold', stroke: '#000', strokeThickness: 6 }).setOrigin(0.5);
+            this.tweens.add({ targets: warningText, y: 350, alpha: 0, duration: 1500, onComplete: () => warningText.destroy() });
             return;
         }
 
         this.isInputActive = false;
-
         this.btns.forEach(b => b.setVisible(false));
         this.moveInfoUI.forEach(element => element.setVisible(false));
         this.logText.setVisible(true);
 
         if (this.isWild) {
-            // ... (logica bot invariata)
-            let mosseDisponibiliBot = this.eEntity.moves.filter(m => m.ppAttuali > 0);
+            let activeBot = this.partita.p2.squadra[this.partita.p2.attivoIdx];
+            let mosseDisponibiliBot = activeBot.mosse.filter(m => m.ppAttuali > 0);
             let botMoveData;
 
             if (this.eEntity.mossaForzata) {
-                botMoveData = this.eEntity.moves.find(m => m && m.Nome === this.eEntity.mossaForzata);
+                botMoveData = activeBot.mosse.find(m => m && m.Nome === this.eEntity.mossaForzata);
                 if (this.eEntity.mossaForzata === "Ricarica") {
                     botMoveData = { Nome: "Ricarica", Tipo: "Normale", Categoria: "Stato", Potenza: 0, Precisione: 100, CodiceFunzione: [] };
                 } else if (botMoveData && botMoveData.ppAttuali <= 0) {
@@ -1308,14 +1278,12 @@ class BattleScene extends Phaser.Scene {
                 botMoveData = this.moveDB["Scontro"];
             }
 
-            // Fallback per sicurezza su botMoveData se per caso "Scontro" o la mossa fallisce a caricarsi
             if (!botMoveData) botMoveData = { Nome: "Scontro", Tipo: "Normale", Categoria: "Fisico" };
             if (!myMoveData) myMoveData = { Nome: moveName, Tipo: "Normale", Categoria: "Fisico" };
 
             let statoAggiornato = this.partita.processaTurno({ mossa: myMoveData }, { mossa: botMoveData });
             this.applicaStatoPartita(statoAggiornato, false);
         } else {
-            // FIX: Assicurati di inviare SEMPRE un messaggio al server!
             this.logText.setText("In attesa dell'avversario...");
             this.socket.emit('pvpUseMove', { roomId: this.roomId, moveName: moveName });
         }
@@ -1323,28 +1291,22 @@ class BattleScene extends Phaser.Scene {
 
     handleButtonClick(index) {
         if (this.menuState === 'MAIN') {
-            if (index === 0) { // LOTTA
-                this.menuState = 'MOVES';
-                this.selectedMoveIndex = 0;
-                this.updateMenuSelection();
-            } else if (index === 1) { // ZAINO / POKÉBALL
-                this.isInputActive = false;
-                this.btns.forEach(b => b.setVisible(false));
-                this.logText.setVisible(true);
-                this.logText.setText("Non puoi catturare i Pokémon altrui!");
+            if (index === 0) {
+                this.menuState = 'MOVES'; this.selectedMoveIndex = 0; this.updateMenuSelection();
+            } else if (index === 1) {
+                this.isInputActive = false; this.btns.forEach(b => b.setVisible(false));
+                this.logText.setVisible(true); this.logText.setText("Non puoi catturare i Pokémon altrui!");
                 this.time.delayedCall(1500, () => this.startTurn());
-            } else if (index === 2) { // POKÉMON (Menu Squadra)
-                this.openTeamModal(); // Apre il nostro nuovo modal HTML
-            } else if (index === 3) { // FUGA
-                this.isInputActive = false;
-                this.btns.forEach(b => b.setVisible(false));
+            } else if (index === 2) {
+                this.openTeamModal();
+            } else if (index === 3) {
+                this.isInputActive = false; this.btns.forEach(b => b.setVisible(false));
                 this.logText.setVisible(true);
                 if (this.isWild) {
                     this.logText.setText("Sei fuggito con successo!");
                     this.time.delayedCall(1500, () => {
                         if (this.socket) this.socket.emit('setInBattle', false);
-                        this.scene.stop();
-                        this.scene.resume('WorldScene');
+                        this.scene.stop(); this.scene.resume('WorldScene');
                     });
                 } else {
                     this.logText.setText("Non puoi fuggire da una lotta tra allenatori!");
@@ -1362,159 +1324,164 @@ class BattleScene extends Phaser.Scene {
     }
 
     applicaStatoPartita(stato, inverti) {
-        this.invertiLogs = inverti; // Ci serve per il parsing dei log
+        this.invertiLogs = inverti;
         this.currentTurn = stato.turno;
         let p1Data = inverti ? stato.p2 : stato.p1;
         let p2Data = inverti ? stato.p1 : stato.p2;
 
         this.myActiveIdx = p1Data.attivoIdx;
-        this.myTeamData = p1Data.squadra;
+
+        // FIX: Invece di sovrascrivere l'intera squadra perdendo statistiche e mosse, 
+        // aggiorniamo chirurgicamente solo gli HP!
+        p1Data.squadra.forEach((p, i) => {
+            if (this.myTeamData[i]) this.myTeamData[i].hp = p.hp;
+        });
+        if (this.oppTeamData) {
+            p2Data.squadra.forEach((p, i) => {
+                if (this.oppTeamData[i]) this.oppTeamData[i].hp = p.hp;
+            });
+        }
+
+        // Sincronizziamo i PP scalati dal server per il Pokémon in campo
+        this.myTeamData[this.myActiveIdx].mosse = [...p1Data.mosse];
+        if (this.oppTeamData) this.oppTeamData[p2Data.attivoIdx].mosse = [...p2Data.mosse];
 
         if (p1Data.nome !== this.pEntity.name) {
-            this.pEntity = new PokemonEntity(p1Data.nome, this.pkmnDB[p1Data.nome], this.moveDB);
-            if (this.pSprite.node) this.pSprite.node.querySelector('img').src = this.pkmnDB[p1Data.nome].sprite.normal;
-            this.pUI.nameText.setText(p1Data.nome.toUpperCase());
+            let myNewActive = this.myTeamData[this.myActiveIdx];
+            this.pEntity = { name: myNewActive.nome, types: myNewActive.tipi, hp: myNewActive.hp, maxHp: myNewActive.maxHp, moves: myNewActive.mosse, alive: myNewActive.hp > 0 };
+            if (this.pSprite.node) this.pSprite.node.querySelector('img').src = this.pkmnDB[myNewActive.nome].sprite.normal;
+            this.pUI.nameText.setText(myNewActive.nome.toUpperCase());
             this.updateStatusOverlay(true, null);
         }
 
         if (p2Data.nome !== this.eEntity.name) {
-            this.eEntity = new PokemonEntity(p2Data.nome, this.pkmnDB[p2Data.nome], this.moveDB);
-            if (this.eSprite.node) this.eSprite.node.querySelector('img').src = this.pkmnDB[p2Data.nome].sprite.normal;
-            this.eUI.nameText.setText(p2Data.nome.toUpperCase());
+            let oppNewActive = this.oppTeamData[p2Data.attivoIdx];
+            this.eEntity = { name: oppNewActive.nome, types: oppNewActive.tipi, hp: oppNewActive.hp, maxHp: oppNewActive.maxHp, moves: oppNewActive.mosse, alive: oppNewActive.hp > 0 };
+            if (this.eSprite.node) this.eSprite.node.querySelector('img').src = this.pkmnDB[oppNewActive.nome].sprite.normal;
+            this.eUI.nameText.setText(oppNewActive.nome.toUpperCase());
             this.updateStatusOverlay(false, null);
         }
 
-        this.pEntity.moves = [...p1Data.mosse];
         this.pEntity.mossaForzata = p1Data.mossaForzata;
         this.eEntity.mossaForzata = p2Data.mossaForzata;
 
-        if (p1Data.hp <= 0) this.pEntity.alive = false;
-        if (p2Data.hp <= 0) this.eEntity.alive = false;
+        if (p1Data.trasformato && this.pSprite.node) this.pSprite.node.querySelector('img').src = this.pkmnDB[this.eEntity.name].sprite.normal;
+        if (p2Data.trasformato && this.eSprite.node) this.eSprite.node.querySelector('img').src = this.pkmnDB[this.pEntity.name].sprite.normal;
 
-        if (p1Data.trasformato && this.pSprite.node) {
-            this.pSprite.node.querySelector('img').src = this.pkmnDB[this.eEntity.name].sprite.normal;
-        }
-        if (p2Data.trasformato && this.eSprite.node) {
-            this.eSprite.node.querySelector('img').src = this.pkmnDB[this.pEntity.name].sprite.normal;
-        }
-
+        let iAmDead = p1Data.hp <= 0;
+        let oppIsDead = p2Data.hp <= 0;
         this.mostraLogsSequenziali(stato.logs, () => {
             this.updateUI();
-            if (stato.finito || !this.pEntity.alive || !this.eEntity.alive) {
-                // ... (animazioni di sconfitta/vittoria) ...
+
+            if (stato.finito) {
                 this.time.delayedCall(1500, () => {
-                    this.logText.setText(!this.pEntity.alive ? 'HAI PERSO... 💀' : 'HAI VINTO! 🎉');
-                    let loserSprite = !this.pEntity.alive ? this.pSprite : this.eSprite;
+                    let vinto = p1Data.squadra.some(p => p.hp > 0);
+                    this.logText.setText(vinto ? 'HAI VINTO! 🎉' : 'HAI PERSO... 💀');
+                    let loserSprite = vinto ? this.eSprite : this.pSprite;
                     this.tweens.add({
-                        targets: loserSprite,
-                        y: loserSprite.y + 100,
-                        alpha: 0,
-                        duration: 1000,
+                        targets: loserSprite, y: loserSprite.y + 100, alpha: 0, duration: 1000,
                         onComplete: () => {
                             if (this.socket) this.socket.emit('setInBattle', false);
                             this.scene.stop(); this.scene.resume('WorldScene');
                         }
                     });
                 });
+            } else if (iAmDead) {
+                // Sono morto IO, devo switchare
+                this.isInputActive = false;
+                this.btns.forEach(b => b.setVisible(false));
+                this.logText.setText(`${p1Data.nome} è esausto! Scegli un sostituto!`);
+                this.time.delayedCall(1500, () => this.forceSwitchMenu());
+            } else if (oppIsDead) {
+                // E' MORTO L'AVVERSARIO!
+                this.isInputActive = false;
+                this.btns.forEach(b => b.setVisible(false));
+
+                if (this.isWild) {
+                    this.logText.setText(`${p2Data.nome} è esausto!`);
+                    this.time.delayedCall(1500, () => {
+                        let nextBotIdx = this.partita.p2.squadra.findIndex(p => p.hp > 0);
+                        if (nextBotIdx !== -1) {
+                            // Cambio gratis del bot senza consumare il turno!
+                            this.partita.p2.attivoIdx = nextBotIdx;
+                            let nuovoPk = this.partita.p2.squadra[nextBotIdx];
+                            this.partita.logs = [`L'avversario manda in campo ${nuovoPk.nome}! `];
+                            let nuovoStato = this.partita.ottieniStatoAggiornato();
+                            this.applicaStatoPartita(nuovoStato, false);
+                        } else {
+                            this.startTurn();
+                        }
+                    });
+                } else {
+                    // Nel PvP non facciamo nulla, aspettiamo il forced_switch dal server
+                    this.logText.setText("L'avversario sta scegliendo chi mandare in campo...");
+                }
             } else {
                 this.startTurn();
             }
         });
     }
 
+    forceSwitchMenu() {
+        this.isInputActive = false;
+        this.isForcedSwitch = true;
+        this.openTeamModal();
+    }
+
     mostraLogsSequenziali(logs, onComplete) {
-        if (!logs || logs.length === 0) {
-            if (onComplete) onComplete();
-            return;
-        }
-        let index = 0;
-        let ultimoAttaccanteEraPlayer = null;
+        if (!logs || logs.length === 0) { if (onComplete) onComplete(); return; }
+        let index = 0; let ultimoAttaccanteEraPlayer = null;
 
         let mostraProssimo = () => {
             if (index < logs.length) {
                 let logObj = logs[index];
-
-                // 1. GESTIONE POLIMORFICA DEL LOG (Stringa o Oggetto con HP)
-                // Se il log è un oggetto {testo, p1Hp, p2Hp}, estraiamo i dati
                 let riga = typeof logObj === 'object' ? logObj.testo : logObj;
 
-                // 2. SINCRONIZZAZIONE HP IN TEMPO REALE
-                // Se abbiamo i dati HP salvati in questo log, aggiorniamo le entità prima di mostrare il testo
                 if (typeof logObj === 'object') {
                     this.pEntity.hp = this.invertiLogs ? logObj.p2Hp : logObj.p1Hp;
                     this.eEntity.hp = this.invertiLogs ? logObj.p1Hp : logObj.p2Hp;
-                    // Aggiorniamo subito la grafica per riflettere lo stato esatto di questo log
                     this.updateUI();
                 }
 
-                // 3. PARSING VECCHIO STILE (Fallback per log con stringa |HP:)
                 let targetHp = null;
                 if (typeof riga === 'string' && riga.includes("|HP:")) {
                     let parts = riga.split("|HP:");
-                    riga = parts[0];
-                    targetHp = parseInt(parts[1]);
+                    riga = parts[0]; targetHp = parseInt(parts[1]);
                 }
 
                 this.logText.setText(riga);
-
                 let isPlayerTarget = riga.includes(this.pEntity.name);
                 let isEnemyTarget = riga.includes(this.eEntity.name);
 
-                // Gestione animazione attacco (Dash)
                 if (riga.includes(" usa ")) {
                     ultimoAttaccanteEraPlayer = riga.includes(this.pEntity.name);
                     this.playDash(ultimoAttaccanteEraPlayer);
                 }
 
-                // Gestione calo HP e animazione danno
                 if (riga.includes("Inflitti") || riga.includes("efficace") || riga.includes("subisce danni") || riga.includes("rubano energia") || riga.includes("recupera") || riga.includes("rigenera") || riga.includes("contraccolpo")) {
-
                     let targetEnt = isPlayerTarget ? this.pEntity : (isEnemyTarget ? this.eEntity : null);
-
-                    // Se stiamo usando il vecchio sistema |HP:, aggiorniamo qui
-                    if (targetEnt && targetHp !== null) {
-                        targetEnt.hp = targetHp;
-                    }
-
+                    if (targetEnt && targetHp !== null) targetEnt.hp = targetHp;
                     this.updateUI(targetEnt);
 
-                    if (riga.includes("Inflitti") || riga.includes("efficace")) {
-                        if (ultimoAttaccanteEraPlayer !== null) {
-                            this.playDamage(!ultimoAttaccanteEraPlayer);
-                        }
-                    } else if (riga.includes("subisce danni") || riga.includes("rubano energia") || riga.includes("contraccolpo")) {
-                        this.playDamage(isPlayerTarget);
-                    }
+                    if (riga.includes("Inflitti") || riga.includes("efficace")) { if (ultimoAttaccanteEraPlayer !== null) this.playDamage(!ultimoAttaccanteEraPlayer); }
+                    else if (riga.includes("subisce danni") || riga.includes("rubano energia") || riga.includes("contraccolpo")) { this.playDamage(isPlayerTarget); }
                 }
 
-                // --- ANIMAZIONI STATISTICHE E STATO ---
-                if (riga.includes("aumenta")) {
-                    this.playStatAnim(isPlayerTarget, true);
-                } else if (riga.includes("diminuisce")) {
-                    this.playStatAnim(isPlayerTarget, false);
-                }
+                if (riga.includes("aumenta")) this.playStatAnim(isPlayerTarget, true);
+                else if (riga.includes("diminuisce")) this.playStatAnim(isPlayerTarget, false);
 
                 if (riga.includes("stato di")) {
                     let stato = riga.split("stato di ")[1].replace("!", "").trim();
                     this.updateStatusOverlay(isPlayerTarget, stato);
-                } else if (riga.includes("addormentato per la sonnolenza")) {
-                    this.updateStatusOverlay(isPlayerTarget, "Sonno");
-                } else if (riga.includes("si è svegliato") || riga.includes("si è scongelato") || riga.includes("curato dal suo problema di stato")) {
-                    this.updateStatusOverlay(isPlayerTarget, null);
-                }
+                } else if (riga.includes("addormentato per la sonnolenza")) this.updateStatusOverlay(isPlayerTarget, "Sonno");
+                else if (riga.includes("si è svegliato") || riga.includes("si è scongelato") || riga.includes("curato dal suo problema di stato")) this.updateStatusOverlay(isPlayerTarget, null);
 
-                if ((riga.includes("confuso") || riga.includes("Confusione")) && !riga.includes("non è più confuso")) {
-                    this.playConfusion(isPlayerTarget);
-                }
-
-                if (riga.includes("intrappolato") || riga.includes("Legatutto") || riga.includes("Parassiseme")) {
-                    this.playTrap(isPlayerTarget);
-                }
+                if ((riga.includes("confuso") || riga.includes("Confusione")) && !riga.includes("non è più confuso")) this.playConfusion(isPlayerTarget);
+                if (riga.includes("intrappolato") || riga.includes("Legatutto") || riga.includes("Parassiseme")) this.playTrap(isPlayerTarget);
 
                 index++;
                 this.time.delayedCall(1500, mostraProssimo);
             } else {
-                // Fine dei log: assicuriamoci che l'interfaccia sia sincronizzata al 100%
                 this.updateUI();
                 if (onComplete) onComplete();
             }
@@ -1522,103 +1489,57 @@ class BattleScene extends Phaser.Scene {
         mostraProssimo();
     }
 
-    playDash(isPlayer) {
-        let sprite = isPlayer ? this.pSprite : this.eSprite;
-        let dist = isPlayer ? 60 : -60;
-        this.tweens.add({ targets: sprite, x: sprite.x + dist, duration: 100, yoyo: true, ease: 'Power2' });
-    }
-
-    playDamage(isPlayer) {
-        let sprite = isPlayer ? this.pSprite : this.eSprite;
-        this.tweens.add({ targets: sprite, alpha: 0.5, x: sprite.x + (isPlayer ? 5 : -5), duration: 50, yoyo: true, repeat: 5, onComplete: () => sprite.alpha = 1 });
-    }
-
-    playStatAnim(isPlayer, isUp) {
-        let x = isPlayer ? 250 : 750;
-        let y = isPlayer ? 500 : 230;
-        let color = isUp ? '#00FF00' : '#FF0000';
-        let label = isUp ? '↑ STATS' : '↓ STATS';
-        let t = this.add.text(x, y, label, { fontSize: '32px', fill: color, fontStyle: 'bold', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5);
-        this.tweens.add({ targets: t, y: y - 100, alpha: 0, duration: 1500, onComplete: () => t.destroy() });
-    }
-
-    playOverlayTesto(isPlayer, testo, colore) {
-        let targetX = isPlayer ? 250 : 750;
-        let targetY = isPlayer ? 500 : 230;
-        let txt = this.add.text(targetX, targetY, testo, { fontSize: '40px', fill: colore, fontStyle: 'bold', stroke: '#000', strokeThickness: 6 }).setOrigin(0.5);
-        this.tweens.add({ targets: txt, y: targetY - 80, scale: 1.2, alpha: 0, duration: 1500, onComplete: () => txt.destroy() });
-    }
-
+    playDash(isPlayer) { let sprite = isPlayer ? this.pSprite : this.eSprite; let dist = isPlayer ? 60 : -60; this.tweens.add({ targets: sprite, x: sprite.x + dist, duration: 100, yoyo: true, ease: 'Power2' }); }
+    playDamage(isPlayer) { let sprite = isPlayer ? this.pSprite : this.eSprite; this.tweens.add({ targets: sprite, alpha: 0.5, x: sprite.x + (isPlayer ? 5 : -5), duration: 50, yoyo: true, repeat: 5, onComplete: () => sprite.alpha = 1 }); }
+    playStatAnim(isPlayer, isUp) { let x = isPlayer ? 250 : 750; let y = isPlayer ? 500 : 230; let color = isUp ? '#00FF00' : '#FF0000'; let label = isUp ? '↑ STATS' : '↓ STATS'; let t = this.add.text(x, y, label, { fontSize: '32px', fill: color, fontStyle: 'bold', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5); this.tweens.add({ targets: t, y: y - 100, alpha: 0, duration: 1500, onComplete: () => t.destroy() }); }
     updateStatusOverlay(isPlayer, stato) {
         let ui = isPlayer ? this.pUI : this.eUI;
-        if (!ui.statusLabel) {
-            ui.statusLabel = this.add.text(ui.nameText.x, ui.nameText.y - 25, '', {
-                fontSize: '16px', fontStyle: 'bold', padding: { x: 4, y: 2 }
-            });
-        }
-        if (!stato) {
-            ui.statusLabel.setText('');
-            ui.statusLabel.setBackgroundColor('transparent');
-            return;
-        }
-        const colori = {
-            'Scottatura': '#f08030', 'Paralisi': '#f8d030', 'Sonno': '#8c888c',
-            'Avvelenamento': '#a040a0', 'Iperavvelenamento': '#a040a0', 'Congelamento': '#98d8d8'
-        };
+        if (!ui.statusLabel) ui.statusLabel = this.add.text(ui.nameText.x, ui.nameText.y - 25, '', { fontSize: '16px', fontStyle: 'bold', padding: { x: 4, y: 2 } });
+        if (!stato) { ui.statusLabel.setText(''); ui.statusLabel.setBackgroundColor('transparent'); return; }
+        const colori = { 'Scottatura': '#f08030', 'Paralisi': '#f8d030', 'Sonno': '#8c888c', 'Avvelenamento': '#a040a0', 'Iperavvelenamento': '#a040a0', 'Congelamento': '#98d8d8' };
         ui.statusLabel.setText(stato.toUpperCase()).setBackgroundColor(colori[stato] || '#777');
     }
+    playConfusion(isPlayer) { let x = isPlayer ? 250 : 750; let y = isPlayer ? 420 : 150; let d1 = this.add.text(x - 30, y, '🦆', { fontSize: '30px' }).setOrigin(0.5); let d2 = this.add.text(x + 30, y, '🦆', { fontSize: '30px' }).setOrigin(0.5); this.tweens.add({ targets: [d1, d2], angle: 360, duration: 1000, repeat: 1, onComplete: () => { d1.destroy(); d2.destroy(); } }); }
+    playTrap(isPlayer) { let targetX = isPlayer ? 250 : 750; let targetY = isPlayer ? 500 : 230; let trap = this.add.text(targetX, targetY, '🔗', { fontSize: '100px' }).setOrigin(0.5); this.tweens.add({ targets: trap, scale: { from: 2, to: 1 }, alpha: { from: 1, to: 0 }, duration: 1500, onComplete: () => trap.destroy() }); }
 
-    playConfusion(isPlayer) {
-        let x = isPlayer ? 250 : 750;
-        let y = isPlayer ? 420 : 150;
-        let d1 = this.add.text(x - 30, y, '🦆', { fontSize: '30px' }).setOrigin(0.5);
-        let d2 = this.add.text(x + 30, y, '🦆', { fontSize: '30px' }).setOrigin(0.5);
-        this.tweens.add({ targets: [d1, d2], angle: 360, duration: 1000, repeat: 1, onComplete: () => { d1.destroy(); d2.destroy(); } });
-    }
-
-    playTrap(isPlayer) {
-        let targetX = isPlayer ? 250 : 750;
-        let targetY = isPlayer ? 500 : 230;
-        let trap = this.add.text(targetX, targetY, '🔗', { fontSize: '100px' }).setOrigin(0.5);
-        this.tweens.add({ targets: trap, scale: { from: 2, to: 1 }, alpha: { from: 1, to: 0 }, duration: 1500, onComplete: () => trap.destroy() });
-    }
     openTeamModal() {
         this.isInputActive = false;
         this.modalSelection = 0;
         this.currentView = 'list';
         this.summaryPage = 0;
 
-        let teamData = this.myTeamData || (this.partita ? this.partita.p1.squadra : [this.pEntity]);
+        let teamData = this.myTeamData;
 
         const html = `
-                        <div class="modal-overlay" id="team-modal">
-                            <div class="modal-content">
-                                <div id="modal-list-view" style="display: block; width: 100%;">
-                                    <div class="modal-header">SQUADRA POKÉMON</div>
-                                    <div class="pokemon-list" id="pkmn-list-container"></div>
-                                </div>
+            <div class="modal-overlay" id="team-modal">
+                <div class="modal-content">
+                    <div id="modal-list-view" style="display: block; width: 100%;">
+                        <div class="modal-header">SQUADRA POKÉMON</div>
+                        <div class="pokemon-list" id="pkmn-list-container"></div>
+                    </div>
 
-                                <div id="modal-summary-view" class="summary-view" style="display: none; width: 100%;">
-                                    <div class="modal-header" style="font-size: 1.5rem;" id="summary-page-indicator">◀ INFO E STATISTICHE ▶</div>
-                                    <div class="summary-layout" style="display: flex; gap: 20px; width: 100%;">
-                                        <div class="summary-left" style="flex: 1; text-align: center; border-right: 4px dashed var(--color-quaternary);">
-                                            <div class="pkmn-name" id="summary-name" style="margin-bottom: 10px;">NOME</div>
-                                            <img id="summary-sprite" src="" style="width: 160px; height: 160px; image-rendering: pixelated;">
-                                            <div class="summary-types" id="summary-types" style="display: flex; justify-content: center; gap: 10px; margin-top: 10px;"></div>
-                                        </div>
-                                        <div class="summary-right" style="flex: 1.5; padding-left: 10px;">
-                                            <div id="summary-page-0" class="stats-grid"></div>
-                                            <div id="summary-page-1" class="moves-grid" style="display: none;"></div>
-                                        </div>
-                                    </div>
-                                </div>
+                    <div id="modal-summary-view" class="summary-view" style="display: none; width: 100%;">
+                        <div class="modal-header" style="font-size: 1.5rem;" id="summary-page-indicator">◀ INFO E STATISTICHE ▶</div>
+                        <div class="summary-layout" style="display: flex; gap: 20px; width: 100%;">
+                            <div class="summary-left" style="flex: 1; text-align: center; border-right: 4px dashed var(--color-quaternary);">
+                                <div class="pkmn-name" id="summary-name" style="margin-bottom: 10px;">NOME</div>
+                                <img id="summary-sprite" src="" style="width: 160px; height: 160px; image-rendering: pixelated;">
+                                <div class="summary-types" id="summary-types" style="display: flex; justify-content: center; gap: 10px; margin-top: 10px;"></div>
                             </div>
-                        </div>`;
+                            <div class="summary-right" style="flex: 1.5; padding-left: 10px;">
+                                <div id="summary-page-0" class="stats-grid"></div>
+                                <div id="summary-page-1" class="moves-grid" style="display: none;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
 
         this.teamModalDom = this.add.dom(500, 400).createFromHTML(html);
         this.populateTeamList(teamData);
         this.setupModalNavigation(teamData);
     }
+
     populateTeamList(teamData) {
         let container = document.getElementById('pkmn-list-container');
         if (!container) return;
@@ -1627,36 +1548,34 @@ class BattleScene extends Phaser.Scene {
         teamData.forEach((pkmn, index) => {
             let localData = (this.pkmnDB && this.pkmnDB[pkmn.nome]) ? this.pkmnDB[pkmn.nome] : null;
             let spriteUrl = pkmn.sprite?.normal || localData?.sprite?.normal || '';
-
-            let hp = pkmn.hp;
-            let maxHp = pkmn.maxHp || pkmn.hpMax || (localData ? localData.statistiche.hp.base_stat : 100);
-            let hpPercent = (hp / maxHp) * 100;
+            let hpPercent = (pkmn.hp / pkmn.maxHp) * 100;
             let hpColor = hpPercent > 50 ? '#4caf50' : (hpPercent > 20 ? '#ffeb3b' : '#f44336');
 
             listHTML += `
-                        <div class="pokemon-item" data-index="${index}">
-                            <img src="${spriteUrl}" style="width: 70px; height: 70px; display: block; image-rendering: pixelated; filter: drop-shadow(2px 2px 0 rgba(0,0,0,0.5));">
-                            <div class="pkmn-info">
-                                <div class="pkmn-name-line">
-                                    <span class="pkmn-name">${pkmn.nome.toUpperCase()} ${index === (this.myActiveIdx || 0) ? '★' : ''}</span>
-                                </div>
-                                <div class="hp-container">
-                                    <span class="hp-label">HP</span>
-                                    <div class="hp-bar-bg"><div class="hp-bar-fill" style="width: ${hpPercent}%; background-color: ${hpColor};"></div></div>
-                                </div>
-                                <div class="pkmn-hp-text">${hp}/${maxHp}</div>
-                            </div>
-                            
-                            <div class="inline-actions" id="actions-${index}">
-                                <div class="action-btn-inline">SOSTITUISCI</div>
-                                <div class="action-btn-inline">SUMMARY</div>
-                                <div class="action-btn-inline">INDIETRO</div>
-                            </div>
-                        </div>`;
+                <div class="pokemon-item" data-index="${index}">
+                    <img src="${spriteUrl}" style="width: 70px; height: 70px; display: block; image-rendering: pixelated; filter: drop-shadow(2px 2px 0 rgba(0,0,0,0.5));">
+                    <div class="pkmn-info">
+                        <div class="pkmn-name-line">
+                            <span class="pkmn-name">${pkmn.nome.toUpperCase()} ${index === (this.myActiveIdx || 0) ? '★' : ''}</span>
+                        </div>
+                        <div class="hp-container">
+                            <span class="hp-label">HP</span>
+                            <div class="hp-bar-bg"><div class="hp-bar-fill" style="width: ${hpPercent}%; background-color: ${hpColor};"></div></div>
+                        </div>
+                        <div class="pkmn-hp-text">${pkmn.hp}/${pkmn.maxHp}</div>
+                    </div>
+                    
+                    <div class="inline-actions" id="actions-${index}">
+                        <div class="action-btn-inline">SOSTITUISCI</div>
+                        <div class="action-btn-inline">SUMMARY</div>
+                        <div class="action-btn-inline">INDIETRO</div>
+                    </div>
+                </div>`;
         });
         container.innerHTML = listHTML;
         this.updateModalVisuals();
     }
+
     setupModalNavigation(teamData) {
         this.modalKeyListener = (event) => {
             if (this.isInputActive) return;
@@ -1665,120 +1584,62 @@ class BattleScene extends Phaser.Scene {
             if (this.currentView === 'list') {
                 let max = document.querySelectorAll('.pokemon-item').length;
                 if (max > 0) {
-                    if (key === 'ArrowDown' || key === 's') {
-                        this.modalSelection = (this.modalSelection + 1) % max;
-                        this.updateModalVisuals();
-                    }
-                    if (key === 'ArrowUp' || key === 'w') {
-                        this.modalSelection = (this.modalSelection - 1 + max) % max;
-                        this.updateModalVisuals();
-                    }
+                    if (key === 'ArrowDown' || key === 's') { this.modalSelection = (this.modalSelection + 1) % max; this.updateModalVisuals(); }
+                    if (key === 'ArrowUp' || key === 'w') { this.modalSelection = (this.modalSelection - 1 + max) % max; this.updateModalVisuals(); }
                 }
-            }
-
-            // 2. MENU AZIONI (Sostituisci, Summary, Indietro)
-            else if (this.currentView === 'inline-actions') {
-                let max = 3; // 3 bottoni (Sostituisci, Summary, Indietro)
-                if (key === 'ArrowDown' || key === 's') {
-                    this.actionSelectionIdx = (this.actionSelectionIdx + 1) % max;
-                    this.updateModalVisuals();
-                }
-                if (key === 'ArrowUp' || key === 'w') {
-                    this.actionSelectionIdx = (this.actionSelectionIdx - 1 + max) % max;
-                    this.updateModalVisuals();
-                }
-            }
-
-            // 3. MENU SUMMARY (Pagine e Mosse)
-            else if (this.currentView === 'summary') {
-                if (this.summaryPage === 1) { // Pagina Mosse
+            } else if (this.currentView === 'inline-actions') {
+                let max = 3;
+                if (key === 'ArrowDown' || key === 's') { this.actionSelectionIdx = (this.actionSelectionIdx + 1) % max; this.updateModalVisuals(); }
+                if (key === 'ArrowUp' || key === 'w') { this.actionSelectionIdx = (this.actionSelectionIdx - 1 + max) % max; this.updateModalVisuals(); }
+            } else if (this.currentView === 'summary') {
+                if (this.summaryPage === 1) {
                     let numMoves = document.querySelectorAll('.move-entry').length;
                     if (numMoves > 0) {
-                        if (key === 'ArrowDown' || key === 's') {
-                            this.moveSelectionIdx = (this.moveSelectionIdx + 1) % numMoves;
-                            this.updateModalVisuals();
-                        }
-                        if (key === 'ArrowUp' || key === 'w') {
-                            this.moveSelectionIdx = (this.moveSelectionIdx - 1 + numMoves) % numMoves;
-                            this.updateModalVisuals();
-                        }
+                        if (key === 'ArrowDown' || key === 's') { this.moveSelectionIdx = (this.moveSelectionIdx + 1) % numMoves; this.updateModalVisuals(); }
+                        if (key === 'ArrowUp' || key === 'w') { this.moveSelectionIdx = (this.moveSelectionIdx - 1 + numMoves) % numMoves; this.updateModalVisuals(); }
                     }
                 }
-                // Cambio Pagina con Destra/Sinistra
                 if (key === 'ArrowRight' || key === 'd' || key === 'ArrowLeft' || key === 'a') {
-                    this.summaryPage = this.summaryPage === 0 ? 1 : 0;
-                    this.updateSummaryPage();
-                    this.updateModalVisuals();
+                    this.summaryPage = this.summaryPage === 0 ? 1 : 0; this.updateSummaryPage(); this.updateModalVisuals();
                 }
             }
 
-            // Conferma (Enter)
-            if (key === 'Enter' || key === ' ') {
-                this.confirmModalSelection(teamData);
-            }
-
-            // Indietro (Esc / Backspace)
+            if (key === 'Enter' || key === ' ') this.confirmModalSelection(teamData);
             if (key === 'Escape' || key === 'Backspace') {
-                if (this.currentView === 'inline-actions') {
-                    this.currentView = 'list';
-                    this.updateModalVisuals();
-                } else if (this.currentView === 'summary') {
-                    this.cancelModalSelection(); // Torna alla lista
-                } else {
-                    this.cancelModalSelection(true); // Chiude tutto
-                }
+                if (this.currentView === 'inline-actions') { this.currentView = 'list'; this.updateModalVisuals(); }
+                else if (this.currentView === 'summary') this.cancelModalSelection();
+                else this.cancelModalSelection(true);
             }
         };
 
         window.addEventListener('keydown', this.modalKeyListener);
 
-        // Supporto Click Mouse
         this.teamModalDom.addListener('click').on('click', (e) => {
-            // 1. Click sull'header per switchare le pagine (Statistiche <-> Mosse)
             if (e.target.id === 'summary-page-indicator') {
-                this.summaryPage = this.summaryPage === 0 ? 1 : 0;
-                this.updateSummaryPage();
-                this.updateModalVisuals();
-                return;
+                this.summaryPage = this.summaryPage === 0 ? 1 : 0; this.updateSummaryPage(); this.updateModalVisuals(); return;
             }
-
-            // 2. Click su un Pokémon nella lista per aprire i bottoni inline
             let item = e.target.closest('.pokemon-item');
             if (item && this.currentView === 'list') {
-                this.modalSelection = parseInt(item.dataset.index);
-                this.confirmModalSelection(teamData);
-                return;
+                this.modalSelection = parseInt(item.dataset.index); this.confirmModalSelection(teamData); return;
             }
-
-            // 3. Click sui bottoni inline
             if (e.target.classList.contains('action-btn-inline')) {
                 let actionText = e.target.innerText.trim();
                 let parentItem = e.target.closest('.pokemon-item');
                 this.modalSelection = parseInt(parentItem.dataset.index);
 
-                if (actionText === 'SOSTITUISCI') {
-                    this.executeSwitch(this.modalSelection);
-                } else if (actionText === 'SUMMARY') {
-                    this.openSummary(teamData[this.modalSelection]);
-                } else if (actionText === 'INDIETRO') {
-                    this.currentView = 'list';
-                    this.updateModalVisuals();
-                }
+                if (actionText === 'SOSTITUISCI') this.executeSwitch(this.modalSelection);
+                else if (actionText === 'SUMMARY') this.openSummary(teamData[this.modalSelection]);
+                else if (actionText === 'INDIETRO') { this.currentView = 'list'; this.updateModalVisuals(); }
                 return;
             }
-
-            // 4. Bottone Indietro nel Summary
-            if (e.target.id === 'btn-back-to-action') {
-                this.cancelModalSelection();
-            }
+            if (e.target.id === 'btn-back-to-action') this.cancelModalSelection();
         });
     }
+
     updateModalVisuals() {
-        // 1. Pulizia totale: togliamo 'selected' da ogni possibile elemento
         document.querySelectorAll('.move-entry').forEach(el => el.classList.remove('selected'));
-        document.querySelectorAll('.pokemon-item, .action-btn, .move-entry').forEach(el => {
-            el.classList.remove('selected');
-        });
+        document.querySelectorAll('.pokemon-item, .action-btn, .move-entry').forEach(el => el.classList.remove('selected'));
+
         if (this.currentView === 'list' || this.currentView === 'inline-actions') {
             document.querySelectorAll('.pokemon-item').forEach((el, index) => {
                 el.classList.remove('selected', 'show-actions');
@@ -1786,72 +1647,66 @@ class BattleScene extends Phaser.Scene {
 
                 if (index === this.modalSelection) {
                     el.classList.add('selected');
-
                     if (this.currentView === 'inline-actions') {
                         el.classList.add('show-actions');
                         let btns = el.querySelectorAll('.action-btn-inline');
-                        if (btns[this.actionSelectionIdx]) {
-                            btns[this.actionSelectionIdx].classList.add('selected');
-                        }
+                        if (btns[this.actionSelectionIdx]) btns[this.actionSelectionIdx].classList.add('selected');
                     }
                 }
             });
-        }
-
-        // Logica per il SUMMARY (Mosse)
-        else if (this.currentView === 'summary' && this.summaryPage === 1) {
+        } else if (this.currentView === 'summary' && this.summaryPage === 1) {
             const moves = document.querySelectorAll('.move-entry');
             if (moves[this.moveSelectionIdx]) {
                 moves[this.moveSelectionIdx].classList.add('selected');
-                // Aggiorna box descrizione (già implementato prima)
                 const desc = moves[this.moveSelectionIdx].getAttribute('data-desc');
                 const pot = moves[this.moveSelectionIdx].getAttribute('data-pot');
                 const prec = moves[this.moveSelectionIdx].getAttribute('data-prec');
                 const descBox = document.getElementById('summary-move-desc');
                 if (descBox) {
                     descBox.innerHTML = `
-                    <div style="flex: 1; padding-right: 15px;">${desc}</div>
-                    <div style="width: 120px; text-align: right; border-left: 2px dashed #ff7477; padding-left: 15px; font-size: 1rem; color: #fff;">
+                    <style>.no-scroll::-webkit-scrollbar { display: none; }</style>
+                    <div class="no-scroll" style="flex: 1; padding-right: 15px; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; text-align: left; line-height: 1.4; display: block;">${desc}</div>
+                    <div style="width: 120px; display: flex; flex-direction: column; justify-content: center; text-align: right; border-left: 2px dashed #ff7477; padding-left: 15px; font-size: 1rem; color: #fff;">
                         <div style="margin-bottom: 5px; color: #ffcc00;">POT: <span style="color:#fff;">${pot}</span></div>
                         <div style="color: #ffcc00;">PREC: <span style="color:#fff;">${prec}</span></div>
-                    </div>
-                `;
+                    </div>`;
                 }
             }
         }
     }
 
     confirmModalSelection(teamData) {
-        const items = document.querySelectorAll('.pokemon-item');
-
         if (this.currentView === 'list') {
             this.currentView = 'inline-actions';
             this.actionSelectionIdx = 0;
             this.updateModalVisuals();
-        }
-        else if (this.currentView === 'inline-actions') {
-            if (this.actionSelectionIdx === 0) { // SOSTITUISCI
+        } else if (this.currentView === 'inline-actions') {
+            if (this.actionSelectionIdx === 0) {
                 this.executeSwitch(this.modalSelection);
-            } else if (this.actionSelectionIdx === 1) { // SUMMARY
+            } else if (this.actionSelectionIdx === 1) {
                 this.openSummary(teamData[this.modalSelection]);
-            } else if (this.actionSelectionIdx === 2) { // INDIETRO
+            } else if (this.actionSelectionIdx === 2) {
+                // FIX: Permette di tornare liberamente alla lista dei Pokémon
+                // senza far scattare falsi allarmi del banner!
                 this.currentView = 'list';
                 this.updateModalVisuals();
             }
         }
-        this.updateModalVisuals();
     }
+
     cancelModalSelection(forceClose = false) {
+        // Fix Bug: Blocca la chiusura intera se sei in switch forzato, ma ti permette di tornare alla lista dal Summary!
+        if (forceClose && this.isForcedSwitch) {
+            window.showBanner("Devi scegliere un sostituto!");
+            return;
+        }
+
         if (forceClose) {
             window.removeEventListener('keydown', this.modalKeyListener);
-            if (this.teamModalDom) {
-                this.teamModalDom.destroy();
-                this.teamModalDom = null;
-            }
+            if (this.teamModalDom) { this.teamModalDom.destroy(); this.teamModalDom = null; }
             this.isInputActive = true;
             if (typeof this.updateMenuSelection === 'function') this.updateMenuSelection();
         } else {
-            // Torna alla lista con i bottoni inline aperti
             this.currentView = 'inline-actions';
             document.getElementById('modal-summary-view').style.display = 'none';
             document.getElementById('modal-list-view').style.display = 'block';
@@ -1860,33 +1715,18 @@ class BattleScene extends Phaser.Scene {
     }
 
     openSummary(pkmn) {
-        this.currentView = 'summary';
-        this.summaryPage = 0;
-        this.moveSelectionIdx = 0;
-
-        // MODIFICA CRITICA: Nascondiamo la lista, non il vecchio action-view
+        this.currentView = 'summary'; this.summaryPage = 0; this.moveSelectionIdx = 0;
         document.getElementById('modal-list-view').style.display = 'none';
         document.getElementById('modal-summary-view').style.display = 'flex';
 
         let localData = (this.pkmnDB && this.pkmnDB[pkmn.nome]) ? this.pkmnDB[pkmn.nome] : null;
         document.getElementById('summary-name').innerText = pkmn.nome.toUpperCase();
         document.getElementById('summary-sprite').src = pkmn.sprite?.normal || localData?.sprite?.normal || '';
+        document.getElementById('summary-types').innerHTML = (pkmn.tipi || localData?.tipi || []).map(t => `<div class="type-badge" style="background-color: ${this.getColorForType(t)}">${t.toUpperCase()}</div>`).join('');
 
-        document.getElementById('summary-types').innerHTML = (pkmn.tipi || localData?.tipi || []).map(t =>
-            `<div class="type-badge" style="background-color: ${this.getColorForType(t)}">${t.toUpperCase()}</div>`
-        ).join('');
-
-        let maxHp = pkmn.maxHp || pkmn.hpMax || (localData ? localData.statistiche.hp.base_stat : 100);
-        let stats = pkmn.statistiche || (localData ? {
-            attacco: localData.statistiche.attack.base_stat,
-            difesa: localData.statistiche.defense.base_stat,
-            attaccoSpeciale: localData.statistiche['special-attack'].base_stat,
-            difesaSpeciale: localData.statistiche['special-defense'].base_stat,
-            velocita: localData.statistiche.speed.base_stat
-        } : {});
-
+        let stats = pkmn.statistiche || (localData ? { attacco: localData.statistiche.attack.base_stat, difesa: localData.statistiche.defense.base_stat, attaccoSpeciale: localData.statistiche['special-attack'].base_stat, difesaSpeciale: localData.statistiche['special-defense'].base_stat, velocita: localData.statistiche.speed.base_stat } : {});
         document.getElementById('summary-page-0').innerHTML = `
-            <div class="stat-row"><span class="stat-label">HP </span><span class="stat-value">${pkmn.hp}/${maxHp}</span></div>
+            <div class="stat-row"><span class="stat-label">HP </span><span class="stat-value">${pkmn.hp}/${pkmn.maxHp}</span></div>
             <div class="stat-row"><span class="stat-label">ATTACCO </span><span class="stat-value">${stats.attacco || 0}</span></div>
             <div class="stat-row"><span class="stat-label">DIFESA </span><span class="stat-value">${stats.difesa || 0}</span></div>
             <div class="stat-row"><span class="stat-label">ATT. SP. </span><span class="stat-value">${stats.attaccoSpeciale || 0}</span></div>
@@ -1900,79 +1740,75 @@ class BattleScene extends Phaser.Scene {
             let nomeMossa = typeof mRaw === 'object' ? mRaw.Nome : mRaw;
             const m = this.moveDB[nomeMossa] || { Nome: nomeMossa, Tipo: '???', PP: '--', Potenza: '--', Precisione: '--', Descrizione: 'Nessuna descrizione.' };
             const catColor = m.Categoria === "Fisico" ? '#ff7477' : (m.Categoria === "Speciale" ? '#6874e8' : '#aaaaaa');
-
             movesHtml += `
             <div class="move-entry" id="move-item-${i}" data-desc="${m.Descrizione}" data-pot="${m.Potenza > 0 ? m.Potenza : '--'}" data-prec="${m.Precisione > 0 ? m.Precisione : '--'}">
-                <div class="move-name-line">
-                    <span>${String(m.Nome).toUpperCase()}</span>
-                    <span>PP ${m.PP}/${m.PP}</span>
-                </div>
-                <div class="move-summary-badges">
-                    <span class="badge" style="background:${this.getColorForType(m.Tipo)}">${String(m.Tipo).toUpperCase()}</span>
-                    <span class="badge" style="background:${catColor}">${(m.Categoria || '???').toUpperCase()}</span>
-                </div>
+                <div class="move-name-line"><span>${String(m.Nome).toUpperCase()}</span><span>PP ${m.PP}/${m.PP}</span></div>
+                <div class="move-summary-badges"><span class="badge" style="background:${this.getColorForType(m.Tipo)}">${String(m.Tipo).toUpperCase()}</span><span class="badge" style="background:${catColor}">${(m.Categoria || '???').toUpperCase()}</span></div>
             </div>`;
         });
-        movesHtml += `</div><div class="move-description-box" id="summary-move-desc">Seleziona una mossa...</div>`;
+        movesHtml += `</div><div class="move-description-box" id="summary-move-desc" style="height: 110px; display: flex; align-items: stretch; box-sizing: border-box;">Seleziona una mossa...</div>`;
 
         document.getElementById('summary-page-1').innerHTML = movesHtml;
-
-        this.updateSummaryPage();
-        this.updateModalVisuals();
+        this.updateSummaryPage(); this.updateModalVisuals();
     }
+
     updateSummaryPage() {
         let ind = document.getElementById('summary-page-indicator');
         ind.innerText = this.summaryPage === 0 ? '◀ INFO E STATISTICHE ▶' : '◀ MOSSE ▶';
-
-        // Correzione dei display: page-0 è grid, page-1 è flex (per accomodare moves-grid e la description-box in colonna)
         document.getElementById('summary-page-0').style.display = this.summaryPage === 0 ? 'grid' : 'none';
         document.getElementById('summary-page-1').style.display = this.summaryPage === 1 ? 'flex' : 'none';
-
-        if (this.summaryPage === 1) {
-            document.getElementById('summary-page-1').style.flexDirection = 'column';
-        }
+        if (this.summaryPage === 1) document.getElementById('summary-page-1').style.flexDirection = 'column';
     }
 
     executeSwitch(index) {
+        let pkmn = this.myTeamData[index];
         let activeIdx = this.myActiveIdx !== undefined ? this.myActiveIdx : 0;
 
-        // SE IL POKEMON È GIÀ IN CAMPO
-        if (index === activeIdx) {
-            // 1. Chiudiamo la UI del team
-            if (this.teamModalDom) {
-                this.teamModalDom.destroy();
-                this.teamModalDom = null;
-            }
-            window.removeEventListener('keydown', this.modalKeyListener);
+        if (pkmn.hp <= 0) {
+            window.showBanner("Questo Pokémon è esausto!");
+            return;
+        }
 
-            // 2. Nascondiamo i bottoni del menu e blocchiamo l'input
-            this.isInputActive = false;
-            this.btns.forEach(b => b.setVisible(false));
-
-            // 3. Mostriamo il messaggio di errore
-            this.logText.setVisible(true);
+        if (index === activeIdx && !this.isForcedSwitch) {
+            this.cancelModalSelection(true);
+            this.isInputActive = false; this.btns.forEach(b => b.setVisible(false)); this.logText.setVisible(true);
             this.logText.setText(`${this.pEntity.name.toUpperCase()} è già in campo!`);
-
-            // 4. Aspettiamo 1.5 secondi e ricarichiamo il menu in automatico!
             this.time.delayedCall(1500, () => this.startTurn());
             return;
         }
 
-        // SE IL CAMBIO È VALIDO (Procediamo normalmente)
-        if (this.teamModalDom) {
-            this.teamModalDom.destroy();
-            this.teamModalDom = null;
-        }
+        if (this.teamModalDom) { this.teamModalDom.destroy(); this.teamModalDom = null; }
         window.removeEventListener('keydown', this.modalKeyListener);
-        this.btns.forEach(b => b.setVisible(false));
-        this.logText.setVisible(true);
+        this.btns.forEach(b => b.setVisible(false)); this.logText.setVisible(true);
 
+        // DICHIARATA UNA SOLA VOLTA QUI
         const switchAction = { tipo: 'switch', nuovoIdx: index };
 
+        let wasForced = this.isForcedSwitch;
+        this.isForcedSwitch = false;
+
+        if (wasForced) {
+            // SWITCH FORZATO DOPO KO (Azione gratuita!)
+            if (this.isWild) {
+                this.partita.p1.attivoIdx = index;
+                let nuovoPk = this.partita.p1.squadra[index];
+                this.partita.logs = [`Vai, ${nuovoPk.nome}! `];
+                let nuovoStato = this.partita.ottieniStatoAggiornato();
+                this.applicaStatoPartita(nuovoStato, false);
+            } else {
+                this.logText.setText("Mando in campo...");
+                this.socket.emit('pvpUseMove', { roomId: this.roomId, tipo: 'forced_switch', nuovoIdx: index });
+            }
+            return; // Terminiamo qui, non andiamo al processaTurno!
+        }
+
+        // SWITCH NORMALE DURANTE LA LOTTA (Consuma il turno e ti fa prendere l'attacco)
         if (this.isWild) {
-            let botMoves = this.eEntity.moves.filter(m => m.ppAttuali > 0);
-            let botMove = botMoves.length > 0 ? Phaser.Utils.Array.GetRandom(botMoves) : (this.moveDB["Scontro"] || { Nome: "Scontro" });
-            let stato = this.partita.processaTurno(switchAction, { mossa: botMove });
+            let activeBot = this.partita.p2.squadra[this.partita.p2.attivoIdx];
+            let botMoves = activeBot.mosse.filter(m => m.ppAttuali > 0);
+            let botAction = { mossa: botMoves.length > 0 ? Phaser.Utils.Array.GetRandom(botMoves) : this.moveDB["Scontro"] };
+
+            let stato = this.partita.processaTurno(switchAction, botAction);
             this.applicaStatoPartita(stato, false);
         } else {
             this.logText.setText("In attesa dell'avversario...");
@@ -1991,6 +1827,6 @@ const config = {
     pixelArt: true,
     dom: { createContainer: true },
     physics: { default: 'arcade', arcade: { gravity: { y: 0 } } },
-    scene: [BootScene, LoginScene, StarterScene, WorldScene, SelectionScene, BattleScene]
+    scene: [BootScene, LoginScene, StarterScene, WorldScene, BattleScene]
 };
 new Phaser.Game(config);
