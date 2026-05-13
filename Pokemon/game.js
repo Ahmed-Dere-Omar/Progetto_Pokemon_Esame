@@ -588,7 +588,7 @@ class WorldScene extends Phaser.Scene {
 
     update() {
         // NUOVO: Controllo del tasto ESC per aprire/chiudere il menu
-        if (Phaser.Input.Keyboard.JustDown(this.escKey) && !this.isTransitioning) {
+        if (Phaser.Input.Keyboard.JustDown(this.escKey) && !this.isTransitioning && !this.pcOpen) {
             this.togglePauseMenu();
         }
 
@@ -715,7 +715,7 @@ class WorldScene extends Phaser.Scene {
 
         this.pcState = { view: 'browsing', area: 'squadra', index: 0, actionIdx: 0, summaryPage: 0, moveSelectionIdx: 0 };
 
-       // APPLICHIAMO LE NUOVE CLASSI GLOBALI!
+        // APPLICHIAMO LE NUOVE CLASSI GLOBALI!
         let overlay = document.createElement('div');
         overlay.className = 'pkmn-modal-overlay';
         overlay.id = 'pc-overlay-main';
@@ -738,7 +738,7 @@ class WorldScene extends Phaser.Scene {
                         <div id="pc-preview-panel" style="width: 100%; display: flex; flex-direction: column; align-items: center;">
                             <h3 id="pc-preview-name" style="color: var(--battle-text); margin: 0 0 10px 0; font-size: 1.5rem; min-height: 30px;">--</h3>
                             <div style="width: 160px; height: 160px; background: #000; border: 2px solid #555; border-radius: 8px; display: flex; justify-content: center; align-items: center; margin-bottom: 15px; box-shadow: inset 2px 2px 5px rgba(0,0,0,0.8);">
-                                <img id="pc-preview-sprite" src="" style="max-width: 140px; max-height: 140px; image-rendering: pixelated; display: none;">
+                                <img id="pc-preview-sprite" src="" style="width: 140px; height: 140px; object-fit: contain; image-rendering: pixelated; display: none;">
                             </div>
                             <div id="pc-preview-types" style="display: flex; gap: 5px; margin-bottom: 15px; min-height: 25px;"></div>
                             <div id="pc-preview-stats" style="color: var(--battle-accent); font-weight: bold; width: 100%; text-align: left; padding: 0 10px;"></div>
@@ -760,7 +760,7 @@ class WorldScene extends Phaser.Scene {
                         <div class="summary-left" style="flex: 1; text-align: center; border-right: 4px dashed var(--color-quaternary); display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">
                             <div class="pkmn-name" id="pc-sum-name" style="margin-bottom: 10px; font-size: 1.8rem; flex-shrink: 0;">NOME</div>
                             <div style="flex: 1; display: flex; align-items: center; justify-content: center; min-height: 140px;">
-                                <img id="pc-sum-sprite" src="" style="max-height: 190px; max-width: 190px; image-rendering: pixelated; filter: drop-shadow(4px 4px 0 rgba(0,0,0,0.5));">
+                              <img id="pc-sum-sprite" src="" style="width: 240px; height: 240px; object-fit: contain; image-rendering: pixelated; filter: drop-shadow(4px 4px 0 rgba(0,0,0,0.5));">
                             </div>
                             <div class="summary-types" id="pc-sum-types" style="display: flex; justify-content: center; gap: 10px; margin-top: 10px; margin-bottom: 15px; flex-shrink: 0;"></div>
                             
@@ -785,7 +785,7 @@ class WorldScene extends Phaser.Scene {
 
                 <div style="margin-top: 15px; display: flex; justify-content: center; align-items: center; gap: 30px; flex-shrink: 0; height: 65px;">
                     <button id="pc-save-btn" style="padding: 10px 40px; font-size: 1.5rem; font-weight: bold; font-family: 'Courier New'; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">SALVA ED ESCI</button>
-                    <p style="color: #fff; line-height: 1.2; font-size: 0.9rem; margin: 0;">Comandi:<br>Frecce: Muoviti<br>Invio: Seleziona<br>ESC: Indietro/Chiudi</p>
+                    <p style="color: #fff; line-height: 1.2; font-size: 0.9rem; margin: 0;">Comandi:<br>Frecce: Muoviti<br>Invio: Seleziona<br>ESC/CANC: Indietro/Chiudi</p>
                 </div>
             </div>
         `;
@@ -1218,10 +1218,7 @@ class BattleScene extends Phaser.Scene {
     }
 
     startBattleLogic() {
-        if (this.waitingDom) {
-            this.waitingDom.destroy();
-            this.waitingDom = null;
-        }
+        if (this.waitingDom) { this.waitingDom.destroy(); this.waitingDom = null; }
 
         if (this.isWild) {
             let p1 = { id: 'player', squadra: this.myTeamData, attivoIdx: this.myActiveIdx };
@@ -1240,11 +1237,13 @@ class BattleScene extends Phaser.Scene {
 
         let pSpriteUrl = this.pkmnDB[this.pEntity.name]?.sprite?.normal || '';
         let eSpriteUrl = this.pkmnDB[this.eEntity.name]?.sprite?.normal || '';
+        // RIPRISTINATO LO SCALE DELLA BATTAGLIA PRINCIPALE
         this.pSprite = this.add.dom(250, 535).createFromHTML(`<img src="${pSpriteUrl}" style="transform: scale(2.5); image-rendering: pixelated;">`);
         this.eSprite = this.add.dom(750, 290).createFromHTML(`<img src="${eSpriteUrl}" style="transform: scale(2.2); image-rendering: pixelated;">`);
 
-        this.pUI = this.createUIBox(100, 360, this.pEntity);
-        this.eUI = this.createUIBox(600, 150, this.eEntity);
+        // NUOVE UI BOX DOM
+        this.eUI = this.createUIBox(300, 210, this.eEntity, false);
+        this.pUI = this.createUIBox(770, 575, this.pEntity, true);
 
         this.add.rectangle(0, 665, 1000, 135, 0x2b2b2b).setOrigin(0, 0);
         this.add.rectangle(3, 668, 994, 129).setOrigin(0, 0).setStrokeStyle(6, 0xd05050);
@@ -1265,7 +1264,6 @@ class BattleScene extends Phaser.Scene {
         this.infoPotVal = this.add.text(910, 765, '90', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
 
         this.moveInfoUI = [this.infoTipoLabel, this.infoTipoVal, this.infoCatLabel, this.infoCatVal, this.infoPPLabel, this.infoPPVal, this.infoPotLabel, this.infoPotVal];
-
         this.createButtons();
 
         if (!this.isWild) {
@@ -1275,20 +1273,42 @@ class BattleScene extends Phaser.Scene {
         this.startTurn();
     }
 
-    createUIBox(x, y, entity) {
-        let nameTxt = this.add.text(x, y, entity.name.toUpperCase(), { fontSize: '24px', fill: '#000', fontStyle: 'bold', backgroundColor: '#fff8' });
-        let hpTxt = this.add.text(x, y + 30, `HP: ${entity.hp}/${entity.maxHp}`, { fontSize: '20px', fill: '#000', backgroundColor: '#fff8' });
-        this.add.rectangle(x, y + 60, 200, 15, 0x555555).setOrigin(0, 0);
-        let bar = this.add.rectangle(x, y + 60, 200, 15, 0x00ff00).setOrigin(0, 0);
-        return { nameText: nameTxt, text: hpTxt, bar: bar };
+    createUIBox(x, y, entity, isPlayer) {
+        let pct = (entity.hp / entity.maxHp) * 100;
+        let color = pct > 50 ? '#4caf50' : (pct > 20 ? '#ffeb3b' : '#f44336');
+
+        // MAGIA: Se il box è del giocatore, iniettiamo il badge "TUO"
+        let indicatorHTML = isPlayer ? `<div class="player-indicator">TU</div>` : '';
+
+        const html = `
+            <div class="battle-hp-box" id="${isPlayer ? 'player-hp-box' : 'enemy-hp-box'}" style="position: relative;">
+                ${indicatorHTML}
+                <div class="battle-status-label" style="position: absolute; top: -15px; left: 15px; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 12px; color: #fff; background-color: transparent;"></div>
+                <div class="battle-pkmn-name">${entity.name}</div>
+                <div class="hp-container" style="margin-top: 5px;">
+                    <span class="hp-label">HP</span>
+                    <div class="hp-bar-bg">
+                        <div class="hp-bar-fill" style="width: ${pct}%; background-color: ${color};"></div>
+                    </div>
+                </div>
+                <div class="battle-hp-text">${entity.hp}/${entity.maxHp}</div>
+            </div>
+        `;
+        return this.add.dom(x, y).createFromHTML(html);
     }
 
     updateUI() {
-        [{ ui: this.pUI, ent: this.pEntity }, { ui: this.eUI, ent: this.eEntity }].forEach(obj => {
-            obj.ui.text.setText(`HP: ${obj.ent.hp}/${obj.ent.maxHp}`);
-            let pct = obj.ent.hp / obj.ent.maxHp;
-            obj.ui.bar.width = 200 * pct;
-            obj.ui.bar.fillColor = pct > 0.5 ? 0x00ff00 : (pct > 0.2 ? 0xffff00 : 0xff0000);
+        [{ dom: this.pUI, ent: this.pEntity }, { dom: this.eUI, ent: this.eEntity }].forEach(obj => {
+            if (!obj.dom.node) return;
+            const hpText = obj.dom.node.querySelector('.battle-hp-text');
+            const bar = obj.dom.node.querySelector('.hp-bar-fill');
+            const name = obj.dom.node.querySelector('.battle-pkmn-name');
+
+            name.innerText = obj.ent.name.toUpperCase();
+            hpText.innerText = `${obj.ent.hp}/${obj.ent.maxHp}`;
+            let pct = (obj.ent.hp / obj.ent.maxHp) * 100;
+            bar.style.width = `${pct}%`;
+            bar.style.backgroundColor = pct > 50 ? '#4caf50' : (pct > 20 ? '#ffeb3b' : '#f44336');
         });
     }
 
@@ -1503,8 +1523,6 @@ class BattleScene extends Phaser.Scene {
 
         this.myActiveIdx = p1Data.attivoIdx;
 
-        // FIX: Invece di sovrascrivere l'intera squadra perdendo statistiche e mosse, 
-        // aggiorniamo chirurgicamente solo gli HP!
         p1Data.squadra.forEach((p, i) => {
             if (this.myTeamData[i]) this.myTeamData[i].hp = p.hp;
         });
@@ -1514,15 +1532,15 @@ class BattleScene extends Phaser.Scene {
             });
         }
 
-        // Sincronizziamo i PP scalati dal server per il Pokémon in campo
         this.myTeamData[this.myActiveIdx].mosse = [...p1Data.mosse];
         if (this.oppTeamData) this.oppTeamData[p2Data.attivoIdx].mosse = [...p2Data.mosse];
 
+        // FIX CRASH 1: Aggiorniamo tramite DOM updateUI() invece di cercare il vecchio setText di Phaser
         if (p1Data.nome !== this.pEntity.name) {
             let myNewActive = this.myTeamData[this.myActiveIdx];
             this.pEntity = { name: myNewActive.nome, types: myNewActive.tipi, hp: myNewActive.hp, maxHp: myNewActive.maxHp, moves: myNewActive.mosse, alive: myNewActive.hp > 0 };
             if (this.pSprite.node) this.pSprite.node.querySelector('img').src = this.pkmnDB[myNewActive.nome].sprite.normal;
-            this.pUI.nameText.setText(myNewActive.nome.toUpperCase());
+            this.updateUI();
             this.updateStatusOverlay(true, null);
         }
 
@@ -1530,7 +1548,7 @@ class BattleScene extends Phaser.Scene {
             let oppNewActive = this.oppTeamData[p2Data.attivoIdx];
             this.eEntity = { name: oppNewActive.nome, types: oppNewActive.tipi, hp: oppNewActive.hp, maxHp: oppNewActive.maxHp, moves: oppNewActive.mosse, alive: oppNewActive.hp > 0 };
             if (this.eSprite.node) this.eSprite.node.querySelector('img').src = this.pkmnDB[oppNewActive.nome].sprite.normal;
-            this.eUI.nameText.setText(oppNewActive.nome.toUpperCase());
+            this.updateUI();
             this.updateStatusOverlay(false, null);
         }
 
@@ -1559,13 +1577,11 @@ class BattleScene extends Phaser.Scene {
                     });
                 });
             } else if (iAmDead) {
-                // Sono morto IO, devo switchare
                 this.isInputActive = false;
                 this.btns.forEach(b => b.setVisible(false));
                 this.logText.setText(`${p1Data.nome} è esausto! Scegli un sostituto!`);
                 this.time.delayedCall(1500, () => this.forceSwitchMenu());
             } else if (oppIsDead) {
-                // E' MORTO L'AVVERSARIO!
                 this.isInputActive = false;
                 this.btns.forEach(b => b.setVisible(false));
 
@@ -1574,7 +1590,6 @@ class BattleScene extends Phaser.Scene {
                     this.time.delayedCall(1500, () => {
                         let nextBotIdx = this.partita.p2.squadra.findIndex(p => p.hp > 0);
                         if (nextBotIdx !== -1) {
-                            // Cambio gratis del bot senza consumare il turno!
                             this.partita.p2.attivoIdx = nextBotIdx;
                             let nuovoPk = this.partita.p2.squadra[nextBotIdx];
                             this.partita.logs = [`L'avversario manda in campo ${nuovoPk.nome}! `];
@@ -1585,7 +1600,6 @@ class BattleScene extends Phaser.Scene {
                         }
                     });
                 } else {
-                    // Nel PvP non facciamo nulla, aspettiamo il forced_switch dal server
                     this.logText.setText("L'avversario sta scegliendo chi mandare in campo...");
                 }
             } else {
@@ -1666,10 +1680,20 @@ class BattleScene extends Phaser.Scene {
     playStatAnim(isPlayer, isUp) { let x = isPlayer ? 250 : 750; let y = isPlayer ? 550 : 280; let color = isUp ? '#00FF00' : '#FF0000'; let label = isUp ? '↑ STATS' : '↓ STATS'; let t = this.add.text(x, y, label, { fontSize: '32px', fill: color, fontStyle: 'bold', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5); this.tweens.add({ targets: t, y: y - 100, alpha: 0, duration: 1500, onComplete: () => t.destroy() }); }
     updateStatusOverlay(isPlayer, stato) {
         let ui = isPlayer ? this.pUI : this.eUI;
-        if (!ui.statusLabel) ui.statusLabel = this.add.text(ui.nameText.x, ui.nameText.y - 25, '', { fontSize: '16px', fontStyle: 'bold', padding: { x: 4, y: 2 } });
-        if (!stato) { ui.statusLabel.setText(''); ui.statusLabel.setBackgroundColor('transparent'); return; }
+        if (!ui || !ui.node) return;
+
+        let statusLabel = ui.node.querySelector('.battle-status-label');
+        if (!statusLabel) return;
+
+        if (!stato) {
+            statusLabel.innerText = '';
+            statusLabel.style.backgroundColor = 'transparent';
+            return;
+        }
+
         const colori = { 'Scottatura': '#f08030', 'Paralisi': '#f8d030', 'Sonno': '#8c888c', 'Avvelenamento': '#a040a0', 'Iperavvelenamento': '#a040a0', 'Congelamento': '#98d8d8' };
-        ui.statusLabel.setText(stato.toUpperCase()).setBackgroundColor(colori[stato] || '#777');
+        statusLabel.innerText = stato.toUpperCase();
+        statusLabel.style.backgroundColor = colori[stato] || '#777';
     }
     playConfusion(isPlayer) { let x = isPlayer ? 250 : 750; let y = isPlayer ? 470 : 200; let d1 = this.add.text(x - 30, y, '🦆', { fontSize: '30px' }).setOrigin(0.5); let d2 = this.add.text(x + 30, y, '🦆', { fontSize: '30px' }).setOrigin(0.5); this.tweens.add({ targets: [d1, d2], angle: 360, duration: 1000, repeat: 1, onComplete: () => { d1.destroy(); d2.destroy(); } }); }
     playTrap(isPlayer) { let targetX = isPlayer ? 250 : 750; let targetY = isPlayer ? 550 : 280; let trap = this.add.text(targetX, targetY, '🔗', { fontSize: '100px' }).setOrigin(0.5); this.tweens.add({ targets: trap, scale: { from: 2, to: 1 }, alpha: { from: 1, to: 0 }, duration: 1500, onComplete: () => trap.destroy() }); }
@@ -1693,10 +1717,10 @@ class BattleScene extends Phaser.Scene {
                         
                         <div class="summary-layout" style="display: flex; gap: 20px; flex: 1; overflow: hidden;">
                             <div class="summary-left" style="flex: 1; text-align: center; border-right: 4px dashed var(--color-quaternary); display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">
-                                <div class="pkmn-name" id="summary-name" style="margin-bottom: 10px; font-size: 1.8rem; flex-shrink: 0;">NOME</div>
-                                <div style="flex: 1; display: flex; align-items: center; justify-content: center; min-height: 140px;">
-                                    <img id="summary-sprite" src="" style="max-height: 190px; max-width: 190px; image-rendering: pixelated; filter: drop-shadow(4px 4px 0 rgba(0,0,0,0.5));">
-                                </div>
+                               <div class="pkmn-name" id="summary-name" style="margin-bottom: 10px; font-size: 1.8rem; flex-shrink: 0;">NOME</div>
+                            <div style="flex: 1; display: flex; align-items: center; justify-content: center; min-height: 140px;">
+                               <img id="summary-sprite" src="" style="width: 240px; height: 240px; object-fit: contain; image-rendering: pixelated; filter: drop-shadow(4px 4px 0 rgba(0,0,0,0.5));">
+                            </div>
                             <div class="summary-types" id="summary-types" style="display: flex; justify-content: center; gap: 10px; margin-top: 10px; margin-bottom: 15px; flex-shrink: 0;"></div>
                             
                             <div class="move-description-box" id="summary-move-desc" style="display: none; width: 100%; height: 130px; flex-shrink: 0;">
@@ -1792,9 +1816,13 @@ class BattleScene extends Phaser.Scene {
             const m = this.moveDB[nomeMossa] || { Nome: nomeMossa, Tipo: '???', PP: '--', Potenza: '--', Precisione: '--', Descrizione: 'Nessuna descrizione.' };
             const catColor = m.Categoria === "Fisico" ? '#ff7477' : (m.Categoria === "Speciale" ? '#6874e8' : '#aaaaaa');
 
+            // FIX: Usa i PP attuali dell'oggetto mRaw, altrimenti usa quelli base del DB
+            let ppAtt = mRaw.ppAttuali !== undefined ? mRaw.ppAttuali : m.PP;
+            let ppMax = mRaw.ppMassimi !== undefined ? mRaw.ppMassimi : m.PP;
+
             movesHtml += `
             <div class="move-entry" id="move-item-${i}" data-desc="${m.Descrizione || 'Nessuna descrizione.'}" data-pot="${m.Potenza > 0 ? m.Potenza : '--'}" data-prec="${m.Precisione > 0 ? m.Precisione : '--'}">
-                <div class="move-name-line"><span>${String(m.Nome).toUpperCase()}</span><span>PP ${m.PP}/${m.PP}</span></div>
+                <div class="move-name-line"><span>${String(m.Nome).toUpperCase()}</span><span>PP ${ppAtt}/${ppMax}</span></div>
                 <div class="move-summary-badges"><span class="badge" style="background:${this.getColorForType(m.Tipo)}">${String(m.Tipo).toUpperCase()}</span><span class="badge" style="background:${catColor}">${(m.Categoria || '???').toUpperCase()}</span></div>
             </div>`;
         });
