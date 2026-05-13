@@ -702,210 +702,382 @@ class WorldScene extends Phaser.Scene {
         this.player.body.setVelocity(0);
         this.player.anims.stop();
 
-        // 1. SCARICHIAMO I POKEMON AGGIORNATI DAL DB
         let profilo = this.registry.get('playerProfile');
-        const { data: myPokemon, error } = await supabaseClient
-            .from('pokemon')
-            .select('*')
-            .eq('id_profilo_proprietario', profilo.id_profilo);
+        const { data: myPokemon, error } = await supabaseClient.from('pokemon').select('*').eq('id_profilo_proprietario', profilo.id_profilo);
 
-        if (error) {
-            console.error("Errore lettura PC:", error);
-            this.pcOpen = false;
-            return;
-        }
+        if (error) { console.error("Errore lettura PC:", error); this.pcOpen = false; return; }
 
         let squadra = myPokemon.filter(p => p.in_squadra).sort((a, b) => a.posizione_slot - b.posizione_slot);
         let box = myPokemon.filter(p => !p.in_squadra);
-        let pkmnDB = this.registry.get('pokemonDB');
 
-        // 2. CREIAMO IL LAYOUT IN PURO HTML (Bypassando la telecamera di Phaser!)
+        let pkmnDB = this.registry.get('pokemonDB');
+        let moveDB = this.registry.get('moveDB');
+
+        this.pcState = { view: 'browsing', area: 'squadra', index: 0, actionIdx: 0, summaryPage: 0, moveSelectionIdx: 0 };
+
+       // APPLICHIAMO LE NUOVE CLASSI GLOBALI!
         let overlay = document.createElement('div');
-        overlay.className = 'modal-overlay';
+        overlay.className = 'pkmn-modal-overlay';
+        overlay.id = 'pc-overlay-main';
         overlay.innerHTML = `
-            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 1000px; box-sizing: border-box; padding: 20px; position: relative;">
-                <h1 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; color: #b5d6d6;">SISTEMA MEMORIA POKÉMON</h1>
+            <div class="pkmn-modal-content" style="width: 1250px !important; height: 760px !important; max-height: 760px !important;">
+                <div class="pkmn-modal-header" style="margin-bottom: 15px;">SISTEMA MEMORIA POKÉMON</div>
                 
-                <div style="display: flex; width: 100%; max-width: 900px; height: 500px; gap: 20px; justify-content: center;">
-                    <div style="flex: 1; background: var(--battle-panel); border: 4px solid var(--color-secondary); border-radius: 8px; padding: 15px; display: flex; flex-direction: column;">
-                        <h2 style="color: var(--battle-accent); text-align: center; margin-top: 0; font-family: 'Courier New';">SQUADRA (Max 3)</h2>
-                        <div id="pc-squadra" style="display: flex; flex-direction: column; gap: 15px; flex: 1;"></div>
+                <div id="pc-main-view" style="display: flex; gap: 20px; flex: 1; overflow: hidden;">
+                    <div style="flex: 1; display: flex; flex-direction: column; background: var(--battle-panel); border: 4px solid var(--color-secondary); border-radius: 8px; padding: 15px;">
+                        <h2 style="color: var(--battle-accent); text-align: center; margin-top: 0; flex-shrink: 0;">SQUADRA</h2>
+                        <div id="pc-squadra" style="display: flex; flex-direction: column; gap: 15px; flex: 1; align-content: start; padding: 10px; overflow: hidden !important;"></div>
                     </div>
 
-                    <div style="flex: 2; background: var(--battle-panel); border: 4px solid var(--battle-border); border-radius: 8px; padding: 15px; display: flex; flex-direction: column;">
-                        <h2 style="color: var(--battle-accent); text-align: center; margin-top: 0; font-family: 'Courier New';">BOX (Clicca per spostare)</h2>
-                        <div id="pc-box" style="display: flex; flex-wrap: wrap; gap: 15px; overflow-y: auto; align-content: flex-start; padding: 10px;"></div>
+                    <div style="flex: 2.2; background: var(--battle-panel); border: 4px solid var(--battle-border); border-radius: 8px; padding: 15px; display: flex; flex-direction: column; overflow: hidden !important;">
+                        <h2 style="color: var(--battle-accent); text-align: center; margin-top: 0; flex-shrink: 0;">BOX DATI</h2>
+                        <div id="pc-box" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; flex: 1; align-content: start; padding: 10px; overflow: hidden !important;"></div>
+                    </div>
+
+                    <div style="flex: 1; background: var(--battle-bg); border: 4px dashed var(--color-quaternary); border-radius: 8px; padding: 15px; display: flex; flex-direction: column; align-items: center; text-align: center;">
+                        <div id="pc-preview-panel" style="width: 100%; display: flex; flex-direction: column; align-items: center;">
+                            <h3 id="pc-preview-name" style="color: var(--battle-text); margin: 0 0 10px 0; font-size: 1.5rem; min-height: 30px;">--</h3>
+                            <div style="width: 160px; height: 160px; background: #000; border: 2px solid #555; border-radius: 8px; display: flex; justify-content: center; align-items: center; margin-bottom: 15px; box-shadow: inset 2px 2px 5px rgba(0,0,0,0.8);">
+                                <img id="pc-preview-sprite" src="" style="max-width: 140px; max-height: 140px; image-rendering: pixelated; display: none;">
+                            </div>
+                            <div id="pc-preview-types" style="display: flex; gap: 5px; margin-bottom: 15px; min-height: 25px;"></div>
+                            <div id="pc-preview-stats" style="color: var(--battle-accent); font-weight: bold; width: 100%; text-align: left; padding: 0 10px;"></div>
+                        </div>
+
+                        <div id="pc-action-menu" style="display: none; flex-direction: column; gap: 10px; width: 100%; margin-top: auto; padding-bottom: 5px;">
+                            <div class="pc-action-btn" data-action="0">SPOSTA</div>
+                            <div class="pc-action-btn" data-action="1">SUMMARY</div>
+                            <div class="pc-action-btn" data-action="2">INDIETRO</div>
+                        </div>
                     </div>
                 </div>
 
-                <div style="margin-top: 30px; display: flex; gap: 30px;">
-                    <button id="pc-save-btn" style="padding: 15px 30px; font-size: 1.3rem; font-weight: bold; font-family: 'Courier New'; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">SALVA MODIFICHE</button>
-                    <button id="pc-cancel-btn" style="padding: 15px 30px; font-size: 1.3rem; font-weight: bold; font-family: 'Courier New'; background-color: #3d2b4f; color: #fff; border: 4px solid #fff; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #000; transition: transform 0.1s;">CHIUDI</button>
+                <div id="pc-summary-view" class="summary-view" style="display: none; flex-direction: column; width: 100%; flex: 1; overflow: hidden;">
+                    <div class="pkmn-modal-header" id="pc-summary-page-indicator" style="cursor: pointer; padding: 5px 0; margin-bottom: 25px;">◀ INFO E STATISTICHE ▶</div>
+                    
+                    <div class="summary-layout" style="display: flex; gap: 20px; flex: 1; overflow: hidden;">
+                        
+                        <div class="summary-left" style="flex: 1; text-align: center; border-right: 4px dashed var(--color-quaternary); display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">
+                            <div class="pkmn-name" id="pc-sum-name" style="margin-bottom: 10px; font-size: 1.8rem; flex-shrink: 0;">NOME</div>
+                            <div style="flex: 1; display: flex; align-items: center; justify-content: center; min-height: 140px;">
+                                <img id="pc-sum-sprite" src="" style="max-height: 190px; max-width: 190px; image-rendering: pixelated; filter: drop-shadow(4px 4px 0 rgba(0,0,0,0.5));">
+                            </div>
+                            <div class="summary-types" id="pc-sum-types" style="display: flex; justify-content: center; gap: 10px; margin-top: 10px; margin-bottom: 15px; flex-shrink: 0;"></div>
+                            
+                            <div class="move-description-box" id="pc-summary-move-desc" style="display: none; width: 100%; height: 130px; flex-shrink: 0;">
+                                <div id="pc-desc-text" style="flex: 1; text-align: left; font-size: 1.1rem; overflow-y: auto; padding-right: 5px; line-height: 1.3;">Seleziona una mossa...</div>
+                                <div style="display: flex; justify-content: space-between; border-top: 2px dashed #ff7477; padding-top: 8px; margin-top: 8px; font-weight: bold; color: #ffcc00; font-size: 1.1rem;">
+                                    <div>POT: <span id="pc-desc-pot" style="color:#fff;">--</span></div>
+                                    <div>PREC: <span id="pc-desc-prec" style="color:#fff;">--</span></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="summary-right" style="flex: 1.5; padding-left: 5px; display: flex; flex-direction: column; overflow: hidden;">
+                            <div id="pc-sum-page-0" class="stats-grid" style="flex: 1; align-content: center;"></div>
+                            
+                            <div id="pc-sum-page-1" style="display: none; flex-direction: column; flex: 1; overflow: hidden;">
+                                <div id="pc-moves-list-container" class="moves-scroll-area"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 15px; display: flex; justify-content: center; align-items: center; gap: 30px; flex-shrink: 0; height: 65px;">
+                    <button id="pc-save-btn" style="padding: 10px 40px; font-size: 1.5rem; font-weight: bold; font-family: 'Courier New'; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">SALVA ED ESCI</button>
+                    <p style="color: #fff; line-height: 1.2; font-size: 0.9rem; margin: 0;">Comandi:<br>Frecce: Muoviti<br>Invio: Seleziona<br>ESC: Indietro/Chiudi</p>
                 </div>
             </div>
         `;
-
         document.getElementById('game-container').appendChild(overlay);
 
         let style = document.createElement('style');
-        style.id = 'pc-styles';
+        style.id = 'pc-styles-extra';
         style.innerHTML = `
-            .pc-slot { transition: transform 0.1s, border-color 0.1s; }
-            .pc-slot:hover { transform: translateY(-3px) scale(1.02); border-color: var(--battle-accent) !important; background-color: #4a3b5c !important; }
-            #pc-box::-webkit-scrollbar { width: 8px; }
-            #pc-box::-webkit-scrollbar-thumb { background: var(--color-secondary); border-radius: 4px; }
+            .pc-grid-slot { background: #222; border: 3px solid #555; border-radius: 8px; height: 65px; display: flex; justify-content: center; align-items: center; position: relative; box-shadow: inset 2px 2px 5px rgba(0,0,0,0.5); }
+            
+            /* FIX 2: Larghezza 92% e margin auto. Questo dà al quadratino lo spazio vitale ai lati per "gonfiarsi" senza toccare il bordo del box squadra! */
+            .pc-sq-slot { width: 92% !important; margin: 0 auto; background: #3d2b4f; border: 3px dashed #555; border-radius: 8px; height: 100px; display: flex; align-items: center; padding: 0 15px; gap: 15px; box-shadow: 2px 2px 0 var(--battle-shadow); } 
+            
+            .pc-grid-slot.selected, .pc-sq-slot.selected { border-color: var(--battle-accent) !important; background-color: #4a3b5c !important; transform: scale(1.05); box-shadow: 0 0 10px var(--battle-accent); z-index: 10; }
+            .pc-action-btn { background: var(--battle-panel); border: 2px solid var(--battle-border); color: #fff; padding: 10px; font-weight: bold; cursor: pointer; }
+            .pc-action-btn.selected { border-color: var(--battle-accent); color: var(--battle-accent); background: #3d2b4f; transform: translateX(-5px); box-shadow: 4px 4px 0 var(--battle-accent); }
         `;
         document.head.appendChild(style);
 
-        // FUNZIONE BANNER ANIMATO
-        const showBanner = (testo, isError = true) => {
-            let old = document.getElementById('pc-banner');
-            if (old) old.remove();
-
-            let banner = document.createElement('div');
-            banner.id = 'pc-banner';
-            banner.style.position = 'absolute';
-            banner.style.top = '20px';
-            banner.style.left = '50%';
-            banner.style.transform = 'translateX(-50%) translateY(-20px)';
-            banner.style.backgroundColor = isError ? '#ff7477' : '#4caf50'; // Rosso errore, Verde successo
-            banner.style.color = '#fff';
-            banner.style.padding = '15px 30px';
-            banner.style.border = '4px solid #fff';
-            banner.style.borderRadius = '8px';
-            banner.style.fontFamily = "'Courier New', Courier, monospace";
-            banner.style.fontWeight = 'bold';
-            banner.style.fontSize = '1.3rem';
-            banner.style.zIndex = '10000';
-            banner.style.boxShadow = '4px 4px 0 rgba(0,0,0,0.5)';
-            banner.style.transition = 'all 0.3s ease-out';
-            banner.style.opacity = '0';
-            banner.innerText = testo;
-
-            overlay.appendChild(banner);
-
-            // Animazione Entrata
-            setTimeout(() => {
-                banner.style.transform = 'translateX(-50%) translateY(0)';
-                banner.style.opacity = '1';
-            }, 10);
-
-            // Animazione Uscita
-            setTimeout(() => {
-                banner.style.opacity = '0';
-                banner.style.transform = 'translateX(-50%) translateY(-20px)';
-                setTimeout(() => banner.remove(), 300);
-            }, 2500);
-        };
-
-        // 3. FUNZIONE DI RE-RENDER
-        const renderPC = () => {
+        const renderPCLists = () => {
             let sqHtml = '';
-            squadra.forEach(p => {
-                let sprite = pkmnDB[p.id_specie]?.sprite?.normal || '';
-                sqHtml += `
-                    <div class="pc-slot" data-id="${p.id_pokemon}" data-from="squadra" style="border: 3px dashed var(--battle-accent); border-radius: 8px; background: #3d2b4f; padding: 10px; display: flex; align-items: center; gap: 15px; cursor: pointer; box-shadow: 2px 2px 0 var(--battle-shadow);">
-                        <img src="${sprite}" style="width: 70px; height: 70px; image-rendering: pixelated; filter: drop-shadow(2px 2px 0 #000);">
-                        <span style="color: white; font-weight: bold; font-family: 'Courier New'; font-size: 1.3rem;">${p.id_specie.toUpperCase()}</span>
-                    </div>
-                `;
-            });
-            for (let i = squadra.length; i < 3; i++) {
-                sqHtml += `<div style="border: 3px dashed #555; border-radius: 8px; background: #222; padding: 10px; height: 70px; display: flex; align-items: center; justify-content: center; color: #777; font-family: 'Courier New'; font-size: 1.2rem;">SLOT VUOTO</div>`;
+            for (let i = 0; i < 3; i++) {
+                let p = squadra[i];
+                if (p) {
+                    let sprite = pkmnDB[p.id_specie]?.sprite?.normal || '';
+                    // Immagine passata da 60px a 80px!
+                    sqHtml += `<div class="pc-sq-slot" data-area="squadra" data-index="${i}"><img src="${sprite}" style="width: 80px; max-height: 80px; image-rendering: pixelated;"><span style="color: white; font-weight: bold; font-size: 1.2rem;">${p.id_specie.toUpperCase()}</span></div>`;
+                } else {
+                    sqHtml += `<div class="pc-sq-slot" data-area="squadra" data-index="${i}"><span style="color: #666; font-style: italic;">SLOT VUOTO</span></div>`;
+                }
             }
             document.getElementById('pc-squadra').innerHTML = sqHtml;
 
             let bxHtml = '';
-            box.forEach(p => {
-                let sprite = pkmnDB[p.id_specie]?.sprite?.normal || '';
-                bxHtml += `
-                    <div class="pc-slot" data-id="${p.id_pokemon}" data-from="box" style="border: 3px solid #555; border-radius: 8px; background: #222; padding: 10px; cursor: pointer; text-align: center; width: 100px; box-shadow: 2px 2px 0 var(--battle-shadow);">
-                        <img src="${sprite}" style="width: 60px; height: 60px; image-rendering: pixelated; margin: 0 auto; filter: drop-shadow(2px 2px 0 #000);">
-                        <div style="color: white; font-size: 0.9rem; font-family: 'Courier New'; font-weight: bold; margin-top: 5px;">${p.id_specie.toUpperCase()}</div>
-                    </div>
-                `;
-            });
+            for (let i = 0; i < 30; i++) {
+                let p = box[i];
+                if (p) {
+                    let sprite = pkmnDB[p.id_specie]?.sprite?.normal || '';
+                    bxHtml += `<div class="pc-grid-slot" data-area="box" data-index="${i}"><img src="${sprite}" style="width: 50px; image-rendering: pixelated; filter: drop-shadow(2px 2px 0 #000);"></div>`;
+                } else {
+                    bxHtml += `<div class="pc-grid-slot" data-area="box" data-index="${i}"></div>`;
+                }
+            }
             document.getElementById('pc-box').innerHTML = bxHtml;
         };
 
-        renderPC();
+        const getColor = (tipo) => {
+            const colors = { "Normale": "#A8A878", "Fuoco": "#F08030", "Acqua": "#6890F0", "Elettro": "#F8D030", "Erba": "#78C850", "Ghiaccio": "#98D8D8", "Lotta": "#C03028", "Veleno": "#A040A0", "Terra": "#E0C068", "Volante": "#A890F0", "Psico": "#F85888", "Coleottero": "#A8B820", "Roccia": "#B8A038", "Spettro": "#705898", "Drago": "#7038F8", "Buio": "#705848", "Acciaio": "#B8B8D0", "Folletto": "#EE99AC" };
+            return colors[tipo] || "#777";
+        };
 
-        // 4. GESTIONE CLICK E SALVATAGGIO 
-        overlay.addEventListener('click', async (e) => {
-            let slot = e.target.closest('.pc-slot');
+        const updateVisuals = () => {
+            document.querySelectorAll('.pc-sq-slot, .pc-grid-slot, .pc-action-btn, .move-entry').forEach(el => el.classList.remove('selected'));
 
-            if (slot) {
-                let id = slot.getAttribute('data-id');
-                let from = slot.getAttribute('data-from');
+            if (this.pcState.view === 'browsing' || this.pcState.view === 'actions') {
+                let activeClass = this.pcState.area === 'squadra' ? '.pc-sq-slot' : '.pc-grid-slot';
+                let activeEl = document.querySelector(`${activeClass}[data-index="${this.pcState.index}"]`);
+                if (activeEl) activeEl.classList.add('selected');
 
-                if (from === 'squadra') {
-                    if (squadra.length <= 1) {
-                        showBanner("Attenzione: Non puoi viaggiare senza Pokémon!");
-                        return;
-                    }
-                    let idx = squadra.findIndex(p => p.id_pokemon === id);
-                    box.push(squadra.splice(idx, 1)[0]);
+                let list = this.pcState.area === 'squadra' ? squadra : box;
+                let pkmn = list[this.pcState.index];
+
+                let nameEl = document.getElementById('pc-preview-name');
+                let spriteEl = document.getElementById('pc-preview-sprite');
+                let typesEl = document.getElementById('pc-preview-types');
+                let statsEl = document.getElementById('pc-preview-stats');
+
+                if (pkmn) {
+                    let pData = pkmnDB[pkmn.id_specie];
+                    nameEl.innerText = pData.nome.toUpperCase();
+                    spriteEl.src = pData.sprite.normal;
+                    spriteEl.style.display = 'block';
+                    typesEl.innerHTML = pData.tipi.map(t => `<div class="badge" style="background:${getColor(t)}">${t.toUpperCase()}</div>`).join('');
+
+                    let maxHp = Math.floor(pData.statistiche.hp.base_stat * 1.5);
+                    statsEl.innerHTML = `HP: ${maxHp}<br>ATK: ${pData.statistiche.attack.base_stat}<br>DEF: ${pData.statistiche.defense.base_stat}<br>VEL: ${pData.statistiche.speed.base_stat}`;
                 } else {
-                    if (squadra.length >= 3) {
-                        showBanner("Attenzione: La tua squadra è già piena! (Max 3)");
-                        return;
-                    }
-                    let idx = box.findIndex(p => p.id_pokemon === id);
-                    squadra.push(box.splice(idx, 1)[0]);
+                    nameEl.innerText = "Nessun Pokémon";
+                    spriteEl.style.display = 'none';
+                    typesEl.innerHTML = '';
+                    statsEl.innerHTML = '';
                 }
-                renderPC();
+
+                let menu = document.getElementById('pc-action-menu');
+                if (this.pcState.view === 'actions') {
+                    menu.style.display = 'flex';
+                    document.querySelector(`.pc-action-btn[data-action="${this.pcState.actionIdx}"]`).classList.add('selected');
+                } else {
+                    menu.style.display = 'none';
+                }
+            } else if (this.pcState.view === 'summary') {
+                document.getElementById('pc-summary-page-indicator').innerText = this.pcState.summaryPage === 0 ? '◀ INFO E STATISTICHE ▶' : '◀ MOSSE ▶';
+                document.getElementById('pc-sum-page-0').style.display = this.pcState.summaryPage === 0 ? 'grid' : 'none';
+                document.getElementById('pc-sum-page-1').style.display = this.pcState.summaryPage === 1 ? 'flex' : 'none';
+                document.getElementById('pc-summary-move-desc').style.display = this.pcState.summaryPage === 1 ? 'flex' : 'none';
+
+                if (this.pcState.summaryPage === 1) {
+                    const moves = document.querySelectorAll('#pc-moves-list-container .move-entry');
+                    if (moves[this.pcState.moveSelectionIdx]) {
+                        let activeMove = moves[this.pcState.moveSelectionIdx];
+                        activeMove.classList.add('selected');
+                        activeMove.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+                        document.getElementById('pc-desc-text').innerText = activeMove.getAttribute('data-desc');
+                        document.getElementById('pc-desc-pot').innerText = activeMove.getAttribute('data-pot');
+                        document.getElementById('pc-desc-prec').innerText = activeMove.getAttribute('data-prec');
+                    }
+                }
+            }
+        };
+
+        const renderSummary = () => {
+            let list = this.pcState.area === 'squadra' ? squadra : box;
+            let pkmn = list[this.pcState.index];
+            if (!pkmn) return;
+
+            let pData = pkmnDB[pkmn.id_specie];
+            document.getElementById('pc-sum-name').innerText = pData.nome.toUpperCase();
+            document.getElementById('pc-sum-sprite').src = pData.sprite.normal;
+            document.getElementById('pc-sum-types').innerHTML = pData.tipi.map(t => `<div class="badge" style="background:${getColor(t)}">${t.toUpperCase()}</div>`).join('');
+
+            let maxHp = Math.floor(pData.statistiche.hp.base_stat * 1.5);
+            document.getElementById('pc-sum-page-0').innerHTML = `
+                <div class="stat-row"><span class="stat-label">HP MAX</span><span class="stat-value">${maxHp}</span></div>
+                <div class="stat-row"><span class="stat-label">ATTACCO</span><span class="stat-value">${pData.statistiche.attack.base_stat}</span></div>
+                <div class="stat-row"><span class="stat-label">DIFESA</span><span class="stat-value">${pData.statistiche.defense.base_stat}</span></div>
+                <div class="stat-row"><span class="stat-label">ATT. SP.</span><span class="stat-value">${pData.statistiche['special-attack'].base_stat}</span></div>
+                <div class="stat-row"><span class="stat-label">DIF. SP.</span><span class="stat-value">${pData.statistiche['special-defense'].base_stat}</span></div>
+                <div class="stat-row"><span class="stat-label">VELOCITÀ</span><span class="stat-value">${pData.statistiche.speed.base_stat}</span></div>
+            `;
+
+            let mosseRaw = pkmn.mosse && pkmn.mosse.length > 0 ? pkmn.mosse : (pData.mosse || []);
+            let movesHtml = ``;
+            mosseRaw.forEach((mRaw, i) => {
+                let nomeMossa = typeof mRaw === 'object' ? mRaw.Nome : mRaw;
+                const m = moveDB[nomeMossa] || { Nome: nomeMossa, Tipo: '???', PP: '--', Potenza: '--', Precisione: '--', Descrizione: 'Nessuna descrizione.' };
+                const catColor = m.Categoria === "Fisico" ? '#ff7477' : (m.Categoria === "Speciale" ? '#6874e8' : '#aaaaaa');
+                movesHtml += `
+                <div class="move-entry" data-desc="${m.Descrizione || 'Nessuna descrizione.'}" data-pot="${m.Potenza > 0 ? m.Potenza : '--'}" data-prec="${m.Precisione > 0 ? m.Precisione : '--'}">
+                    <div class="move-name-line"><span>${String(m.Nome).toUpperCase()}</span><span>PP ${m.PP}/${m.PP}</span></div>
+                    <div class="move-summary-badges"><span class="badge" style="background:${getColor(m.Tipo)}">${String(m.Tipo).toUpperCase()}</span><span class="badge" style="background:${catColor}">${(m.Categoria || '???').toUpperCase()}</span></div>
+                </div>`;
+            });
+            document.getElementById('pc-moves-list-container').innerHTML = movesHtml;
+        };
+
+        const eseguiSpostamento = () => {
+            let s = this.pcState;
+            let list = s.area === 'squadra' ? squadra : box;
+            let pkmn = list[s.index];
+
+            if (!pkmn) { window.showBanner("Non c'è nessun Pokémon qui!"); return; }
+
+            if (s.area === 'squadra') {
+                if (squadra.length <= 1) { window.showBanner("Non puoi viaggiare senza Pokémon in squadra!"); return; }
+                box.push(squadra.splice(s.index, 1)[0]);
+            } else {
+                if (squadra.length >= 3) { window.showBanner("La tua squadra è già piena! (Max 3)"); return; }
+                squadra.push(box.splice(s.index, 1)[0]);
+            }
+
+            s.view = 'browsing';
+            renderPCLists();
+            updateVisuals();
+        };
+
+        const chiudiESalva = async () => {
+            let btn = document.getElementById('pc-save-btn');
+            btn.innerText = "SALVATAGGIO...";
+            btn.style.backgroundColor = "#ffcc00";
+            window.removeEventListener('keydown', handleKey);
+
+            squadra.forEach((p, i) => { p.in_squadra = true; p.posizione_slot = i + 1; });
+            box.forEach((p, i) => { p.in_squadra = false; p.posizione_slot = null; });
+
+            let allUpdates = [...squadra, ...box].map(p => ({
+                id_pokemon: p.id_pokemon, id_specie: p.id_specie, id_profilo_proprietario: p.id_profilo_proprietario, in_squadra: p.in_squadra, posizione_slot: p.posizione_slot
+            }));
+
+            const { error } = await supabaseClient.from('pokemon').upsert(allUpdates);
+
+            if (error) {
+                window.showBanner("Errore di rete durante il salvataggio!");
+                btn.innerText = "SALVA ED ESCI";
+                btn.style.backgroundColor = "#f6eedf";
+                window.addEventListener('keydown', handleKey);
+            } else {
+                this.registry.set('userPokemon', [...squadra, ...box]);
+                window.showBanner("Dati del PC sincronizzati!", false);
+                setTimeout(() => {
+                    if (document.getElementById('pc-overlay-main')) {
+                        overlay.remove();
+                        document.getElementById('pc-styles-extra').remove();
+                        this.pcOpen = false;
+                    }
+                }, 1000);
+            }
+        };
+
+        const handleKey = (e) => {
+            const key = e.key;
+            let s = this.pcState;
+
+            if (s.view === 'browsing') {
+                if (s.area === 'squadra') {
+                    if (key === 'ArrowDown' || key === 's') s.index = Math.min(2, s.index + 1);
+                    if (key === 'ArrowUp' || key === 'w') s.index = Math.max(0, s.index - 1);
+                    if (key === 'ArrowRight' || key === 'd') { s.area = 'box'; s.index = Math.min(29, s.index * 6); }
+                } else if (s.area === 'box') {
+                    if (key === 'ArrowLeft' || key === 'a') {
+                        if (s.index % 6 === 0) { s.area = 'squadra'; s.index = Math.min(2, Math.floor(s.index / 6)); }
+                        else s.index--;
+                    }
+                    if (key === 'ArrowRight' || key === 'd') { if ((s.index + 1) % 6 !== 0) s.index = Math.min(29, s.index + 1); }
+                    if (key === 'ArrowUp' || key === 'w') { if (s.index >= 6) s.index -= 6; }
+                    if (key === 'ArrowDown' || key === 's') { if (s.index + 6 < 30) s.index += 6; }
+                }
+
+                if (key === 'Enter' || key === ' ') {
+                    let targetList = s.area === 'squadra' ? squadra : box;
+                    if (targetList[s.index]) { s.view = 'actions'; s.actionIdx = 0; }
+                    else { window.showBanner("Questo slot è vuoto!"); }
+                }
+                if (key === 'Escape' || key === 'Backspace') chiudiESalva();
+
+            } else if (s.view === 'actions') {
+                if (key === 'ArrowDown' || key === 's') s.actionIdx = (s.actionIdx + 1) % 3;
+                if (key === 'ArrowUp' || key === 'w') s.actionIdx = (s.actionIdx - 1 + 3) % 3;
+                if (key === 'Escape' || key === 'Backspace') s.view = 'browsing';
+                if (key === 'Enter' || key === ' ') {
+                    if (s.actionIdx === 0) eseguiSpostamento();
+                    else if (s.actionIdx === 1) {
+                        s.view = 'summary'; s.summaryPage = 0; s.moveSelectionIdx = 0;
+                        document.getElementById('pc-main-view').style.display = 'none';
+                        document.getElementById('pc-summary-view').style.display = 'flex';
+                        renderSummary();
+                    }
+                    else if (s.actionIdx === 2) s.view = 'browsing';
+                }
+            } else if (s.view === 'summary') {
+                if (s.summaryPage === 1) {
+                    let numMoves = document.querySelectorAll('#pc-moves-list-container .move-entry').length;
+                    if (numMoves > 0) {
+                        if (key === 'ArrowDown' || key === 's') s.moveSelectionIdx = Math.min(numMoves - 1, s.moveSelectionIdx + 1);
+                        if (key === 'ArrowUp' || key === 'w') s.moveSelectionIdx = Math.max(0, s.moveSelectionIdx - 1);
+                    }
+                }
+                if (key === 'ArrowRight' || key === 'd' || key === 'ArrowLeft' || key === 'a') {
+                    s.summaryPage = s.summaryPage === 0 ? 1 : 0;
+                    s.moveSelectionIdx = 0;
+                }
+                if (key === 'Escape' || key === 'Backspace') {
+                    s.view = 'actions';
+                    document.getElementById('pc-summary-view').style.display = 'none';
+                    document.getElementById('pc-main-view').style.display = 'flex';
+                }
+            }
+            updateVisuals();
+        };
+
+        window.addEventListener('keydown', handleKey);
+
+        overlay.addEventListener('click', (e) => {
+            // CLICK SULLE MOSSE NEL PC
+            let moveItem = e.target.closest('.move-entry');
+            if (moveItem && this.pcState.view === 'summary' && this.pcState.summaryPage === 1) {
+                let idx = Array.from(moveItem.parentNode.children).indexOf(moveItem);
+                this.pcState.moveSelectionIdx = idx;
+                updateVisuals();
                 return;
             }
+            let slot = e.target.closest('.pc-sq-slot, .pc-grid-slot');
+            if (slot && this.pcState.view === 'browsing') {
+                this.pcState.area = slot.dataset.area;
+                this.pcState.index = parseInt(slot.dataset.index);
+                updateVisuals();
 
-            if (e.target.id === 'pc-cancel-btn') {
-                overlay.remove();
-                document.getElementById('pc-styles').remove();
-                this.pcOpen = false;
+                let targetList = this.pcState.area === 'squadra' ? squadra : box;
+                if (targetList[this.pcState.index]) {
+                    this.pcState.view = 'actions'; this.pcState.actionIdx = 0; updateVisuals();
+                } else { window.showBanner("Questo slot è vuoto!"); }
             }
-
-            if (e.target.id === 'pc-save-btn') {
-                e.target.innerText = "SALVATAGGIO...";
-                e.target.style.backgroundColor = "#ffcc00";
-
-                squadra.forEach((p, index) => {
-                    p.in_squadra = true;
-                    p.posizione_slot = index + 1;
-                });
-                box.forEach(p => {
-                    p.in_squadra = false;
-                    p.posizione_slot = null;
-                });
-
-                let allUpdates = [...squadra, ...box].map(p => ({
-                    id_pokemon: p.id_pokemon,
-                    id_specie: p.id_specie,
-                    id_profilo_proprietario: p.id_profilo_proprietario,
-                    in_squadra: p.in_squadra,
-                    posizione_slot: p.posizione_slot
-                }));
-
-                const { error } = await supabaseClient.from('pokemon').upsert(allUpdates);
-
-                if (error) {
-                    console.error("Errore salvataggio PC:", error);
-                    showBanner("Errore di rete durante il salvataggio!");
-                    e.target.innerText = "SALVA MODIFICHE";
-                    e.target.style.backgroundColor = "#f6eedf";
-                } else {
-                    this.registry.set('userPokemon', [...squadra, ...box]);
-                    showBanner("Squadra salvata con successo!", false); // False = Verde!
-
-                    // Chiude il PC dopo 1 secondo così l'utente fa in tempo a leggere il successo
-                    setTimeout(() => {
-                        if (document.body.contains(overlay)) {
-                            overlay.remove();
-                            document.getElementById('pc-styles').remove();
-                            this.pcOpen = false;
-                        }
-                    }, 1200);
-                }
+            if (e.target.classList.contains('pc-action-btn')) {
+                this.pcState.actionIdx = parseInt(e.target.dataset.action);
+                updateVisuals(); handleKey({ key: 'Enter' });
             }
+            if (e.target.id === 'pc-summary-page-indicator') handleKey({ key: 'ArrowRight' });
+            if (e.target.id === 'pc-save-btn') chiudiESalva();
         });
+
+        renderPCLists();
+        updateVisuals();
     }
     startEncounter(battleData, testo = "BATTAGLIA!") {
         this.isTransitioning = true;
@@ -1068,11 +1240,11 @@ class BattleScene extends Phaser.Scene {
 
         let pSpriteUrl = this.pkmnDB[this.pEntity.name]?.sprite?.normal || '';
         let eSpriteUrl = this.pkmnDB[this.eEntity.name]?.sprite?.normal || '';
-        this.pSprite = this.add.dom(250, 500).createFromHTML(`<img src="${pSpriteUrl}" style="transform: scale(2.5); image-rendering: pixelated;">`);
-        this.eSprite = this.add.dom(750, 230).createFromHTML(`<img src="${eSpriteUrl}" style="transform: scale(2.2); image-rendering: pixelated;">`);
+        this.pSprite = this.add.dom(250, 535).createFromHTML(`<img src="${pSpriteUrl}" style="transform: scale(2.5); image-rendering: pixelated;">`);
+        this.eSprite = this.add.dom(750, 290).createFromHTML(`<img src="${eSpriteUrl}" style="transform: scale(2.2); image-rendering: pixelated;">`);
 
         this.pUI = this.createUIBox(100, 360, this.pEntity);
-        this.eUI = this.createUIBox(600, 100, this.eEntity);
+        this.eUI = this.createUIBox(600, 150, this.eEntity);
 
         this.add.rectangle(0, 665, 1000, 135, 0x2b2b2b).setOrigin(0, 0);
         this.add.rectangle(3, 668, 994, 129).setOrigin(0, 0).setStrokeStyle(6, 0xd05050);
@@ -1491,7 +1663,7 @@ class BattleScene extends Phaser.Scene {
 
     playDash(isPlayer) { let sprite = isPlayer ? this.pSprite : this.eSprite; let dist = isPlayer ? 60 : -60; this.tweens.add({ targets: sprite, x: sprite.x + dist, duration: 100, yoyo: true, ease: 'Power2' }); }
     playDamage(isPlayer) { let sprite = isPlayer ? this.pSprite : this.eSprite; this.tweens.add({ targets: sprite, alpha: 0.5, x: sprite.x + (isPlayer ? 5 : -5), duration: 50, yoyo: true, repeat: 5, onComplete: () => sprite.alpha = 1 }); }
-    playStatAnim(isPlayer, isUp) { let x = isPlayer ? 250 : 750; let y = isPlayer ? 500 : 230; let color = isUp ? '#00FF00' : '#FF0000'; let label = isUp ? '↑ STATS' : '↓ STATS'; let t = this.add.text(x, y, label, { fontSize: '32px', fill: color, fontStyle: 'bold', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5); this.tweens.add({ targets: t, y: y - 100, alpha: 0, duration: 1500, onComplete: () => t.destroy() }); }
+    playStatAnim(isPlayer, isUp) { let x = isPlayer ? 250 : 750; let y = isPlayer ? 550 : 280; let color = isUp ? '#00FF00' : '#FF0000'; let label = isUp ? '↑ STATS' : '↓ STATS'; let t = this.add.text(x, y, label, { fontSize: '32px', fill: color, fontStyle: 'bold', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5); this.tweens.add({ targets: t, y: y - 100, alpha: 0, duration: 1500, onComplete: () => t.destroy() }); }
     updateStatusOverlay(isPlayer, stato) {
         let ui = isPlayer ? this.pUI : this.eUI;
         if (!ui.statusLabel) ui.statusLabel = this.add.text(ui.nameText.x, ui.nameText.y - 25, '', { fontSize: '16px', fontStyle: 'bold', padding: { x: 4, y: 2 } });
@@ -1499,8 +1671,8 @@ class BattleScene extends Phaser.Scene {
         const colori = { 'Scottatura': '#f08030', 'Paralisi': '#f8d030', 'Sonno': '#8c888c', 'Avvelenamento': '#a040a0', 'Iperavvelenamento': '#a040a0', 'Congelamento': '#98d8d8' };
         ui.statusLabel.setText(stato.toUpperCase()).setBackgroundColor(colori[stato] || '#777');
     }
-    playConfusion(isPlayer) { let x = isPlayer ? 250 : 750; let y = isPlayer ? 420 : 150; let d1 = this.add.text(x - 30, y, '🦆', { fontSize: '30px' }).setOrigin(0.5); let d2 = this.add.text(x + 30, y, '🦆', { fontSize: '30px' }).setOrigin(0.5); this.tweens.add({ targets: [d1, d2], angle: 360, duration: 1000, repeat: 1, onComplete: () => { d1.destroy(); d2.destroy(); } }); }
-    playTrap(isPlayer) { let targetX = isPlayer ? 250 : 750; let targetY = isPlayer ? 500 : 230; let trap = this.add.text(targetX, targetY, '🔗', { fontSize: '100px' }).setOrigin(0.5); this.tweens.add({ targets: trap, scale: { from: 2, to: 1 }, alpha: { from: 1, to: 0 }, duration: 1500, onComplete: () => trap.destroy() }); }
+    playConfusion(isPlayer) { let x = isPlayer ? 250 : 750; let y = isPlayer ? 470 : 200; let d1 = this.add.text(x - 30, y, '🦆', { fontSize: '30px' }).setOrigin(0.5); let d2 = this.add.text(x + 30, y, '🦆', { fontSize: '30px' }).setOrigin(0.5); this.tweens.add({ targets: [d1, d2], angle: 360, duration: 1000, repeat: 1, onComplete: () => { d1.destroy(); d2.destroy(); } }); }
+    playTrap(isPlayer) { let targetX = isPlayer ? 250 : 750; let targetY = isPlayer ? 550 : 280; let trap = this.add.text(targetX, targetY, '🔗', { fontSize: '100px' }).setOrigin(0.5); this.tweens.add({ targets: trap, scale: { from: 2, to: 1 }, alpha: { from: 1, to: 0 }, duration: 1500, onComplete: () => trap.destroy() }); }
 
     openTeamModal() {
         this.isInputActive = false;
@@ -1511,31 +1683,49 @@ class BattleScene extends Phaser.Scene {
         let teamData = this.myTeamData;
 
         const html = `
-            <div class="modal-overlay" id="team-modal">
-                <div class="modal-content">
-                    <div id="modal-list-view" style="display: block; width: 100%;">
-                        <div class="modal-header">SQUADRA POKÉMON</div>
-                        <div class="pokemon-list" id="pkmn-list-container"></div>
+            <div class="pkmn-modal-content">
+                    <div id="modal-list-view" style="display: flex; flex-direction: column; width: 100%; flex: 1; overflow: hidden;">
+                        <div class="pkmn-modal-header" style="margin-bottom: 25px;">SQUADRA POKÉMON</div> <div class="pokemon-list" id="pkmn-list-container" style="overflow-y: auto; overflow-x: hidden; flex: 1;"></div>
                     </div>
 
-                    <div id="modal-summary-view" class="summary-view" style="display: none; width: 100%;">
-                        <div class="modal-header" style="font-size: 1.5rem;" id="summary-page-indicator">◀ INFO E STATISTICHE ▶</div>
-                        <div class="summary-layout" style="display: flex; gap: 20px; width: 100%;">
-                            <div class="summary-left" style="flex: 1; text-align: center; border-right: 4px dashed var(--color-quaternary);">
-                                <div class="pkmn-name" id="summary-name" style="margin-bottom: 10px;">NOME</div>
-                                <img id="summary-sprite" src="" style="width: 160px; height: 160px; image-rendering: pixelated;">
-                                <div class="summary-types" id="summary-types" style="display: flex; justify-content: center; gap: 10px; margin-top: 10px;"></div>
+                    <div id="modal-summary-view" class="summary-view" style="display: none; flex-direction: column; width: 100%; flex: 1; overflow: hidden;">
+                        <div class="pkmn-modal-header" id="summary-page-indicator" style="cursor: pointer; padding: 5px 0; margin-bottom: 25px;">◀ INFO E STATISTICHE ▶</div>
+                        
+                        <div class="summary-layout" style="display: flex; gap: 20px; flex: 1; overflow: hidden;">
+                            <div class="summary-left" style="flex: 1; text-align: center; border-right: 4px dashed var(--color-quaternary); display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">
+                                <div class="pkmn-name" id="summary-name" style="margin-bottom: 10px; font-size: 1.8rem; flex-shrink: 0;">NOME</div>
+                                <div style="flex: 1; display: flex; align-items: center; justify-content: center; min-height: 140px;">
+                                    <img id="summary-sprite" src="" style="max-height: 190px; max-width: 190px; image-rendering: pixelated; filter: drop-shadow(4px 4px 0 rgba(0,0,0,0.5));">
+                                </div>
+                            <div class="summary-types" id="summary-types" style="display: flex; justify-content: center; gap: 10px; margin-top: 10px; margin-bottom: 15px; flex-shrink: 0;"></div>
+                            
+                            <div class="move-description-box" id="summary-move-desc" style="display: none; width: 100%; height: 130px; flex-shrink: 0;">
+                                <div id="desc-text" style="flex: 1; text-align: left; font-size: 1.1rem; overflow-y: auto; padding-right: 5px; line-height: 1.3;">Seleziona una mossa...</div>
+                                <div style="display: flex; justify-content: space-between; border-top: 2px dashed #ff7477; padding-top: 8px; margin-top: 8px; font-weight: bold; color: #ffcc00; font-size: 1.1rem;">
+                                    <div>POT: <span id="desc-pot" style="color:#fff;">--</span></div>
+                                    <div>PREC: <span id="desc-prec" style="color:#fff;">--</span></div>
+                                </div>
                             </div>
-                            <div class="summary-right" style="flex: 1.5; padding-left: 10px;">
-                                <div id="summary-page-0" class="stats-grid"></div>
-                                <div id="summary-page-1" class="moves-grid" style="display: none;"></div>
+                        </div>
+
+                        <div class="summary-right" style="flex: 1.5; padding-left: 5px; display: flex; flex-direction: column; overflow: hidden;">
+                            <div id="summary-page-0" class="stats-grid" style="flex: 1; align-content: center;"></div>
+                            
+                            <div id="summary-page-1" style="display: none; flex-direction: column; flex: 1; overflow: hidden;">
+                                <div id="moves-list-container" class="moves-scroll-area"></div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>`;
 
-        this.teamModalDom = this.add.dom(500, 400).createFromHTML(html);
+        // MAGIA: Creiamo il div nativo HTML e lo ancoriamo allo schermo bypassando Phaser!
+        let tempDiv = document.createElement('div');
+        tempDiv.className = 'pkmn-modal-overlay';
+        tempDiv.innerHTML = html;
+        this.teamModalDom = tempDiv;
+        document.getElementById('game-container').appendChild(this.teamModalDom);
+
         this.populateTeamList(teamData);
         this.setupModalNavigation(teamData);
     }
@@ -1553,7 +1743,7 @@ class BattleScene extends Phaser.Scene {
 
             listHTML += `
                 <div class="pokemon-item" data-index="${index}">
-                    <img src="${spriteUrl}" style="width: 70px; height: 70px; display: block; image-rendering: pixelated; filter: drop-shadow(2px 2px 0 rgba(0,0,0,0.5));">
+                    <img src="${spriteUrl}" style="width: 85px; height: 85px; display: block; image-rendering: pixelated; filter: drop-shadow(2px 2px 0 rgba(0,0,0,0.5));">
                     <div class="pkmn-info">
                         <div class="pkmn-name-line">
                             <span class="pkmn-name">${pkmn.nome.toUpperCase()} ${index === (this.myActiveIdx || 0) ? '★' : ''}</span>
@@ -1564,7 +1754,6 @@ class BattleScene extends Phaser.Scene {
                         </div>
                         <div class="pkmn-hp-text">${pkmn.hp}/${pkmn.maxHp}</div>
                     </div>
-                    
                     <div class="inline-actions" id="actions-${index}">
                         <div class="action-btn-inline">SOSTITUISCI</div>
                         <div class="action-btn-inline">SUMMARY</div>
@@ -1575,12 +1764,50 @@ class BattleScene extends Phaser.Scene {
         container.innerHTML = listHTML;
         this.updateModalVisuals();
     }
+    openSummary(pkmn) {
+        this.currentView = 'summary'; this.summaryPage = 0; this.moveSelectionIdx = 0;
+        document.getElementById('modal-list-view').style.display = 'none';
+        document.getElementById('modal-summary-view').style.display = 'flex';
 
+        let localData = (this.pkmnDB && this.pkmnDB[pkmn.nome]) ? this.pkmnDB[pkmn.nome] : null;
+        document.getElementById('summary-name').innerText = pkmn.nome.toUpperCase();
+        document.getElementById('summary-sprite').src = pkmn.sprite?.normal || localData?.sprite?.normal || '';
+        document.getElementById('summary-types').innerHTML = (pkmn.tipi || localData?.tipi || []).map(t => `<div class="badge" style="background-color: ${this.getColorForType(t)}">${t.toUpperCase()}</div>`).join('');
+
+        let stats = pkmn.statistiche || (localData ? { attacco: localData.statistiche.attack.base_stat, difesa: localData.statistiche.defense.base_stat, attaccoSpeciale: localData.statistiche['special-attack'].base_stat, difesaSpeciale: localData.statistiche['special-defense'].base_stat, velocita: localData.statistiche.speed.base_stat } : {});
+        document.getElementById('summary-page-0').innerHTML = `
+            <div class="stat-row"><span class="stat-label">HP </span><span class="stat-value">${pkmn.hp}/${pkmn.maxHp}</span></div>
+            <div class="stat-row"><span class="stat-label">ATTACCO </span><span class="stat-value">${stats.attacco || 0}</span></div>
+            <div class="stat-row"><span class="stat-label">DIFESA </span><span class="stat-value">${stats.difesa || 0}</span></div>
+            <div class="stat-row"><span class="stat-label">ATT. SP. </span><span class="stat-value">${stats.attaccoSpeciale || 0}</span></div>
+            <div class="stat-row"><span class="stat-label">DIF. SP. </span><span class="stat-value">${stats.difesaSpeciale || 0}</span></div>
+            <div class="stat-row"><span class="stat-label">VELOCITÀ </span><span class="stat-value">${stats.velocita || 0}</span></div>
+        `;
+
+        let mosseRaw = pkmn.mosse && pkmn.mosse.length > 0 ? pkmn.mosse : (localData?.mosse || []);
+        let movesHtml = ``;
+
+        mosseRaw.forEach((mRaw, i) => {
+            let nomeMossa = typeof mRaw === 'object' ? mRaw.Nome : mRaw;
+            const m = this.moveDB[nomeMossa] || { Nome: nomeMossa, Tipo: '???', PP: '--', Potenza: '--', Precisione: '--', Descrizione: 'Nessuna descrizione.' };
+            const catColor = m.Categoria === "Fisico" ? '#ff7477' : (m.Categoria === "Speciale" ? '#6874e8' : '#aaaaaa');
+
+            movesHtml += `
+            <div class="move-entry" id="move-item-${i}" data-desc="${m.Descrizione || 'Nessuna descrizione.'}" data-pot="${m.Potenza > 0 ? m.Potenza : '--'}" data-prec="${m.Precisione > 0 ? m.Precisione : '--'}">
+                <div class="move-name-line"><span>${String(m.Nome).toUpperCase()}</span><span>PP ${m.PP}/${m.PP}</span></div>
+                <div class="move-summary-badges"><span class="badge" style="background:${this.getColorForType(m.Tipo)}">${String(m.Tipo).toUpperCase()}</span><span class="badge" style="background:${catColor}">${(m.Categoria || '???').toUpperCase()}</span></div>
+            </div>`;
+        });
+
+        document.getElementById('moves-list-container').innerHTML = movesHtml;
+        this.updateSummaryPage();
+        this.updateModalVisuals();
+    }
     setupModalNavigation(teamData) {
+        // [Tutto il blocco modalKeyListener rimane invariato, omettilo se vuoi, ma lo riscrivo qui per sicurezza]
         this.modalKeyListener = (event) => {
             if (this.isInputActive) return;
             const key = event.key;
-
             if (this.currentView === 'list') {
                 let max = document.querySelectorAll('.pokemon-item').length;
                 if (max > 0) {
@@ -1595,12 +1822,15 @@ class BattleScene extends Phaser.Scene {
                 if (this.summaryPage === 1) {
                     let numMoves = document.querySelectorAll('.move-entry').length;
                     if (numMoves > 0) {
-                        if (key === 'ArrowDown' || key === 's') { this.moveSelectionIdx = (this.moveSelectionIdx + 1) % numMoves; this.updateModalVisuals(); }
-                        if (key === 'ArrowUp' || key === 'w') { this.moveSelectionIdx = (this.moveSelectionIdx - 1 + numMoves) % numMoves; this.updateModalVisuals(); }
+                        if (key === 'ArrowDown' || key === 's') { this.moveSelectionIdx = Math.min(numMoves - 1, this.moveSelectionIdx + 1); this.updateModalVisuals(); }
+                        if (key === 'ArrowUp' || key === 'w') { this.moveSelectionIdx = Math.max(0, this.moveSelectionIdx - 1); this.updateModalVisuals(); }
                     }
                 }
                 if (key === 'ArrowRight' || key === 'd' || key === 'ArrowLeft' || key === 'a') {
-                    this.summaryPage = this.summaryPage === 0 ? 1 : 0; this.updateSummaryPage(); this.updateModalVisuals();
+                    this.summaryPage = this.summaryPage === 0 ? 1 : 0;
+                    this.moveSelectionIdx = 0;
+                    this.updateSummaryPage();
+                    this.updateModalVisuals();
                 }
             }
 
@@ -1614,10 +1844,20 @@ class BattleScene extends Phaser.Scene {
 
         window.addEventListener('keydown', this.modalKeyListener);
 
-        this.teamModalDom.addListener('click').on('click', (e) => {
+        // USIAMO ADDEVENTLISTENER NATIVO (Non il .addListener di Phaser!)
+        this.teamModalDom.addEventListener('click', (e) => {
             if (e.target.id === 'summary-page-indicator') {
                 this.summaryPage = this.summaryPage === 0 ? 1 : 0; this.updateSummaryPage(); this.updateModalVisuals(); return;
             }
+
+            let moveItem = e.target.closest('.move-entry');
+            if (moveItem && this.currentView === 'summary' && this.summaryPage === 1) {
+                let idx = Array.from(moveItem.parentNode.children).indexOf(moveItem);
+                this.moveSelectionIdx = idx;
+                this.updateModalVisuals();
+                return;
+            }
+
             let item = e.target.closest('.pokemon-item');
             if (item && this.currentView === 'list') {
                 this.modalSelection = parseInt(item.dataset.index); this.confirmModalSelection(teamData); return;
@@ -1657,20 +1897,14 @@ class BattleScene extends Phaser.Scene {
         } else if (this.currentView === 'summary' && this.summaryPage === 1) {
             const moves = document.querySelectorAll('.move-entry');
             if (moves[this.moveSelectionIdx]) {
-                moves[this.moveSelectionIdx].classList.add('selected');
-                const desc = moves[this.moveSelectionIdx].getAttribute('data-desc');
-                const pot = moves[this.moveSelectionIdx].getAttribute('data-pot');
-                const prec = moves[this.moveSelectionIdx].getAttribute('data-prec');
-                const descBox = document.getElementById('summary-move-desc');
-                if (descBox) {
-                    descBox.innerHTML = `
-                    <style>.no-scroll::-webkit-scrollbar { display: none; }</style>
-                    <div class="no-scroll" style="flex: 1; padding-right: 15px; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; text-align: left; line-height: 1.4; display: block;">${desc}</div>
-                    <div style="width: 120px; display: flex; flex-direction: column; justify-content: center; text-align: right; border-left: 2px dashed #ff7477; padding-left: 15px; font-size: 1rem; color: #fff;">
-                        <div style="margin-bottom: 5px; color: #ffcc00;">POT: <span style="color:#fff;">${pot}</span></div>
-                        <div style="color: #ffcc00;">PREC: <span style="color:#fff;">${prec}</span></div>
-                    </div>`;
-                }
+                let activeMove = moves[this.moveSelectionIdx];
+                activeMove.classList.add('selected');
+                activeMove.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+                // Aggiornamento pulito del Box Descrizione senza distruggere i tag
+                document.getElementById('desc-text').innerText = activeMove.getAttribute('data-desc');
+                document.getElementById('desc-pot').innerText = activeMove.getAttribute('data-pot');
+                document.getElementById('desc-prec').innerText = activeMove.getAttribute('data-prec');
             }
         }
     }
@@ -1695,7 +1929,6 @@ class BattleScene extends Phaser.Scene {
     }
 
     cancelModalSelection(forceClose = false) {
-        // Fix Bug: Blocca la chiusura intera se sei in switch forzato, ma ti permette di tornare alla lista dal Summary!
         if (forceClose && this.isForcedSwitch) {
             window.showBanner("Devi scegliere un sostituto!");
             return;
@@ -1703,7 +1936,10 @@ class BattleScene extends Phaser.Scene {
 
         if (forceClose) {
             window.removeEventListener('keydown', this.modalKeyListener);
-            if (this.teamModalDom) { this.teamModalDom.destroy(); this.teamModalDom = null; }
+            if (this.teamModalDom) {
+                this.teamModalDom.remove(); // NATIVO: .remove() invece di .destroy()
+                this.teamModalDom = null;
+            }
             this.isInputActive = true;
             if (typeof this.updateMenuSelection === 'function') this.updateMenuSelection();
         } else {
@@ -1714,50 +1950,12 @@ class BattleScene extends Phaser.Scene {
         }
     }
 
-    openSummary(pkmn) {
-        this.currentView = 'summary'; this.summaryPage = 0; this.moveSelectionIdx = 0;
-        document.getElementById('modal-list-view').style.display = 'none';
-        document.getElementById('modal-summary-view').style.display = 'flex';
-
-        let localData = (this.pkmnDB && this.pkmnDB[pkmn.nome]) ? this.pkmnDB[pkmn.nome] : null;
-        document.getElementById('summary-name').innerText = pkmn.nome.toUpperCase();
-        document.getElementById('summary-sprite').src = pkmn.sprite?.normal || localData?.sprite?.normal || '';
-        document.getElementById('summary-types').innerHTML = (pkmn.tipi || localData?.tipi || []).map(t => `<div class="type-badge" style="background-color: ${this.getColorForType(t)}">${t.toUpperCase()}</div>`).join('');
-
-        let stats = pkmn.statistiche || (localData ? { attacco: localData.statistiche.attack.base_stat, difesa: localData.statistiche.defense.base_stat, attaccoSpeciale: localData.statistiche['special-attack'].base_stat, difesaSpeciale: localData.statistiche['special-defense'].base_stat, velocita: localData.statistiche.speed.base_stat } : {});
-        document.getElementById('summary-page-0').innerHTML = `
-            <div class="stat-row"><span class="stat-label">HP </span><span class="stat-value">${pkmn.hp}/${pkmn.maxHp}</span></div>
-            <div class="stat-row"><span class="stat-label">ATTACCO </span><span class="stat-value">${stats.attacco || 0}</span></div>
-            <div class="stat-row"><span class="stat-label">DIFESA </span><span class="stat-value">${stats.difesa || 0}</span></div>
-            <div class="stat-row"><span class="stat-label">ATT. SP. </span><span class="stat-value">${stats.attaccoSpeciale || 0}</span></div>
-            <div class="stat-row"><span class="stat-label">DIF. SP. </span><span class="stat-value">${stats.difesaSpeciale || 0}</span></div>
-            <div class="stat-row"><span class="stat-label">VELOCITÀ </span><span class="stat-value">${stats.velocita || 0}</span></div>
-        `;
-
-        let mosseRaw = pkmn.mosse || localData?.mosse || [];
-        let movesHtml = `<div class="moves-grid" style="width: 100%;">`;
-        mosseRaw.slice(0, 4).forEach((mRaw, i) => {
-            let nomeMossa = typeof mRaw === 'object' ? mRaw.Nome : mRaw;
-            const m = this.moveDB[nomeMossa] || { Nome: nomeMossa, Tipo: '???', PP: '--', Potenza: '--', Precisione: '--', Descrizione: 'Nessuna descrizione.' };
-            const catColor = m.Categoria === "Fisico" ? '#ff7477' : (m.Categoria === "Speciale" ? '#6874e8' : '#aaaaaa');
-            movesHtml += `
-            <div class="move-entry" id="move-item-${i}" data-desc="${m.Descrizione}" data-pot="${m.Potenza > 0 ? m.Potenza : '--'}" data-prec="${m.Precisione > 0 ? m.Precisione : '--'}">
-                <div class="move-name-line"><span>${String(m.Nome).toUpperCase()}</span><span>PP ${m.PP}/${m.PP}</span></div>
-                <div class="move-summary-badges"><span class="badge" style="background:${this.getColorForType(m.Tipo)}">${String(m.Tipo).toUpperCase()}</span><span class="badge" style="background:${catColor}">${(m.Categoria || '???').toUpperCase()}</span></div>
-            </div>`;
-        });
-        movesHtml += `</div><div class="move-description-box" id="summary-move-desc" style="height: 110px; display: flex; align-items: stretch; box-sizing: border-box;">Seleziona una mossa...</div>`;
-
-        document.getElementById('summary-page-1').innerHTML = movesHtml;
-        this.updateSummaryPage(); this.updateModalVisuals();
-    }
-
     updateSummaryPage() {
         let ind = document.getElementById('summary-page-indicator');
         ind.innerText = this.summaryPage === 0 ? '◀ INFO E STATISTICHE ▶' : '◀ MOSSE ▶';
         document.getElementById('summary-page-0').style.display = this.summaryPage === 0 ? 'grid' : 'none';
         document.getElementById('summary-page-1').style.display = this.summaryPage === 1 ? 'flex' : 'none';
-        if (this.summaryPage === 1) document.getElementById('summary-page-1').style.flexDirection = 'column';
+        document.getElementById('summary-move-desc').style.display = this.summaryPage === 1 ? 'flex' : 'none';
     }
 
     executeSwitch(index) {
@@ -1777,18 +1975,19 @@ class BattleScene extends Phaser.Scene {
             return;
         }
 
-        if (this.teamModalDom) { this.teamModalDom.destroy(); this.teamModalDom = null; }
+        if (this.teamModalDom) {
+            this.teamModalDom.remove(); // NATIVO: .remove() invece di .destroy()
+            this.teamModalDom = null;
+        }
         window.removeEventListener('keydown', this.modalKeyListener);
         this.btns.forEach(b => b.setVisible(false)); this.logText.setVisible(true);
 
-        // DICHIARATA UNA SOLA VOLTA QUI
         const switchAction = { tipo: 'switch', nuovoIdx: index };
 
         let wasForced = this.isForcedSwitch;
         this.isForcedSwitch = false;
 
         if (wasForced) {
-            // SWITCH FORZATO DOPO KO (Azione gratuita!)
             if (this.isWild) {
                 this.partita.p1.attivoIdx = index;
                 let nuovoPk = this.partita.p1.squadra[index];
@@ -1799,10 +1998,9 @@ class BattleScene extends Phaser.Scene {
                 this.logText.setText("Mando in campo...");
                 this.socket.emit('pvpUseMove', { roomId: this.roomId, tipo: 'forced_switch', nuovoIdx: index });
             }
-            return; // Terminiamo qui, non andiamo al processaTurno!
+            return;
         }
 
-        // SWITCH NORMALE DURANTE LA LOTTA (Consuma il turno e ti fa prendere l'attacco)
         if (this.isWild) {
             let activeBot = this.partita.p2.squadra[this.partita.p2.attivoIdx];
             let botMoves = activeBot.mosse.filter(m => m.ppAttuali > 0);
