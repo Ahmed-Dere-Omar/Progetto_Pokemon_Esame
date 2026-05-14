@@ -512,14 +512,15 @@ class WorldScene extends Phaser.Scene {
         }
     }
 
-    setupNPCs() {
+     setupNPCs() {
         this.npc = this.physics.add.sprite(300, 200, 'allenatore');
+        this.npc.setScale(2.0); // Aumenta o diminuisci questo valore per regolare la grandezza
         this.npc.body.updateFromGameObject();
         this.npc.setCollideWorldBounds(true);
         this.npc.setImmovable(true);
         this.physics.add.collider(this.npc, this.wallLayer);
 
-        this.add.text(this.npc.x, this.npc.y - 40, "NPC", {
+        this.add.text(this.npc.x, this.npc.y - 50, "NPC", {
             fontSize: '12px', fill: '#fff', backgroundColor: '#00000088', padding: { x: 4, y: 2 }
         }).setOrigin(0.5, 1);
     }
