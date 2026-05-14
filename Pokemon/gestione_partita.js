@@ -803,6 +803,148 @@ class gestionePartita {
             turno: this.turno
         };
     }
+    scegliMossaBotIntelligente(botPk, playerPk, botLati, playerLati) {
+        let mosseDisponibili = botPk.mosse.filter(m => m && m.ppAttuali > 0);
+        if (mosseDisponibili.length === 0) return { Nome: "Scontro" };
+
+        let mossaMigliore = null;
+        let punteggioMassimo = -9999;
+
+        // Valutiamo la % di vita del bot e del nemico
+        let botHpPct = botPk.hp / botPk.hpMax;
+        let playerHpPct = playerPk.hp / playerPk.hpMax;
+
+        mosseDisponibili.forEach(mossa => {
+            let score = 0;
+
+            // ==========================================
+            // 1. VALUTAZIONE DANNO DIRETTO (Potenza e Tipi)
+            // ==========================================
+            if (mossa.Potenza > 0) {
+                score += mossa.Potenza; // Base di partenza
+
+                // Calcolo Efficacia
+                let efficacia = 1;
+                playerPk.tipi.forEach(tipoDifesa => {
+                    if (EfficaciaTipi[mossa.Tipo] && EfficaciaTipi[mossa.Tipo][tipoDifesa] !== undefined) {
+                        efficacia *= EfficaciaTipi[mossa.Tipo][tipoDifesa];
+                    }
+                });
+
+                if (efficacia === 0) {
+                    score = -1000; // Impossibile colpire, scarta la mossa!
+                } else {
+                    score *= efficacia; // x2, x4, x0.5 etc.
+                    
+                    // Bonus Kill (Se stima di poterlo mandare KO, priorità massima)
+                    if (efficacia >= 2 && playerHpPct < 0.4) score += 500; 
+                }
+
+                // STAB (Bonus di tipo)
+                if (botPk.tipi.includes(mossa.Tipo)) score *= 1.5;
+            }
+
+            // ==========================================
+            // 2. VALUTAZIONE EFFETTI SPECIALI (Il vero intelletto)
+            // ==========================================
+            if (mossa.CodiceFunzione && mossa.CodiceFunzione.length > 0) {
+                mossa.CodiceFunzione.forEach(eff => {
+                    let p = eff.Parametri || {};
+
+                    switch (eff.NomeFunzione) {
+                        
+                        // --- STATI PRIMARI (Sonno, Veleno, Paralisi...) ---
+                        case "ApplicaStato":
+                            if (playerPk.stato) {
+                                score -= 500; // Ha già uno status, non spammarlo!
+                            } else {
+                                if (p.Stato === "Avvelenamento" || p.Stato === "Iperavvelenamento") {
+                                    if (playerPk.tipi.includes("Veleno") || playerPk.tipi.includes("Acciaio")) score -= 500;
+                                    else score += (playerHpPct > 0.6) ? 150 : 30; // Ottimo se il nemico ha tanta vita
+                                } else {
+                                    score += 100; // Ottimo rompere le scatole con Sonno/Paralisi
+                                }
+                            }
+                            break;
+
+                        // --- STATI UNICI (Parassiseme, Confusione, Intrappolamento...) ---
+                        case "ApplicaStatoUnico":
+                        case "Intrappola":
+                            let tipoEffetto = p.Tipo || eff.NomeFunzione;
+                            if (playerPk.statiVolatili && playerPk.statiVolatili[tipoEffetto]) {
+                                score -= 500; // Già applicato
+                            } else {
+                                if (p.Tipo === "Parassiseme" && playerPk.tipi.includes("Erba")) score -= 500;
+                                else score += 120; // Le mosse logoranti piacciono molto all'IA
+                            }
+                            break;
+
+                        // --- CURE E RIGENERAZIONI ---
+                        case "Cura":
+                            if (botHpPct > 0.8) {
+                                score -= 500; // Inutile curarsi se si è sani
+                            } else if (botHpPct < 0.4) {
+                                score += 300; // Priorità di sopravvivenza
+                            }
+                            break;
+
+                        // --- MODIFICA STATISTICHE ---
+                        case "ModificaStatistica":
+                            let bersaglioEffetto = (p.Bersaglio === "Utente") ? botPk : playerPk;
+                            let statMod = bersaglioEffetto.modificatori ? (bersaglioEffetto.modificatori[p.Statistica.toLowerCase()] || 0) : 0;
+                            
+                            if (p.Bersaglio === "Utente" && p.Gradi > 0) {
+                                // Mi sto potenziando
+                                if (statMod >= 4) score -= 200; // Già abbastanza boostato
+                                else score += 80;
+                            } else if (p.Bersaglio !== "Utente" && p.Gradi < 0) {
+                                // Sto debuffando il nemico
+                                if (statMod <= -4) score -= 200;
+                                else score += 70;
+                            }
+                            break;
+
+                        // --- TRAPPOLE SUL CAMPO (Levitoroccia, Punte...) ---
+                        case "PiazzaTrappola":
+                            if (playerLati && playerLati.trappole && playerLati.trappole[p.Tipo]) {
+                                score -= 500; // Trappola già in campo
+                            } else {
+                                score += 150; // Ottimo da usare a inizio partita!
+                            }
+                            break;
+
+                        // --- DANNO CONTRACCOLPO (es. Sdoppiatore) ---
+                        case "DannoContraccolpo":
+                            if (botHpPct < 0.2) score -= 100; // Evita il suicidio se ha poca vita
+                            break;
+
+                        // --- PROTEZIONE E IMMUNITA' ---
+                        case "Proteggi":
+                        case "ResistiAKO":
+                            let contatore = botPk.contatoriStato ? (botPk.contatoriStato.usciteProtezione || 0) : 0;
+                            if (contatore > 0) score -= 300; // Fallirà quasi sicuramente, evitala
+                            else score += (botHpPct < 0.3) ? 150 : 50;
+                            break;
+                    }
+                });
+            }
+
+            // ==========================================
+            // 3. FATTORE IMPREVEDIBILITÀ (Jitter)
+            // ==========================================
+            // Aggiungiamo un leggero valore casuale (0-15) per evitare che il bot faccia SEMPRE
+            // la stessa identica sequenza di mosse a parità di punteggio.
+            score += Math.floor(Math.random() * 15);
+
+            if (score > punteggioMassimo) {
+                punteggioMassimo = score;
+                mossaMigliore = mossa;
+            }
+        });
+
+        // Fallback di sicurezza
+        return mossaMigliore || mosseDisponibili[0];
+    }
 }
 
 if (typeof module !== 'undefined' && module.exports) {

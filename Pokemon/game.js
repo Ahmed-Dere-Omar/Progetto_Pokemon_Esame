@@ -67,7 +67,7 @@ class BootScene extends Phaser.Scene {
         this.load.tilemapTiledJSON('map', 'assets/mappa.tmj');
         this.load.image('tiles', 'assets/tileset.png');
         this.load.spritesheet('player', 'assets/avatar.png', { frameWidth: 64, frameHeight: 64 });
-        this.load.image('allenatore', 'assets/aaron.png');
+        this.load.image('allenatore', 'assets/npc.png');
     }
 
     create() {
@@ -512,7 +512,7 @@ class WorldScene extends Phaser.Scene {
         }
     }
 
-     setupNPCs() {
+    setupNPCs() {
         this.npc = this.physics.add.sprite(300, 200, 'allenatore');
         this.npc.setScale(2.0); // Aumenta o diminuisci questo valore per regolare la grandezza
         this.npc.body.updateFromGameObject();
@@ -520,7 +520,7 @@ class WorldScene extends Phaser.Scene {
         this.npc.setImmovable(true);
         this.physics.add.collider(this.npc, this.wallLayer);
 
-        this.add.text(this.npc.x, this.npc.y - 50, "NPC", {
+        this.add.text(this.npc.x, this.npc.y - 35, "NPC", {
             fontSize: '12px', fill: '#fff', backgroundColor: '#00000088', padding: { x: 4, y: 2 }
         }).setOrigin(0.5, 1);
     }
@@ -1454,6 +1454,7 @@ class BattleScene extends Phaser.Scene {
 
         if (this.isWild) {
             let activeBot = this.partita.p2.squadra[this.partita.p2.attivoIdx];
+            let activePlayer = this.partita.p1.squadra[this.partita.p1.attivoIdx]; // Serve per fargli leggere le tue stat!
             let mosseDisponibiliBot = activeBot.mosse.filter(m => m.ppAttuali > 0);
             let botMoveData;
 
@@ -1463,10 +1464,12 @@ class BattleScene extends Phaser.Scene {
                     botMoveData = { Nome: "Ricarica", Tipo: "Normale", Categoria: "Stato", Potenza: 0, Precisione: 100, CodiceFunzione: [] };
                 } else if (botMoveData && botMoveData.ppAttuali <= 0) {
                     this.eEntity.mossaForzata = null;
-                    botMoveData = (mosseDisponibiliBot.length > 0) ? Phaser.Utils.Array.GetRandom(mosseDisponibiliBot) : this.moveDB["Scontro"];
+                    // FIX: Anche nel caso in cui finisca i PP della mossa forzata, usa l'IA!
+                    botMoveData = (mosseDisponibiliBot.length > 0) ? this.partita.scegliMossaBotIntelligente(activeBot, activePlayer, this.partita.p2, this.partita.p1) : this.moveDB["Scontro"];
                 }
             } else if (mosseDisponibiliBot.length > 0) {
-                botMoveData = Phaser.Utils.Array.GetRandom(mosseDisponibiliBot);
+                // MAGIA: Chiamiamo l'IA!
+                botMoveData = this.partita.scegliMossaBotIntelligente(activeBot, activePlayer, this.partita.p2, this.partita.p1);
             } else {
                 botMoveData = this.moveDB["Scontro"];
             }
@@ -2032,9 +2035,17 @@ class BattleScene extends Phaser.Scene {
 
         if (this.isWild) {
             let activeBot = this.partita.p2.squadra[this.partita.p2.attivoIdx];
-            let botMoves = activeBot.mosse.filter(m => m.ppAttuali > 0);
-            let botAction = { mossa: botMoves.length > 0 ? Phaser.Utils.Array.GetRandom(botMoves) : this.moveDB["Scontro"] };
 
+            // IL SEGRETO È QUI: Il bot deve valutare i danni sul Pokémon che STA ENTRANDO (usando "index")
+            let playerTarget = this.partita.p1.squadra[index];
+
+            // Facciamo ragionare l'algoritmo intelligente
+            let botMoveData = this.partita.scegliMossaBotIntelligente(activeBot, playerTarget, this.partita.p2, this.partita.p1);
+
+            // Creiamo l'azione finale del bot
+            let botAction = { mossa: botMoveData };
+
+            // Processiamo il turno: tu fai lo switch, lui ti attacca!
             let stato = this.partita.processaTurno(switchAction, botAction);
             this.applicaStatoPartita(stato, false);
         } else {
