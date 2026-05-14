@@ -65,7 +65,10 @@ class BootScene extends Phaser.Scene {
         this.load.json('moveDB', 'DB/DB_mosse.json');
 
         this.load.tilemapTiledJSON('map', 'assets/mappa.tmj');
-        this.load.image('tiles', 'assets/tileset.png');
+        this.load.image('tilesA', 'assets/a.png');
+        this.load.image('tilesB', 'assets/b.png');
+        this.load.image('tilesC', 'assets/c.png');
+        this.load.image('tilesD', 'assets/d.png');
         this.load.spritesheet('player', 'assets/avatar.png', { frameWidth: 64, frameHeight: 64 });
         this.load.image('allenatore', 'assets/npc.png');
     }
@@ -483,37 +486,43 @@ class WorldScene extends Phaser.Scene {
 
     setupMap() {
         const map = this.make.tilemap({ key: 'map' });
+
+        // I parametri sono: (nome_tileset, chiave_asset, tileWidth, tileHeight, margin, spacing)
+        // Impostiamo spacing a 1 per allineare perfettamente i disegni di Pokémon FireRed
+        const tilesetA = map.addTilesetImage('a', 'tilesA', 16, 16, 1, 1);
+        const tilesetB = map.addTilesetImage('b', 'tilesB', 16, 16, 0, 1);
+        const tilesetC = map.addTilesetImage('c', 'tilesC', 16, 16, 1, 1);
+        const tilesetD = map.addTilesetImage('d', 'tilesD', 16, 16, 1, 1);
+
+        const allTilesets = [tilesetA, tilesetB, tilesetC, tilesetD];
+
+        // Caricamento dei layer definiti in Tiled
+        map.createLayer('Sfondo', allTilesets, 0, 0);
+        this.wallLayer = map.createLayer('Ostacoli', allTilesets, 0, 0);
+        this.grassLayer = map.createLayer('Erba', allTilesets, 0, 0);
+
+        // Dimensioni fisiche del mondo
         this.mapWidth = map.widthInPixels;
         this.mapHeight = map.heightInPixels;
-        const tileset = map.addTilesetImage('tileset', 'tiles');
-
-        map.createLayer('Sfondo', tileset, 0, 0);
-        this.wallLayer = map.createLayer('Ostacoli', tileset, 0, 0);
-        this.grassLayer = map.createLayer('Erba', tileset, 0, 0);
-
         this.physics.world.setBounds(0, 0, this.mapWidth, this.mapHeight);
+
+        // Collisioni (tutti i tile tranne quelli vuoti)
         this.wallLayer.setCollisionByExclusion([-1]);
 
-        // NUOVO: Lettura del livello "Interazioni" da Tiled
+        // Setup delle zone interattive (PC, porte, ecc.)
         this.zoneInterattive = [];
         const objLayer = map.getObjectLayer('Interazioni');
         if (objLayer && objLayer.objects) {
             objLayer.objects.forEach(obj => {
-                if (obj.name === 'PC') {
-                    // Creiamo una "Zona" invisibile al centro del rettangolo disegnato su Tiled
-                    let pcZone = this.add.zone(obj.x + obj.width / 2, obj.y + obj.height / 2, obj.width, obj.height);
-                    pcZone.nomeInterazione = 'PC';
-                    this.zoneInterattive.push(pcZone);
-
-                    // (Opzionale) Aggiunge un testino volante per farti capire dov'è il PC
-                    this.add.text(pcZone.x, pcZone.y - 20, "PC", { fontSize: '10px', fill: '#0f0', backgroundColor: '#000' }).setOrigin(0.5);
-                }
+                let zone = this.add.zone(obj.x, obj.y, obj.width, obj.height).setOrigin(0);
+                zone.nomeInterazione = obj.name;
+                this.zoneInterattive.push(zone);
             });
         }
     }
 
     setupNPCs() {
-        this.npc = this.physics.add.sprite(300, 200, 'allenatore');
+        this.npc = this.physics.add.sprite(304, 208, 'allenatore');
         this.npc.setScale(2.0); // Aumenta o diminuisci questo valore per regolare la grandezza
         this.npc.body.updateFromGameObject();
         this.npc.setCollideWorldBounds(true);
@@ -568,12 +577,18 @@ class WorldScene extends Phaser.Scene {
     }
 
     addPlayer(info) {
-        this.player = this.physics.add.sprite(info.x, info.y, 'player').setCollideWorldBounds(true);
-        this.player.body.setSize(24, 30).setOffset(20, 34);
+        let startX = Math.floor(info.x / 16) * 16 + 8;
+        let startY = Math.floor(info.y / 16) * 16 + 8;
+
+        this.player = this.physics.add.sprite(startX, startY, 'player').setCollideWorldBounds(true);
+        this.player.setScale(0.5);
+        this.player.body.setSize(32, 32).setOffset(16, 32);
+
         this.physics.add.collider(this.player, this.wallLayer);
         this.physics.add.collider(this.player, this.npc);
         this.playerNameText = this.createNameTag(info.x, info.y, info.name);
-        this.cameras.main.startFollow(this.player).setZoom(1.7).setBounds(0, 0, this.mapWidth, this.mapHeight);
+
+        this.cameras.main.startFollow(this.player).setZoom(4).setBounds(0, 0, this.mapWidth, this.mapHeight);
     }
 
     addOtherPlayer(info) {
@@ -588,49 +603,87 @@ class WorldScene extends Phaser.Scene {
     }
 
     update() {
-        // NUOVO: Controllo del tasto ESC per aprire/chiudere il menu
         if (Phaser.Input.Keyboard.JustDown(this.escKey) && !this.isTransitioning && !this.pcOpen) {
             this.togglePauseMenu();
         }
 
-        // FIX: Se il gioco è in transizione, non c'è il player, o siamo in PAUSA, blocca tutto!
-        if (this.isTransitioning || !this.player || this.isPaused || this.pcOpen) return;
+        // Se siamo bloccati in menu, transizioni o il player sta GIÀ camminando, fermiamo l'update
+        if (this.isTransitioning || !this.player || this.isPaused || this.pcOpen || this.isMovingGrid) return;
 
-        const speed = 160;
-        let isMoving = false;
+        // LA SALVEZZA: Definiamo la grandezza dei passi direttamente qui!
+        const TILE_SIZE = 16; 
+        
         let currentAnim = null;
+        let dx = 0;
+        let dy = 0;
 
-        this.player.body.setVelocity(0);
+        // 1. Lettura Tasti
+        if (this.cursors.left.isDown) { dx = -TILE_SIZE; currentAnim = 'left'; }
+        else if (this.cursors.right.isDown) { dx = TILE_SIZE; currentAnim = 'right'; }
+        else if (this.cursors.up.isDown) { dy = -TILE_SIZE; currentAnim = 'up'; }
+        else if (this.cursors.down.isDown) { dy = TILE_SIZE; currentAnim = 'down'; }
 
-        if (this.cursors.left.isDown) { this.player.body.setVelocityX(-speed); currentAnim = 'left'; isMoving = true; }
-        else if (this.cursors.right.isDown) { this.player.body.setVelocityX(speed); currentAnim = 'right'; isMoving = true; }
-        else if (this.cursors.up.isDown) { this.player.body.setVelocityY(-speed); currentAnim = 'up'; isMoving = true; }
-        else if (this.cursors.down.isDown) { this.player.body.setVelocityY(speed); currentAnim = 'down'; isMoving = true; }
+        // 2. Movimento
+        if (dx !== 0 || dy !== 0) {
+            let targetX = this.player.x + dx;
+            let targetY = this.player.y + dy;
 
-        isMoving ? this.player.anims.play(currentAnim, true) : this.player.anims.stop();
-        this.player.body.velocity.normalize().scale(speed);
-        this.playerNameText.setPosition(this.player.x, this.player.y - 35);
+            this.player.anims.play(currentAnim, true);
 
-        if (isMoving) {
-            let px = this.player.x;
-            let py = this.player.y;
-            if (this.player.oldP && (px !== this.player.oldP.x || py !== this.player.oldP.y)) {
-                this.socket.emit('playerMovement', { x: px, y: py, anim: currentAnim });
+            // Controlli di sicurezza per evitare di calpestare cose che non esistono
+            let isOutOfBounds = targetX < 0 || targetX >= this.mapWidth || targetY < 0 || targetY >= this.mapHeight;
+            let ostacolo = this.wallLayer.getTileAtWorldXY(targetX, targetY, true);
+            let isWall = (ostacolo && ostacolo.index !== -1);
+            let isNpc = this.npc ? Phaser.Math.Distance.Between(targetX, targetY, this.npc.x, this.npc.y) < 16 : false;
+
+            // Se la via è libera...
+            if (!isWall && !isNpc && !isOutOfBounds) {
+                this.isMovingGrid = true; // Blocca altri input
+                
+                if (this.socket) {
+                    this.socket.emit('playerMovement', { x: targetX, y: targetY, anim: currentAnim });
+                }
+
+                // TWEEN SICURO: Anima solo il player, il nome lo segue frame per frame
+                this.tweens.add({
+                    targets: this.player,
+                    x: targetX,
+                    y: targetY,
+                    duration: 250, // 250ms = camminata classica fluida e scattante
+                    onUpdate: () => {
+                        // Trascina il nome in modo sicuro durante l'animazione
+                        if (this.playerNameText) {
+                            this.playerNameText.setPosition(this.player.x, this.player.y - 35);
+                        }
+                    },
+                    onComplete: () => {
+                        this.isMovingGrid = false; // Sblocca gli input
+                        this.player.anims.stop(); // Ferma le gambine
+                        
+                        // Controllo Erba Alta a passo finito
+                        let grassTile = this.grassLayer.getTileAtWorldXY(targetX, targetY, true);
+                        if (this.canEncounter && grassTile && grassTile.index !== -1) {
+                            if (Phaser.Math.Between(1, 100) <= 5) { // 5% di probabilità
+                                this.startEncounter({ isWild: true, socket: this.socket }, "POKÉMON SELVATICO!");
+                            }
+                            this.canEncounter = false;
+                            this.time.delayedCall(250, () => this.canEncounter = true);
+                        }
+                    }
+                });
+            } else {
+                // Sbatte contro un muro e si ferma sul posto
+                this.player.anims.stop(); 
             }
-            this.player.oldP = { x: px, y: py };
+        } else {
+            // Se rilascio il tasto
+            this.player.anims.stop();
         }
 
-        if (isMoving && this.canEncounter && this.grassLayer.getTileAtWorldXY(this.player.x, this.player.y, true)?.index !== -1) {
-            if (Phaser.Math.Between(1, 100) <= 5) {
-                this.startEncounter({ isWild: true, socket: this.socket }, "POKÉMON SELVATICO!");
-            }
-            this.canEncounter = false;
-            this.time.delayedCall(250, () => this.canEncounter = true);
-        }
-
+        // --- 3. INTERAZIONI TASTO INVIO ---
         if (Phaser.Input.Keyboard.JustDown(this.enterKey) && !this.isTransitioning) {
-
-            // 1. Controllo Oggetti (PC)
+            
+            // Cerca un PC vicino
             if (this.zoneInterattive) {
                 let pcVicino = this.zoneInterattive.find(z => Phaser.Math.Distance.Between(this.player.x, this.player.y, z.x, z.y) < 50);
                 if (pcVicino && pcVicino.nomeInterazione === 'PC') {
@@ -640,18 +693,21 @@ class WorldScene extends Phaser.Scene {
                 }
             }
 
-            // 2. Controllo NPC
-            let distToNpc = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.npc.x, this.npc.y);
-            if (distToNpc < 50) {
-                this.player.anims.stop();
-                // AGGIUNTO isNPC: true per distinguerlo dall'erba alta!
-                this.startEncounter({ isWild: true, isNPC: true, socket: this.socket }, "SFIDA CONTRO NPC!");
-                return;
+            // Cerca un NPC vicino
+            if (this.npc) {
+                let distToNpc = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.npc.x, this.npc.y);
+                if (distToNpc < 50) {
+                    this.player.anims.stop();
+                    this.startEncounter({ isWild: true, isNPC: true, socket: this.socket }, "SFIDA CONTRO NPC!");
+                    return;
+                }
             }
 
-            // 3. Controllo Multiplayer
-            let closest = this.otherPlayers.getChildren().find(op => Phaser.Math.Distance.Between(this.player.x, this.player.y, op.x, op.y) < 150);
-            if (closest) this.socket.emit('challengePlayer', closest.playerId);
+            // Cerca altri giocatori per il PvP
+            if (this.otherPlayers && this.otherPlayers.getChildren) {
+                let closest = this.otherPlayers.getChildren().find(op => Phaser.Math.Distance.Between(this.player.x, this.player.y, op.x, op.y) < 150);
+                if (closest && this.socket) this.socket.emit('challengePlayer', closest.playerId);
+            }
         }
     }
     togglePauseMenu() {
