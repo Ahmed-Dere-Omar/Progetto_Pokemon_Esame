@@ -66,7 +66,7 @@ class BootScene extends Phaser.Scene {
 
         this.load.tilemapTiledJSON('map', 'assets/mappa.tmj');
         this.load.image('tilesA', 'assets/a.png');
-        this.load.image('tilesB', 'assets/b.png');
+        this.load.image('tilesE', 'assets/e.png');
         this.load.image('tilesC', 'assets/c.png');
         this.load.image('tilesD', 'assets/d.png');
         this.load.spritesheet('player', 'assets/avatar.png', { frameWidth: 64, frameHeight: 64 });
@@ -490,7 +490,7 @@ class WorldScene extends Phaser.Scene {
         // I parametri sono: (nome_tileset, chiave_asset, tileWidth, tileHeight, margin, spacing)
         // Impostiamo spacing a 1 per allineare perfettamente i disegni di Pokémon FireRed
         const tilesetA = map.addTilesetImage('a', 'tilesA', 16, 16, 1, 1);
-        const tilesetB = map.addTilesetImage('b', 'tilesB', 16, 16, 0, 1);
+        const tilesetB = map.addTilesetImage('e', 'tilesE', 16, 16, 0, 0);
         const tilesetC = map.addTilesetImage('c', 'tilesC', 16, 16, 1, 1);
         const tilesetD = map.addTilesetImage('d', 'tilesD', 16, 16, 1, 1);
 
@@ -522,16 +522,12 @@ class WorldScene extends Phaser.Scene {
     }
 
     setupNPCs() {
-        this.npc = this.physics.add.sprite(304, 208, 'allenatore');
-        this.npc.setScale(2.0); // Aumenta o diminuisci questo valore per regolare la grandezza
+        this.npc = this.physics.add.sprite(280, 184, 'allenatore');
+        this.npc.setScale(1);
         this.npc.body.updateFromGameObject();
         this.npc.setCollideWorldBounds(true);
         this.npc.setImmovable(true);
         this.physics.add.collider(this.npc, this.wallLayer);
-
-        this.add.text(this.npc.x, this.npc.y - 35, "NPC", {
-            fontSize: '12px', fill: '#fff', backgroundColor: '#00000088', padding: { x: 4, y: 2 }
-        }).setOrigin(0.5, 1);
     }
 
     setupNetwork() {
@@ -552,7 +548,7 @@ class WorldScene extends Phaser.Scene {
             this.otherPlayers.getChildren().forEach(op => {
                 if (op.playerId === p.playerId) {
                     op.setPosition(p.x, p.y);
-                    op.nameText.setPosition(p.x, p.y - 35);
+                    op.nameText.setPosition(p.x, p.y - 15);
                     p.anim ? op.anims.play(p.anim, true) : op.anims.stop();
                 }
             });
@@ -586,9 +582,9 @@ class WorldScene extends Phaser.Scene {
 
         this.physics.add.collider(this.player, this.wallLayer);
         this.physics.add.collider(this.player, this.npc);
-        this.playerNameText = this.createNameTag(info.x, info.y, info.name);
+        this.playerNameText = this.createNameTag(startX, startY, info.name);
 
-        this.cameras.main.startFollow(this.player).setZoom(4).setBounds(0, 0, this.mapWidth, this.mapHeight);
+        this.cameras.main.startFollow(this.player, true).setZoom(4).setBounds(0, 0, this.mapWidth, this.mapHeight);
     }
 
     addOtherPlayer(info) {
@@ -599,7 +595,7 @@ class WorldScene extends Phaser.Scene {
     }
 
     createNameTag(x, y, name) {
-        return this.add.text(x, y - 35, name, { fontSize: '12px', fill: '#fff', backgroundColor: '#00000088', padding: { x: 4, y: 2 } }).setOrigin(0.5, 1);
+        return this.add.text(x, y-15, name, { fontSize: '10px', fill: '#3E1E68' }).setOrigin(0.5, 1);
     }
 
     update() {
@@ -653,7 +649,7 @@ class WorldScene extends Phaser.Scene {
                     onUpdate: () => {
                         // Trascina il nome in modo sicuro durante l'animazione
                         if (this.playerNameText) {
-                            this.playerNameText.setPosition(this.player.x, this.player.y - 35);
+                            this.playerNameText.setPosition(this.player.x, this.player.y - 15);
                         }
                     },
                     onComplete: () => {
@@ -2119,6 +2115,7 @@ const config = {
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: 1000, height: 800 },
     parent: 'game-container',
     pixelArt: true,
+    roundPixels: true,
     dom: { createContainer: true },
     physics: { default: 'arcade', arcade: { gravity: { y: 0 } } },
     scene: [BootScene, LoginScene, StarterScene, WorldScene, BattleScene]
