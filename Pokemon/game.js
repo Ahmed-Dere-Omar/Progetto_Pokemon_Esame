@@ -65,6 +65,7 @@ class BootScene extends Phaser.Scene {
         this.load.json('moveDB', 'DB/DB_mosse.json');
 
         this.load.tilemapTiledJSON('map', 'assets/mappa.tmj');
+        this.load.tilemapTiledJSON('mapPVE', 'assets/mappaPVE.tmj');
         this.load.image('tilesA', 'assets/a.png');
         this.load.image('tilesE', 'assets/e.png');
         this.load.image('tilesC', 'assets/c.png');
@@ -354,7 +355,7 @@ class LoginScene extends Phaser.Scene {
             if (dom) dom.destroy();
             this.scene.start('StarterScene', { name: nomeFinal, user: user, starters: myPokemon });
         } else {
-            // Se è vecchio, dritto in mappa
+            // Se è vecchio, dritto in mappa (SEMPRE NELLA LOBBY)
             setTimeout(() => {
                 if (dom) dom.destroy();
                 this.scene.start('WorldScene', { name: nomeFinal, user: user });
@@ -459,6 +460,11 @@ class WorldScene extends Phaser.Scene {
     init(data) { this.myPlayerName = data.name; }
 
     create() {
+        this.player = null;
+        this.playerNameText = null;
+        this.npc = null;
+        this.isMovingGrid = false;
+
         this.setupMap();
         this.setupAnimations();
         this.setupNetwork();
@@ -472,6 +478,7 @@ class WorldScene extends Phaser.Scene {
         this.isPaused = false;
         this.pauseMenuDom = null;
         this.pcOpen = false;
+        this.isDialogActive = false;
 
         this.canEncounter = true;
         this.isTransitioning = false;
@@ -480,7 +487,15 @@ class WorldScene extends Phaser.Scene {
             this.cursors.left.reset(); this.cursors.right.reset();
             this.cursors.up.reset(); this.cursors.down.reset();
             this.canEncounter = false;
-            this.time.delayedCall(1500, () => this.canEncounter = true);
+            setTimeout(() => { this.canEncounter = true; }, 1500);
+            this.registry.set('lastBattleResult', null);
+        });
+
+        this.events.on('shutdown', () => {
+            if (this.socket) {
+                this.socket.disconnect();
+                this.socket = null;
+            }
         });
     }
 
@@ -604,7 +619,7 @@ class WorldScene extends Phaser.Scene {
         }
 
         // Se siamo bloccati in menu, transizioni o il player sta GIÀ camminando, fermiamo l'update
-        if (this.isTransitioning || !this.player || this.isPaused || this.pcOpen || this.isMovingGrid) return;
+        if (this.isTransitioning || !this.player || this.isPaused || this.pcOpen || this.isMovingGrid || this.isDialogActive) return;
 
         // LA SALVEZZA: Definiamo la grandezza dei passi direttamente qui!
         const TILE_SIZE = 16; 
@@ -665,6 +680,14 @@ class WorldScene extends Phaser.Scene {
                             this.canEncounter = false;
                             this.time.delayedCall(250, () => this.canEncounter = true);
                         }
+
+                        // Controllo porte automatiche calpestate
+                        if (this.zoneInterattive && !this.isDialogActive && !this.isTransitioning) {
+                            let interazioneCalpestata = this.zoneInterattive.find(z => Phaser.Math.Distance.Between(this.player.x, this.player.y, z.x + (z.width || 0) / 2, z.y + (z.height || 0) / 2) < 20);
+                            if (interazioneCalpestata && interazioneCalpestata.nomeInterazione === 'Porta PVE') {
+                                this.gestisciPortaPVE();
+                            }
+                        }
                     }
                 });
             } else {
@@ -677,15 +700,21 @@ class WorldScene extends Phaser.Scene {
         }
 
         // --- 3. INTERAZIONI TASTO INVIO ---
-        if (Phaser.Input.Keyboard.JustDown(this.enterKey) && !this.isTransitioning) {
+        if (Phaser.Input.Keyboard.JustDown(this.enterKey) && !this.isTransitioning && !this.isDialogActive) {
             
-            // Cerca un PC vicino
+            // Cerca un PC o altre interazioni vicine
             if (this.zoneInterattive) {
-                let pcVicino = this.zoneInterattive.find(z => Phaser.Math.Distance.Between(this.player.x, this.player.y, z.x, z.y) < 50);
-                if (pcVicino && pcVicino.nomeInterazione === 'PC') {
-                    this.player.anims.stop();
-                    this.apriPC();
-                    return;
+                let interazioneVicino = this.zoneInterattive.find(z => Phaser.Math.Distance.Between(this.player.x, this.player.y, z.x + (z.width || 0) / 2, z.y + (z.height || 0) / 2) < 40);
+                if (interazioneVicino) {
+                    if (interazioneVicino.nomeInterazione === 'PC') {
+                        this.player.anims.stop();
+                        this.apriPC();
+                        return;
+                    } else if (interazioneVicino.nomeInterazione && interazioneVicino.nomeInterazione.includes('Cartello')) {
+                        this.player.anims.stop();
+                        this.leggiCartello();
+                        return;
+                    }
                 }
             }
 
@@ -706,6 +735,250 @@ class WorldScene extends Phaser.Scene {
             }
         }
     }
+
+    async gestisciPortaPVE() {
+        if (this.isDialogActive) return;
+        this.isDialogActive = true;
+        this.player.body.setVelocity(0);
+        this.player.anims.stop();
+
+        try {
+            // 1. Controlla il salvataggio sul DB
+            let profilo = this.registry.get('playerProfile');
+            let hasSave = false;
+
+            const { data, error } = await supabaseClient.from('profilo').select('id_mappa').eq('id_profilo', profilo.id_profilo).single();
+            if (error) {
+                console.warn("Nessun salvataggio trovato o colonna mancante sul DB:", error.message);
+            } else if (data && data.id_mappa && data.id_mappa !== 'mappa_base') {
+                hasSave = true;
+            }
+
+            // 2. Crea la UI del dialogo
+            this.createDialogUI();
+
+            // 3. Mostra i testi in sequenza
+            let dialoghi = hasSave 
+                ? ["Hai un salvataggio in corso nella modalità PvE.", "Vuoi riprendere la tua avventura?"] 
+                : ["Benvenuto nella modalità PvE!", "Vuoi iniziare una nuova avventura?"];
+            
+            this.mostraTestiDialogo(dialoghi, () => {
+                this.mostraSceltaSiNo((scelta) => {
+                    this.chiudiDialogo();
+                    if (scelta === 'SI') {
+                        this.avviaPVE(hasSave);
+                    } else {
+                        this.time.delayedCall(100, () => {
+                            this.isDialogActive = false;
+                        });
+                    }
+                });
+            });
+        } catch (err) {
+            console.error("Errore fatale imprevisto nella porta PVE:", err);
+            this.isDialogActive = false;
+            window.showBanner("Impossibile contattare il server DB!");
+        }
+    }
+
+    createDialogUI() {
+        let container = document.getElementById('dialog-ui-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'dialog-ui-container';
+            container.style.position = 'fixed';
+            container.style.bottom = '20px';
+            container.style.left = '50%';
+            container.style.transform = 'translateX(-50%)';
+            container.style.width = '800px';
+            container.style.height = '140px';
+            container.style.backgroundColor = '#2b2b2b';
+            container.style.border = '6px solid #d05050';
+            container.style.boxSizing = 'border-box';
+            container.style.padding = '20px 30px';
+            container.style.zIndex = '999999';
+            container.style.display = 'flex';
+            container.style.flexDirection = 'column';
+            container.style.justifyContent = 'flex-start';
+            container.style.boxShadow = '0px 10px 20px rgba(0,0,0,0.8)';
+            
+            let textEl = document.createElement('div');
+            textEl.id = 'dialog-ui-text';
+            textEl.style.color = '#ffffff';
+            textEl.style.fontFamily = '"Courier New", Courier, monospace';
+            textEl.style.fontSize = '26px';
+            textEl.style.fontWeight = 'bold';
+            textEl.style.textShadow = '2px 2px 0 #000';
+            textEl.style.lineHeight = '1.3';
+
+            container.appendChild(textEl);
+            document.body.appendChild(container);
+        }
+        container.style.display = 'flex';
+        document.getElementById('dialog-ui-text').innerText = '';
+    }
+
+    chiudiDialogo() {
+        let container = document.getElementById('dialog-ui-container');
+        if (container) container.style.display = 'none';
+        let choiceContainer = document.getElementById('dialog-choice-container');
+        if (choiceContainer) choiceContainer.style.display = 'none';
+    }
+
+    mostraTestiDialogo(testi, onComplete) {
+        let index = 0;
+        let textEl = document.getElementById('dialog-ui-text');
+        
+        const mostraProssimo = () => {
+            if (index < testi.length) {
+                textEl.innerHTML = testi[index] + '<span style="color:#ffcc00;"> ▼</span>';
+                index++;
+                
+                setTimeout(() => {
+                    const handleEnter = (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            window.removeEventListener('keydown', handleEnter);
+                            mostraProssimo();
+                        }
+                    };
+                    window.addEventListener('keydown', handleEnter);
+                }, 100);
+            } else {
+                if (onComplete) onComplete();
+            }
+        };
+        mostraProssimo();
+    }
+
+    mostraSceltaSiNo(onChoice) {
+        let choiceContainer = document.getElementById('dialog-choice-container');
+        if (!choiceContainer) {
+            choiceContainer = document.createElement('div');
+            choiceContainer.id = 'dialog-choice-container';
+            choiceContainer.style.position = 'fixed';
+            choiceContainer.style.bottom = '175px';
+            choiceContainer.style.left = '50%';
+            choiceContainer.style.transform = 'translateX(250px)';
+            choiceContainer.style.width = '150px';
+            choiceContainer.style.backgroundColor = '#2b2b2b';
+            choiceContainer.style.border = '4px solid #d05050';
+            choiceContainer.style.boxSizing = 'border-box';
+            choiceContainer.style.padding = '15px';
+            choiceContainer.style.zIndex = '999999';
+            choiceContainer.style.display = 'flex';
+            choiceContainer.style.flexDirection = 'column';
+            choiceContainer.style.gap = '15px';
+            choiceContainer.style.boxShadow = '0px 10px 20px rgba(0,0,0,0.8)';
+
+            let optSi = document.createElement('div');
+            optSi.id = 'dialog-opt-si';
+            optSi.style.color = '#ffffff';
+            optSi.style.fontFamily = '"Courier New", Courier, monospace';
+            optSi.style.fontSize = '26px';
+            optSi.style.fontWeight = 'bold';
+            optSi.style.textShadow = '2px 2px 0 #000';
+
+            let optNo = document.createElement('div');
+            optNo.id = 'dialog-opt-no';
+            optNo.style.color = '#ffffff';
+            optNo.style.fontFamily = '"Courier New", Courier, monospace';
+            optNo.style.fontSize = '26px';
+            optNo.style.fontWeight = 'bold';
+            optNo.style.textShadow = '2px 2px 0 #000';
+
+            choiceContainer.appendChild(optSi);
+            choiceContainer.appendChild(optNo);
+            document.body.appendChild(choiceContainer);
+        }
+        
+        choiceContainer.style.display = 'flex';
+        this.sceltaAttuale = 0; // 0 = SÌ, 1 = NO
+        
+        const aggiornaCursoreScelta = () => {
+            let optSi = document.getElementById('dialog-opt-si');
+            let optNo = document.getElementById('dialog-opt-no');
+            if (this.sceltaAttuale === 0) {
+                optSi.innerHTML = `<span style="display:inline-block; width: 25px; color: #ffcc00;">▶</span><span style="color: #ffcc00;">SÌ</span>`;
+                optNo.innerHTML = `<span style="display:inline-block; width: 25px;"></span><span style="color: #ffffff;">NO</span>`;
+            } else {
+                optSi.innerHTML = `<span style="display:inline-block; width: 25px;"></span><span style="color: #ffffff;">SÌ</span>`;
+                optNo.innerHTML = `<span style="display:inline-block; width: 25px; color: #ffcc00;">▶</span><span style="color: #ffcc00;">NO</span>`;
+            }
+        };
+
+        aggiornaCursoreScelta();
+
+        const handleChoiceInput = (e) => {
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'ArrowDown' || e.key === 's') {
+                this.sceltaAttuale = this.sceltaAttuale === 0 ? 1 : 0;
+                aggiornaCursoreScelta();
+            } else if (e.key === 'Enter' || e.key === ' ') {
+                window.removeEventListener('keydown', handleChoiceInput);
+                onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO');
+            }
+        };
+
+        setTimeout(() => {
+            window.addEventListener('keydown', handleChoiceInput);
+        }, 100);
+    }
+
+    leggiCartello() {
+        if (this.isDialogActive) return;
+        this.isDialogActive = true;
+
+        this.createDialogUI();
+
+        this.mostraTestiDialogo([
+            "BENVENUTO A NEOMON!", 
+            "Esplora la mappa, incontra altri giocatori e preparati per l'avventura.",
+            "Usa il PC per gestire la tua squadra."
+        ], () => {
+            this.chiudiDialogo();
+            this.time.delayedCall(100, () => { this.isDialogActive = false; });
+        });
+    }
+
+    async avviaPVE(hasSave) {
+        this.isTransitioning = true;
+        
+        let overlay = document.createElement('div');
+        overlay.style.position = 'absolute';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.backgroundColor = '#000';
+        overlay.style.display = 'flex';
+        overlay.style.justifyContent = 'center';
+        overlay.style.alignItems = 'center';
+        overlay.style.zIndex = '9999';
+        
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 3rem; color: #fff;">CARICAMENTO PVE...</h1>`;
+        document.getElementById('game-container').appendChild(overlay);
+
+        try {
+            let profilo = this.registry.get('playerProfile');
+            const { error } = await supabaseClient.from('profilo').update({ id_mappa: 'mappa_pve' }).eq('id_profilo', profilo.id_profilo);
+            if (error) {
+                console.error("Errore aggiornamento DB (Mappa PVE):", error);
+            } else {
+                profilo.id_mappa = 'mappa_pve';
+            }
+        } catch (err) {
+            console.error("Errore nel salvataggio dell'ingresso in PVE:", err);
+        }
+
+        setTimeout(() => {
+            if(overlay) overlay.remove();
+            this.isTransitioning = false;
+            this.isDialogActive = false;
+            
+            this.scene.stop('WorldScene');
+            this.scene.start('PVEScene', { name: this.myPlayerName, user: this.registry.get('playerProfile') });
+        }, 1000);
+    }
+
     togglePauseMenu() {
         if (this.isPaused) {
             // Se è in pausa, distruggiamo il div HTML e riprendiamo il gioco
@@ -723,14 +996,17 @@ class WorldScene extends Phaser.Scene {
             overlay.id = 'pause-menu-overlay';
             overlay.className = 'modal-overlay'; // Usiamo lo stesso magico blur del PC!
 
-            overlay.innerHTML = `
-                <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                    <h2 class="text-shadows" style="font-size: 4rem; margin-bottom: 30px;">MENU PAUSA</h2>
-                    
-                    <button id="logout-btn" style="width: 300px; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">ESCI DAL GIOCO</button>
-                    
-                    <p style="color: #fff; margin-top: 40px; font-size: 1.2rem; font-family: 'Courier New'; font-weight: bold;">Premi ESC per tornare al gioco</p>
-                </div>`;
+            const renderMainPause = () => {
+                overlay.innerHTML = `
+                    <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 500px; max-width: 90%;">
+                        <h2 class="text-shadows" style="font-size: 4rem; margin-bottom: 30px; text-align: center;">MENU PAUSA</h2>
+                        <button id="profile-btn" style="width: 300px; padding: 15px; margin-top: 10px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">PROFILO</button>
+                        <button id="logout-btn" style="width: 300px; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">ESCI DAL GIOCO</button>
+                        <p style="color: #fff; margin-top: 40px; font-size: 1.2rem; font-family: 'Courier New'; font-weight: bold; text-align: center;">Premi ESC per tornare al gioco</p>
+                    </div>`;
+            };
+
+            renderMainPause();
 
             // Lo incolliamo fisicamente sopra al canvas di gioco
             document.getElementById('game-container').appendChild(overlay);
@@ -745,6 +1021,23 @@ class WorldScene extends Phaser.Scene {
 
                     // Riavvia l'intera pagina pulendo tutto
                     window.location.reload();
+                } else if (e.target.id === 'profile-btn') {
+                    let profilo = this.registry.get('playerProfile');
+                    let box = document.getElementById('pause-box');
+                    if (box) {
+                        box.innerHTML = `
+                            <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">PROFILO ALLENATORE</h2>
+                            <div style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; border: 2px solid #ff7477; width: 85%; text-align: left; color: #fff; font-family: 'Courier New', monospace; font-size: 1.2rem;">
+                                <p style="margin: 10px 0;"><strong>NOME:</strong> ${profilo.username || 'Sconosciuto'}</p>
+                                <p style="margin: 10px 0;"><strong>ID:</strong> ${profilo.id_profilo ? profilo.id_profilo.substring(0,8).toUpperCase() : '---'}</p>
+                                <p style="margin: 10px 0;"><strong>VITTORIE:</strong> ${profilo.vittorie || 0}</p>
+                                <p style="margin: 10px 0;"><strong>PARTITE GIOCATE:</strong> ${profilo.partite_giocate || 0}</p>
+                            </div>
+                            <button id="back-pause-btn" style="width: 300px; padding: 15px; margin-top: 30px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">INDIETRO</button>
+                        `;
+                    }
+                } else if (e.target.id === 'back-pause-btn') {
+                    renderMainPause();
                 }
             });
         }
@@ -1152,9 +1445,10 @@ class WorldScene extends Phaser.Scene {
         overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 4rem;">${testo}</h1>`;
         document.getElementById('game-container').appendChild(overlay);
 
-        this.time.delayedCall(2000, () => {
-            overlay.remove();
+        setTimeout(() => {
+            if(overlay) overlay.remove();
             this.isTransitioning = false;
+            this.isDialogActive = false;
             this.scene.pause();
 
             let myDbTeam = this.registry.get('userPokemon').filter(p => p.in_squadra).sort((a, b) => a.posizione_slot - b.posizione_slot);
@@ -1166,8 +1460,9 @@ class WorldScene extends Phaser.Scene {
             }
 
             // Bypassiamo SelectionScene e andiamo dritti alla lotta!
+            battleData.parentScene = 'WorldScene';
             this.scene.launch('BattleScene', battleData);
-        });
+        }, 2000);
     }
 }
 
@@ -1182,6 +1477,7 @@ class BattleScene extends Phaser.Scene {
         this.roomId = data.roomId;
         this.socket = data.socket;
         this.isForcedSwitch = false;
+        this.parentScene = data.parentScene || 'WorldScene';
     }
 
     preload() {
@@ -1554,7 +1850,7 @@ class BattleScene extends Phaser.Scene {
                     this.logText.setText("Sei fuggito con successo!");
                     this.time.delayedCall(1500, () => {
                         if (this.socket) this.socket.emit('setInBattle', false);
-                        this.scene.stop(); this.scene.resume('WorldScene');
+                        this.scene.stop(); this.scene.resume(this.parentScene);
                     });
                 } else {
                     this.logText.setText("Non puoi fuggire da una lotta tra allenatori!");
@@ -1623,12 +1919,13 @@ class BattleScene extends Phaser.Scene {
                 this.time.delayedCall(1500, () => {
                     let vinto = p1Data.squadra.some(p => p.hp > 0);
                     this.logText.setText(vinto ? 'HAI VINTO! 🎉' : 'HAI PERSO... 💀');
+                    this.registry.set('lastBattleResult', vinto ? 'win' : 'lose');
                     let loserSprite = vinto ? this.eSprite : this.pSprite;
                     this.tweens.add({
                         targets: loserSprite, y: loserSprite.y + 100, alpha: 0, duration: 1000,
                         onComplete: () => {
                             if (this.socket) this.socket.emit('setInBattle', false);
-                            this.scene.stop(); this.scene.resume('WorldScene');
+                            this.scene.stop(); this.scene.resume(this.parentScene);
                         }
                     });
                 });
@@ -2108,6 +2405,619 @@ class BattleScene extends Phaser.Scene {
 }
 
 // ==============================================================================
+// 5. PVE SCENE: Mappa per la modalità offline / avventura
+// ==============================================================================
+class PVEScene extends Phaser.Scene {
+    constructor() { super({ key: 'PVEScene' }); }
+    init(data) {
+        this.myPlayerName = data.name;
+        this.user = data.user;
+    }
+    
+    create() {
+        this.player = null;
+        this.npcInSfida = null;
+        this.npcs = null;
+        this.isMovingGrid = false;
+
+        // Qui andrà implementata la logica per creare la mappa PVE usando mappaPVE.tmj
+        // const map = this.make.tilemap({ key: 'mapPVE' });
+        this.setupMap();
+        this.setupNPCs();
+        
+        let startX = 100;
+        let startY = 100;
+        if (this.zoneInterattive) {
+            let startZone = this.zoneInterattive.find(z => z.nomeInterazione === 'Porta Inizio');
+            if (startZone) {
+                startX = startZone.x + 8; // Centriamo sull'asse
+                startY = startZone.y + 8;
+                startY = startZone.y - 32; // Spostiamo lo spawn più in alto per non attivare l'uscita
+            }
+        }
+        this.setupPlayer(startX, startY);
+
+        if (!this.anims.exists('down')) {
+            ['down', 'left', 'right', 'up'].forEach((key, i) => {
+                this.anims.create({ key, frames: this.anims.generateFrameNumbers('player', { start: i * 4, end: i * 4 + 3 }), frameRate: 10, repeat: -1 });
+            });
+        }
+
+        this.cursors = this.input.keyboard.createCursorKeys();
+        this.enterKey = this.input.keyboard.addKey('ENTER');
+        this.escKey = this.input.keyboard.addKey('ESC');
+
+        this.isPaused = false;
+        this.isDialogActive = false;
+        this.canEncounter = true;
+        this.isTransitioning = false;
+        this.isMovingGrid = false;
+        
+        this.events.on('resume', () => {
+            this.cursors.left.reset(); this.cursors.right.reset();
+            this.cursors.up.reset(); this.cursors.down.reset();
+            this.canEncounter = false;
+            setTimeout(() => { this.canEncounter = true; }, 1500);
+
+            let lastResult = this.registry.get('lastBattleResult');
+            this.registry.set('lastBattleResult', null);
+
+            if (lastResult === 'lose') {
+                this.isDialogActive = true;
+                this.player.body.setVelocity(0);
+                this.player.anims.stop();
+                this.createDialogUI();
+                this.mostraTestiDialogo(["I tuoi Pokémon sono esausti...", "Hai perso la run! Tornerai alla Lobby. ▼"], () => {
+                    this.chiudiDialogo();
+                    this.tornaAllaLobby(false);
+                });
+                return;
+            }
+
+            if (this.npcInSfida) {
+                if (lastResult === 'win') {
+                    this.npcInSfida.isDefeated = true;
+                    this.npcInSfida.setTint(0x888888);
+                }
+                this.npcInSfida = null;
+            }
+        });
+    }
+
+    setupMap() {
+        const map = this.make.tilemap({ key: 'mapPVE' });
+
+        // Configurazione delle proporzioni esatte estratte dal Json della mappa PVE
+        const tilesetA = map.addTilesetImage('a', 'tilesA', 16, 16, 1, 1);
+        const tilesetE = map.addTilesetImage('e', 'tilesE', 16, 16, 0, 0);
+        const tilesetC = map.addTilesetImage('c', 'tilesC', 16, 16, 1, 1);
+        const tilesetD = map.addTilesetImage('d', 'tilesD', 16, 16, 1, 1); 
+
+        const allTilesets = [tilesetA, tilesetC, tilesetD, tilesetE];
+
+        map.createLayer('Sfondo', allTilesets, 0, 0);
+        this.wallLayer = map.createLayer('Ostacoli', allTilesets, 0, 0);
+        this.grassLayer = map.createLayer('Erba', allTilesets, 0, 0);
+
+        this.mapWidth = map.widthInPixels;
+        this.mapHeight = map.heightInPixels;
+        this.physics.world.setBounds(0, 0, this.mapWidth, this.mapHeight);
+
+        this.wallLayer.setCollisionByExclusion([-1]);
+
+        this.zoneInterattive = [];
+        const objLayer = map.getObjectLayer('Interazioni');
+        if (objLayer && objLayer.objects) {
+            objLayer.objects.forEach(obj => {
+                let zone = this.add.zone(obj.x, obj.y, obj.width, obj.height).setOrigin(0);
+                zone.nomeInterazione = obj.name;
+                this.zoneInterattive.push(zone);
+            });
+        }
+    }
+
+    setupNPCs() {
+        this.npcs = this.physics.add.group();
+        
+        let npcPositions = [
+            { x: 120, y: 350 },
+            { x: 180, y: 200 },
+            { x: 120, y: 100 }
+        ];
+
+        npcPositions.forEach((pos, index) => {
+            let npc = this.physics.add.sprite(pos.x, pos.y, 'allenatore').setScale(1).setImmovable(true);
+            npc.npcId = index;
+            npc.isDefeated = false;
+            this.physics.add.collider(npc, this.wallLayer);
+            this.npcs.add(npc);
+        });
+    }
+
+    setupPlayer(startX, startY) {
+        this.player = this.physics.add.sprite(startX, startY, 'player').setCollideWorldBounds(true);
+        this.player.setScale(0.5);
+        this.player.body.setSize(32, 32).setOffset(16, 32);
+
+        this.physics.add.collider(this.player, this.wallLayer);
+        this.cameras.main.startFollow(this.player, true).setZoom(4).setBounds(0, 0, this.mapWidth, this.mapHeight);
+    }
+
+    update() {
+        if (Phaser.Input.Keyboard.JustDown(this.escKey) && !this.isTransitioning) {
+            this.togglePauseMenu();
+        }
+
+        if (this.isTransitioning || !this.player || this.isPaused || this.isMovingGrid || this.isDialogActive) return;
+
+        const TILE_SIZE = 16; 
+        
+        let currentAnim = null;
+        let dx = 0;
+        let dy = 0;
+
+        if (this.cursors.left.isDown) { dx = -TILE_SIZE; currentAnim = 'left'; }
+        else if (this.cursors.right.isDown) { dx = TILE_SIZE; currentAnim = 'right'; }
+        else if (this.cursors.up.isDown) { dy = -TILE_SIZE; currentAnim = 'up'; }
+        else if (this.cursors.down.isDown) { dy = TILE_SIZE; currentAnim = 'down'; }
+
+        if (dx !== 0 || dy !== 0) {
+            let targetX = this.player.x + dx;
+            let targetY = this.player.y + dy;
+
+            this.player.anims.play(currentAnim, true);
+
+            let isOutOfBounds = targetX < 0 || targetX >= this.mapWidth || targetY < 0 || targetY >= this.mapHeight;
+            let ostacolo = this.wallLayer.getTileAtWorldXY(targetX, targetY, true);
+            let isWall = (ostacolo && ostacolo.index !== -1);
+            
+            let isNpc = false;
+            if (this.npcs) {
+                this.npcs.getChildren().forEach(n => {
+                    if (Phaser.Math.Distance.Between(targetX, targetY, n.x, n.y) < 16) {
+                        isNpc = true;
+                    }
+                });
+            }
+
+            if (!isWall && !isNpc && !isOutOfBounds) {
+                this.isMovingGrid = true;
+                
+                this.tweens.add({
+                    targets: this.player,
+                    x: targetX,
+                    y: targetY,
+                    duration: 250,
+                    onComplete: () => {
+                        this.isMovingGrid = false;
+                        this.player.anims.stop();
+                        
+                        // Controllo Erba Alta
+                        let grassTile = this.grassLayer.getTileAtWorldXY(targetX, targetY, true);
+                        if (this.canEncounter && grassTile && grassTile.index !== -1) {
+                            if (Phaser.Math.Between(1, 100) <= 10) { // 10% di probabilità
+                                this.startPVEEncounter();
+                            }
+                            this.canEncounter = false;
+                            this.time.delayedCall(250, () => this.canEncounter = true);
+                        }
+
+                        // Controllo porte di uscita
+                        if (this.zoneInterattive && !this.isDialogActive && !this.isTransitioning) {
+                            let interazioneCalpestata = this.zoneInterattive.find(z => Phaser.Math.Distance.Between(this.player.x, this.player.y, z.x + (z.width || 0) / 2, z.y + (z.height || 0) / 2) < 20);
+                            if (interazioneCalpestata) {
+                                if (interazioneCalpestata.nomeInterazione === 'Porta Fine') {
+                                    let tuttiSconfitti = true;
+                                    if (this.npcs) {
+                                        this.npcs.getChildren().forEach(n => {
+                                            if (!n.isDefeated) tuttiSconfitti = false;
+                                        });
+                                    }
+                                    if (tuttiSconfitti) {
+                                        this.tornaAllaLobby(false); // Finito: torna in base resettando la posizione.
+                                    } else {
+                                        this.isDialogActive = true;
+                                        this.createDialogUI();
+                                        this.mostraTestiDialogo(["Devi sconfiggere tutti gli allenatori", "prima di poter uscire da qui!"], () => {
+                                            this.chiudiDialogo();
+                                            this.isMovingGrid = true;
+                                            this.tweens.add({
+                                                targets: this.player,
+                                                x: this.player.x - dx,
+                                                y: this.player.y - dy,
+                                                duration: 250,
+                                                onComplete: () => { this.isMovingGrid = false; this.isDialogActive = false; }
+                                            });
+                                        });
+                                    }
+                                } else if (interazioneCalpestata.nomeInterazione === 'Porta Inizio') {
+                                    this.gestisciUscitaPVE();
+                                }
+                            }
+                        }
+                    }
+                });
+            } else {
+                this.player.anims.stop(); 
+            }
+        } else {
+            this.player.anims.stop();
+        }
+
+        if (Phaser.Input.Keyboard.JustDown(this.enterKey) && !this.isTransitioning && !this.isDialogActive) {
+            let interactionHandled = false;
+            if (this.npcs) {
+                let npcVicino = this.npcs.getChildren().find(n => Phaser.Math.Distance.Between(this.player.x, this.player.y, n.x, n.y) < 50);
+                if (npcVicino) {
+                    this.player.anims.stop();
+                    this.gestisciDialogoNPC(npcVicino);
+                    interactionHandled = true;
+                }
+            }
+
+            if (!interactionHandled && this.zoneInterattive) {
+                let interazioneVicino = this.zoneInterattive.find(z => Phaser.Math.Distance.Between(this.player.x, this.player.y, z.x + (z.width || 0) / 2, z.y + (z.height || 0) / 2) < 40);
+                if (interazioneVicino && interazioneVicino.nomeInterazione && interazioneVicino.nomeInterazione.includes('Cartello')) {
+                    this.player.anims.stop();
+                    this.leggiCartello();
+                }
+            }
+        }
+    }
+
+    startPVEEncounter(isNPC = false) {
+        this.isTransitioning = true;
+        this.player.body.setVelocity(0);
+        this.player.anims.stop();
+
+        let overlay = document.createElement('div');
+        overlay.style.position = 'absolute';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.display = 'flex';
+        overlay.style.justifyContent = 'center';
+        overlay.style.alignItems = 'center';
+        overlay.style.pointerEvents = 'none';
+        overlay.style.zIndex = '9999';
+
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 4rem;">${isNPC ? 'SFIDA ALLENATORE!' : 'POKÉMON SELVATICO!'}</h1>`;
+        document.getElementById('game-container').appendChild(overlay);
+
+        setTimeout(() => {
+            if(overlay) overlay.remove();
+            this.isTransitioning = false;
+            this.isDialogActive = false;
+            this.scene.pause();
+
+            let myDbTeam = this.registry.get('userPokemon').filter(p => p.in_squadra).sort((a, b) => a.posizione_slot - b.posizione_slot);
+            if (myDbTeam.length === 0) {
+                window.showBanner("Non hai Pokémon in squadra! Torna indietro.");
+                this.scene.resume('PVEScene');
+                return;
+            }
+
+            this.scene.launch('BattleScene', { isWild: true, isNPC: isNPC, parentScene: 'PVEScene' });
+        }, 2000);
+    }
+
+    gestisciDialogoNPC(npc) {
+        if (this.isDialogActive) return;
+        this.isDialogActive = true;
+
+        this.createDialogUI();
+
+        if (npc.isDefeated) {
+            this.mostraTestiDialogo(["Mh, mi hai già battuto...", "Sei davvero in gamba!"], () => {
+                this.chiudiDialogo();
+                this.time.delayedCall(100, () => { this.isDialogActive = false; });
+            });
+        } else {
+            this.mostraTestiDialogo(["Ehi tu! Sei pronto a farti stracciare?", "Vuoi sfidarmi ora? ▼"], () => {
+                this.mostraSceltaSiNo((scelta) => {
+                    this.chiudiDialogo();
+                    if (scelta === 'SI') {
+                        this.npcInSfida = npc;
+                        this.startPVEEncounter(true);
+                    } else {
+                        this.mostraTestiDialogo(["Tsk, fifone!"], () => {
+                            this.chiudiDialogo();
+                            this.time.delayedCall(100, () => { this.isDialogActive = false; });
+                        });
+                    }
+                });
+            });
+        }
+    }
+
+    gestisciUscitaPVE() {
+        if (this.isDialogActive) return;
+        this.isDialogActive = true;
+        this.player.body.setVelocity(0);
+        this.player.anims.stop();
+
+        this.createDialogUI();
+
+        this.mostraTestiDialogo(["Sei vicino all'uscita.", "Vuoi salvare i progressi e tornare alla Lobby? ▼"], () => {
+            this.mostraSceltaSiNo((scelta) => {
+                this.chiudiDialogo();
+                if (scelta === 'SI') {
+                    this.tornaAllaLobby(true);
+                } else {
+                    this.time.delayedCall(100, () => {
+                        this.isDialogActive = false;
+                    });
+                }
+            });
+        });
+    }
+
+    async tornaAllaLobby(salvaRun = false) {
+        this.isTransitioning = true;
+        
+        let overlay = document.createElement('div');
+        overlay.style.position = 'absolute';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.backgroundColor = '#000';
+        overlay.style.display = 'flex';
+        overlay.style.justifyContent = 'center';
+        overlay.style.alignItems = 'center';
+        overlay.style.zIndex = '9999';
+        
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 3rem; color: #fff;">TORNO ALLA LOBBY...</h1>`;
+        document.getElementById('game-container').appendChild(overlay);
+
+        try {
+            let profilo = this.registry.get('playerProfile');
+            let mappaDaSalvare = salvaRun ? 'mappa_pve' : 'mappa_base';
+            
+            const { error } = await supabaseClient.from('profilo').update({ id_mappa: mappaDaSalvare }).eq('id_profilo', profilo.id_profilo);
+            if (error) {
+                console.error("Errore aggiornamento DB (Mappa):", error);
+            } else {
+                profilo.id_mappa = mappaDaSalvare;
+            }
+            
+            let myDbTeam = this.registry.get('userPokemon');
+            let allUpdates = myDbTeam.map(p => ({
+                id_pokemon: p.id_pokemon, id_specie: p.id_specie, id_profilo_proprietario: p.id_profilo_proprietario, in_squadra: p.in_squadra, posizione_slot: p.posizione_slot
+            }));
+            await supabaseClient.from('pokemon').upsert(allUpdates);
+        } catch (err) {
+            console.error("Errore nel salvataggio in uscita:", err);
+        }
+
+        setTimeout(() => {
+            if(overlay) overlay.remove();
+            this.isTransitioning = false;
+            
+            this.scene.stop('PVEScene');
+            this.scene.start('WorldScene', { name: this.myPlayerName, user: this.user });
+        }, 1000);
+    }
+
+    togglePauseMenu() {
+        if (this.isPaused) {
+            this.isPaused = false;
+            let existingMenu = document.getElementById('pause-menu-overlay');
+            if (existingMenu) existingMenu.remove();
+        } else {
+            this.isPaused = true;
+            this.player.body.setVelocity(0);
+            this.player.anims.stop();
+
+            let overlay = document.createElement('div');
+            overlay.id = 'pause-menu-overlay';
+            overlay.className = 'modal-overlay';
+
+            const renderMainPause = () => {
+                overlay.innerHTML = `
+                    <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 500px; max-width: 90%;">
+                        <h2 class="text-shadows" style="font-size: 4rem; margin-bottom: 30px; text-align: center;">MENU PAUSA PVE</h2>
+                        <button id="profile-btn" style="width: 300px; padding: 15px; margin-top: 10px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">PROFILO</button>
+                        <button id="lobby-btn" style="width: 300px; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">TORNA ALLA LOBBY</button>
+                        <p style="color: #fff; margin-top: 40px; font-size: 1.2rem; font-family: 'Courier New'; font-weight: bold; text-align: center;">Premi ESC per tornare al gioco</p>
+                    </div>`;
+            };
+
+            renderMainPause();
+
+            document.getElementById('game-container').appendChild(overlay);
+
+            overlay.addEventListener('click', (e) => {
+                if (e.target.id === 'lobby-btn') {
+                    e.target.innerText = "USCITA...";
+                    this.isPaused = false;
+                    let existingMenu = document.getElementById('pause-menu-overlay');
+                    if (existingMenu) existingMenu.remove();
+                    this.tornaAllaLobby(true);
+                } else if (e.target.id === 'profile-btn') {
+                    let profilo = this.registry.get('playerProfile');
+                    let box = document.getElementById('pause-box');
+                    if (box) {
+                        box.innerHTML = `
+                            <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">PROFILO ALLENATORE</h2>
+                            <div style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; border: 2px solid #ff7477; width: 85%; text-align: left; color: #fff; font-family: 'Courier New', monospace; font-size: 1.2rem;">
+                                <p style="margin: 10px 0;"><strong>NOME:</strong> ${profilo.username || 'Sconosciuto'}</p>
+                                <p style="margin: 10px 0;"><strong>ID:</strong> ${profilo.id_profilo ? profilo.id_profilo.substring(0,8).toUpperCase() : '---'}</p>
+                                <p style="margin: 10px 0;"><strong>VITTORIE:</strong> ${profilo.vittorie || 0}</p>
+                                <p style="margin: 10px 0;"><strong>PARTITE GIOCATE:</strong> ${profilo.partite_giocate || 0}</p>
+                            </div>
+                            <button id="back-pause-btn" style="width: 300px; padding: 15px; margin-top: 30px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">INDIETRO</button>
+                        `;
+                    }
+                } else if (e.target.id === 'back-pause-btn') {
+                    renderMainPause();
+                }
+            });
+        }
+    }
+
+    createDialogUI() {
+        let container = document.getElementById('dialog-ui-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'dialog-ui-container';
+            container.style.position = 'fixed';
+            container.style.bottom = '20px';
+            container.style.left = '50%';
+            container.style.transform = 'translateX(-50%)';
+            container.style.width = '800px';
+            container.style.height = '140px';
+            container.style.backgroundColor = '#2b2b2b';
+            container.style.border = '6px solid #d05050';
+            container.style.boxSizing = 'border-box';
+            container.style.padding = '20px 30px';
+            container.style.zIndex = '999999';
+            container.style.display = 'flex';
+            container.style.flexDirection = 'column';
+            container.style.justifyContent = 'flex-start';
+            container.style.boxShadow = '0px 10px 20px rgba(0,0,0,0.8)';
+            
+            let textEl = document.createElement('div');
+            textEl.id = 'dialog-ui-text';
+            textEl.style.color = '#ffffff';
+            textEl.style.fontFamily = '"Courier New", Courier, monospace';
+            textEl.style.fontSize = '26px';
+            textEl.style.fontWeight = 'bold';
+            textEl.style.textShadow = '2px 2px 0 #000';
+            textEl.style.lineHeight = '1.3';
+
+            container.appendChild(textEl);
+            document.body.appendChild(container);
+        }
+        container.style.display = 'flex';
+        document.getElementById('dialog-ui-text').innerText = '';
+    }
+
+    chiudiDialogo() {
+        let container = document.getElementById('dialog-ui-container');
+        if (container) container.style.display = 'none';
+        let choiceContainer = document.getElementById('dialog-choice-container');
+        if (choiceContainer) choiceContainer.style.display = 'none';
+    }
+
+    mostraTestiDialogo(testi, onComplete) {
+        let index = 0;
+        let textEl = document.getElementById('dialog-ui-text');
+        
+        const mostraProssimo = () => {
+            if (index < testi.length) {
+                textEl.innerHTML = testi[index].replace(' ▼', '') + '<span style="color:#ffcc00;"> ▼</span>';
+                index++;
+                
+                setTimeout(() => {
+                    const handleEnter = (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            window.removeEventListener('keydown', handleEnter);
+                            mostraProssimo();
+                        }
+                    };
+                    window.addEventListener('keydown', handleEnter);
+                }, 100);
+            } else {
+                if (onComplete) onComplete();
+            }
+        };
+        mostraProssimo();
+    }
+
+    mostraSceltaSiNo(onChoice) {
+        let choiceContainer = document.getElementById('dialog-choice-container');
+        if (!choiceContainer) {
+            choiceContainer = document.createElement('div');
+            choiceContainer.id = 'dialog-choice-container';
+            choiceContainer.style.position = 'fixed';
+            choiceContainer.style.bottom = '175px';
+            choiceContainer.style.left = '50%';
+            choiceContainer.style.transform = 'translateX(250px)';
+            choiceContainer.style.width = '150px';
+            choiceContainer.style.backgroundColor = '#2b2b2b';
+            choiceContainer.style.border = '4px solid #d05050';
+            choiceContainer.style.boxSizing = 'border-box';
+            choiceContainer.style.padding = '15px';
+            choiceContainer.style.zIndex = '999999';
+            choiceContainer.style.display = 'flex';
+            choiceContainer.style.flexDirection = 'column';
+            choiceContainer.style.gap = '15px';
+            choiceContainer.style.boxShadow = '0px 10px 20px rgba(0,0,0,0.8)';
+
+            let optSi = document.createElement('div');
+            optSi.id = 'dialog-opt-si';
+            optSi.style.color = '#ffffff';
+            optSi.style.fontFamily = '"Courier New", Courier, monospace';
+            optSi.style.fontSize = '26px';
+            optSi.style.fontWeight = 'bold';
+            optSi.style.textShadow = '2px 2px 0 #000';
+
+            let optNo = document.createElement('div');
+            optNo.id = 'dialog-opt-no';
+            optNo.style.color = '#ffffff';
+            optNo.style.fontFamily = '"Courier New", Courier, monospace';
+            optNo.style.fontSize = '26px';
+            optNo.style.fontWeight = 'bold';
+            optNo.style.textShadow = '2px 2px 0 #000';
+
+            choiceContainer.appendChild(optSi);
+            choiceContainer.appendChild(optNo);
+            document.body.appendChild(choiceContainer);
+        }
+        
+        choiceContainer.style.display = 'flex';
+        this.sceltaAttuale = 0; // 0 = SÌ, 1 = NO
+        
+        const aggiornaCursoreScelta = () => {
+            let optSi = document.getElementById('dialog-opt-si');
+            let optNo = document.getElementById('dialog-opt-no');
+            if (this.sceltaAttuale === 0) {
+                optSi.innerHTML = `<span style="display:inline-block; width: 25px; color: #ffcc00;">▶</span><span style="color: #ffcc00;">SÌ</span>`;
+                optNo.innerHTML = `<span style="display:inline-block; width: 25px;"></span><span style="color: #ffffff;">NO</span>`;
+            } else {
+                optSi.innerHTML = `<span style="display:inline-block; width: 25px;"></span><span style="color: #ffffff;">SÌ</span>`;
+                optNo.innerHTML = `<span style="display:inline-block; width: 25px; color: #ffcc00;">▶</span><span style="color: #ffcc00;">NO</span>`;
+            }
+        };
+
+        aggiornaCursoreScelta();
+
+        const handleChoiceInput = (e) => {
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'ArrowDown' || e.key === 's') {
+                this.sceltaAttuale = this.sceltaAttuale === 0 ? 1 : 0;
+                aggiornaCursoreScelta();
+            } else if (e.key === 'Enter' || e.key === ' ') {
+                window.removeEventListener('keydown', handleChoiceInput);
+                onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO');
+            }
+        };
+
+        setTimeout(() => {
+            window.addEventListener('keydown', handleChoiceInput);
+        }, 100);
+    }
+
+    leggiCartello() {
+        if (this.isDialogActive) return;
+        this.isDialogActive = true;
+
+        this.createDialogUI();
+
+        this.mostraTestiDialogo([
+            "BENVENUTO NELLA MODALITÀ PVE!", 
+            "Qui puoi esplorare l'erba alta per trovare Pokémon selvatici...", 
+            "Oppure sfidare gli allenatori presenti per allenare la tua squadra.", 
+            "Trova l'uscita alla fine del percorso per completare l'area!"
+        ], () => {
+            this.chiudiDialogo();
+            this.time.delayedCall(100, () => { this.isDialogActive = false; });
+        });
+    }
+}
+
+// ==============================================================================
 // PARTE 3: CONFIGURAZIONE PHASER
 // ==============================================================================
 const config = {
@@ -2118,6 +3028,6 @@ const config = {
     roundPixels: true,
     dom: { createContainer: true },
     physics: { default: 'arcade', arcade: { gravity: { y: 0 } } },
-    scene: [BootScene, LoginScene, StarterScene, WorldScene, BattleScene]
+    scene: [BootScene, LoginScene, StarterScene, WorldScene, PVEScene, BattleScene]
 };
 new Phaser.Game(config);

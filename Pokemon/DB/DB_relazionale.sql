@@ -11,7 +11,7 @@ CREATE TABLE public.profilo (
     partite_totali INT DEFAULT 0,
     vittorie_totali INT DEFAULT 0,
     coord_x DECIMAL(8, 2) DEFAULT 0.00,
-    coord_y DECIMAL(8, 2) DEFAULT 0.00
+    coord_y DECIMAL(8, 2) DEFAULT 0.00a_base'
 );
 
 -- 2. ENTITÀ PARTITA
