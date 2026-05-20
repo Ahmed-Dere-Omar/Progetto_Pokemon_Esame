@@ -32,6 +32,8 @@ class gestionePartita {
 
         if (this.p1.attivoIdx === undefined) this.p1.attivoIdx = 0;
         if (this.p2.attivoIdx === undefined) this.p2.attivoIdx = 0;
+        this.p1.haFuggito = false;
+        this.p2.haFuggito = false;
 
         // Supporto per Barriere, Trappole e Meteo
         this.p1.effetti = {};
@@ -55,6 +57,17 @@ class gestionePartita {
         this.logs.length = 0; 
         this.statiTurno = {}; 
         
+        // 0. Controlla subito le fughe PvP e forza il termine
+        let haFuggitoQualcuno = false;
+        if (azioneP1 && azioneP1.tipo === 'flee') { this.p1.haFuggito = true; this.logs.push(`L'allenatore si arrende e ritira ${this.p1.squadra[this.p1.attivoIdx].nome}!`); haFuggitoQualcuno = true; }
+        if (azioneP2 && azioneP2.tipo === 'flee') { this.p2.haFuggito = true; this.logs.push(`L'allenatore si arrende e ritira ${this.p2.squadra[this.p2.attivoIdx].nome}!`); haFuggitoQualcuno = true; }
+
+        if (haFuggitoQualcuno) {
+            this.finito = true;
+            this.logs.push("La partita è terminata!");
+            return this.ottieniStatoAggiornato();
+        }
+
         // Reset flag di inizio turno per tentennamenti e protezioni
         [this.p1, this.p2].forEach(p => {
             let pk = p.squadra[p.attivoIdx];
@@ -755,8 +768,8 @@ class gestionePartita {
     }
 
     controllaFinePartita() {
-        const p1Perso = this.p1.squadra.every(p => p.hp <= 0);
-        const p2Perso = this.p2.squadra.every(p => p.hp <= 0);
+        const p1Perso = this.p1.squadra.every(p => p.hp <= 0) || this.p1.haFuggito;
+        const p2Perso = this.p2.squadra.every(p => p.hp <= 0) || this.p2.haFuggito;
 
         if (p1Perso || p2Perso) {
             this.finito = true;
@@ -787,7 +800,8 @@ class gestionePartita {
                 trasformato: !!(p1Pk.statiVolatili && p1Pk.statiVolatili.trasformato),
                 mossaForzata: this.getMossaForzata(p1Pk),
                 attivoIdx: this.p1.attivoIdx,
-                squadra: teamP1
+                squadra: teamP1,
+                sconfitto: this.p1.squadra.every(p => p.hp <= 0) || this.p1.haFuggito
             },
             p2: {
                 hp: p2Pk.hp,
@@ -796,7 +810,8 @@ class gestionePartita {
                 trasformato: !!(p2Pk.statiVolatili && p2Pk.statiVolatili.trasformato),
                 mossaForzata: this.getMossaForzata(p2Pk),
                 attivoIdx: this.p2.attivoIdx,
-                squadra: teamP2
+                squadra: teamP2,
+                sconfitto: this.p2.squadra.every(p => p.hp <= 0) || this.p2.haFuggito
             },
             logs: this.logs,
             finito: this.finito,

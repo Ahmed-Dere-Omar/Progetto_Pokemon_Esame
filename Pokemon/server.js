@@ -151,6 +151,7 @@ io.on('connection', (socket) => {
 
             let buildAzione = (raw) => {
                 if (raw.tipo === 'switch') return raw;
+                if (raw.tipo === 'flee') return raw;
                 return { mossa: moveDB[raw.moveName] || moveDB["Scontro"] };
             };
 

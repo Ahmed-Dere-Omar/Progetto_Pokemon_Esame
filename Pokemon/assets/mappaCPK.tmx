@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.12.1" orientation="orthogonal" renderorder="right-down" width="10" height="10" tilewidth="16" tileheight="16" infinite="0" nextlayerid="5" nextobjectid="3">
+ <properties>
+  <property name="collides" type="bool" value="true"/>
+ </properties>
+ <tileset firstgid="1" name="a" tilewidth="16" tileheight="16" spacing="1" tilecount="1316" columns="28">
+  <image source="a.png" trans="ff00ff" width="477" height="800"/>
+ </tileset>
+ <tileset firstgid="1317" name="e" tilewidth="16" tileheight="16" spacing="1" tilecount="5330" columns="82">
+  <image source="e.png" trans="ff00ff" width="1408" height="1104"/>
+ </tileset>
+ <tileset firstgid="6647" name="d" tilewidth="16" tileheight="16" tilecount="12288" columns="192">
+  <image source="d.png" trans="ff00ff" width="3072" height="1024"/>
+ </tileset>
+ <layer id="1" name="Sfondo" width="10" height="10">
+  <data encoding="csv">
+6817,6817,6817,6817,6817,6817,6817,6817,6817,6817,
+6817,6817,6817,6817,6817,6817,6817,6817,0,6817,
+6817,6817,6817,6817,6817,6817,6817,6817,8639,6817,
+6817,6817,6817,6817,6817,6817,6817,6817,6817,6817,
+6817,6817,6817,6817,8351,8351,6817,8351,8351,8351,
+6817,6817,8351,8351,8351,8351,8351,8351,8351,8351,
+6817,6817,8351,7967,7968,7969,7970,8351,8351,8351,
+7971,6817,8351,8159,8160,8161,8162,8351,6817,7589,
+6817,6817,8351,8351,8352,8353,8354,8351,8351,8351,
+6817,6817,7589,8351,6818,6819,8351,7971,8351,8351
+</data>
+ </layer>
+ <objectgroup id="2" name="Interazioni">
+  <object id="1" name="PC" x="128.5" y="10.75" width="14.75" height="21.75"/>
+  <object id="2" name="Porta Inizio" x="64" y="144" width="31.5" height="15"/>
+ </objectgroup>
+ <layer id="3" name="Erba" width="10" height="10">
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0
+</data>
+ </layer>
+ <layer id="4" name="Ostacoli" width="10" height="10">
+  <data encoding="csv">
+7007,9312,11042,11043,11044,9312,9313,7008,7011,7014,
+7199,8543,11234,11235,11236,7202,8544,7200,8447,7206,
+7391,8735,11620,11621,11621,11622,8736,7392,0,7398,
+0,8927,11813,11813,11813,11813,8928,0,0,0,
+0,0,0,0,0,0,0,0,0,7009,
+7780,7781,0,0,0,0,0,0,0,7201,
+7972,7973,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+8933,0,0,0,0,0,0,0,8164,8165,
+9125,0,0,0,0,0,0,0,8356,8357
+</data>
+ </layer>
+</map>

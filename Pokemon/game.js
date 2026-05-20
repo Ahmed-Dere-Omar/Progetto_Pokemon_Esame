@@ -66,6 +66,8 @@ class BootScene extends Phaser.Scene {
 
         this.load.tilemapTiledJSON('map', 'assets/mappa.tmj');
         this.load.tilemapTiledJSON('mapPVE', 'assets/mappaPVE.tmj');
+        this.load.tilemapTiledJSON('mapPvP', 'assets/mappaPvP.tmj');
+        this.load.tilemapTiledJSON('mapCPK', 'assets/mappaCPK.tmj');
         this.load.image('tilesA', 'assets/a.png');
         this.load.image('tilesE', 'assets/e.png');
         this.load.image('tilesC', 'assets/c.png');
@@ -413,7 +415,7 @@ class StarterScene extends Phaser.Scene {
     init(data) {
         this.user = data.user;
         this.playerName = data.name;
-        this.starters = data.starters; // Riceviamo i 3 pokemon creati nel login
+        this.starters = data.starters;
     }
 
     create() {
@@ -457,8 +459,10 @@ class StarterScene extends Phaser.Scene {
 // 3. WORLD SCENE: Mappa e Multiplayer
 class WorldScene extends Phaser.Scene {
     constructor() { super({ key: 'WorldScene' }); }
-    init(data) { this.myPlayerName = data.name; }
-
+    init(data) {
+        this.myPlayerName = data.name;
+        this.vengoDa = data.vengoDa; // Registra da quale porta stai uscendo
+    }
     create() {
         this.player = null;
         this.playerNameText = null;
@@ -467,13 +471,12 @@ class WorldScene extends Phaser.Scene {
 
         this.setupMap();
         this.setupAnimations();
-        this.setupNetwork();
         this.setupNPCs();
+        this.setupPlayer(); // Multiplayer rimosso: carica solo il giocatore locale
 
         this.cursors = this.input.keyboard.createCursorKeys();
         this.enterKey = this.input.keyboard.addKey('ENTER');
 
-        // NUOVO: Aggiungiamo il tasto ESC e il controllo della pausa
         this.escKey = this.input.keyboard.addKey('ESC');
         this.isPaused = false;
         this.pauseMenuDom = null;
@@ -489,13 +492,6 @@ class WorldScene extends Phaser.Scene {
             this.canEncounter = false;
             setTimeout(() => { this.canEncounter = true; }, 1500);
             this.registry.set('lastBattleResult', null);
-        });
-
-        this.events.on('shutdown', () => {
-            if (this.socket) {
-                this.socket.disconnect();
-                this.socket = null;
-            }
         });
     }
 
@@ -545,39 +541,7 @@ class WorldScene extends Phaser.Scene {
         this.physics.add.collider(this.npc, this.wallLayer);
     }
 
-    setupNetwork() {
-        this.otherPlayers = this.physics.add.group();
-        this.socket = io();
-        this.socket.emit('joinGame', this.myPlayerName);
 
-        this.socket.on('currentPlayers', (players) => {
-            Object.values(players).forEach(p => p.playerId === this.socket.id ? this.addPlayer(p) : this.addOtherPlayer(p));
-        });
-        this.socket.on('newPlayer', (p) => this.addOtherPlayer(p));
-        this.socket.on('playerDisconnected', (id) => {
-            this.otherPlayers.getChildren().forEach(op => {
-                if (op.playerId === id) { op.nameText.destroy(); op.destroy(); }
-            });
-        });
-        this.socket.on('playerMoved', (p) => {
-            this.otherPlayers.getChildren().forEach(op => {
-                if (op.playerId === p.playerId) {
-                    op.setPosition(p.x, p.y);
-                    op.nameText.setPosition(p.x, p.y - 15);
-                    p.anim ? op.anims.play(p.anim, true) : op.anims.stop();
-                }
-            });
-        });
-
-        this.socket.on('challengeReceived', (id) => this.socket.emit('acceptChallenge', id));
-        this.socket.on('opponentBusy', () => window.showBanner("Questo allenatore è già impegnato!"));
-
-        this.socket.on('startPvP', (data) => {
-            data.socket = this.socket;
-            data.isWild = false;
-            this.startEncounter(data, "SFIDA PVP!");
-        });
-    }
 
     setupAnimations() {
         if (!this.anims.exists('down')) {
@@ -587,30 +551,32 @@ class WorldScene extends Phaser.Scene {
         }
     }
 
-    addPlayer(info) {
-        let startX = Math.floor(info.x / 16) * 16 + 8;
-        let startY = Math.floor(info.y / 16) * 16 + 8;
+    setupPlayer() {
+        let startX = 64;
+        let startY = 64;
+        let startAnim = 'down';
+
+        if (this.vengoDa && this.zoneInterattive) {
+            let porta = this.zoneInterattive.find(z => z.nomeInterazione === this.vengoDa);
+            if (porta) {
+                startX = porta.x + (porta.width || 16) / 2;
+                startY = porta.y + 32;
+                startAnim = 'down';
+            }
+        }
 
         this.player = this.physics.add.sprite(startX, startY, 'player').setCollideWorldBounds(true);
         this.player.setScale(0.5);
         this.player.body.setSize(32, 32).setOffset(16, 32);
+        this.player.setDepth(10);
+
+        this.player.anims.play(startAnim, true);
+        this.player.anims.stop();
 
         this.physics.add.collider(this.player, this.wallLayer);
-        this.physics.add.collider(this.player, this.npc);
-        this.playerNameText = this.createNameTag(startX, startY, info.name);
+        if (this.npc) this.physics.add.collider(this.player, this.npc);
 
         this.cameras.main.startFollow(this.player, true).setZoom(4).setBounds(0, 0, this.mapWidth, this.mapHeight);
-    }
-
-    addOtherPlayer(info) {
-        let op = this.add.sprite(info.x, info.y, 'player');
-        op.playerId = info.playerId;
-        op.nameText = this.createNameTag(info.x, info.y, info.name);
-        this.otherPlayers.add(op);
-    }
-
-    createNameTag(x, y, name) {
-        return this.add.text(x, y-15, name, { fontSize: '10px', fill: '#3E1E68' }).setOrigin(0.5, 1);
     }
 
     update() {
@@ -618,91 +584,74 @@ class WorldScene extends Phaser.Scene {
             this.togglePauseMenu();
         }
 
-        // Se siamo bloccati in menu, transizioni o il player sta GIÀ camminando, fermiamo l'update
         if (this.isTransitioning || !this.player || this.isPaused || this.pcOpen || this.isMovingGrid || this.isDialogActive) return;
 
-        // LA SALVEZZA: Definiamo la grandezza dei passi direttamente qui!
-        const TILE_SIZE = 16; 
-        
+        const TILE_SIZE = 16;
+
         let currentAnim = null;
         let dx = 0;
         let dy = 0;
 
-        // 1. Lettura Tasti
         if (this.cursors.left.isDown) { dx = -TILE_SIZE; currentAnim = 'left'; }
         else if (this.cursors.right.isDown) { dx = TILE_SIZE; currentAnim = 'right'; }
         else if (this.cursors.up.isDown) { dy = -TILE_SIZE; currentAnim = 'up'; }
         else if (this.cursors.down.isDown) { dy = TILE_SIZE; currentAnim = 'down'; }
 
-        // 2. Movimento
         if (dx !== 0 || dy !== 0) {
             let targetX = this.player.x + dx;
             let targetY = this.player.y + dy;
 
             this.player.anims.play(currentAnim, true);
 
-            // Controlli di sicurezza per evitare di calpestare cose che non esistono
             let isOutOfBounds = targetX < 0 || targetX >= this.mapWidth || targetY < 0 || targetY >= this.mapHeight;
             let ostacolo = this.wallLayer.getTileAtWorldXY(targetX, targetY, true);
             let isWall = (ostacolo && ostacolo.index !== -1);
             let isNpc = this.npc ? Phaser.Math.Distance.Between(targetX, targetY, this.npc.x, this.npc.y) < 16 : false;
 
-            // Se la via è libera...
             if (!isWall && !isNpc && !isOutOfBounds) {
-                this.isMovingGrid = true; // Blocca altri input
-                
-                if (this.socket) {
-                    this.socket.emit('playerMovement', { x: targetX, y: targetY, anim: currentAnim });
-                }
+                this.isMovingGrid = true;
 
-                // TWEEN SICURO: Anima solo il player, il nome lo segue frame per frame
                 this.tweens.add({
                     targets: this.player,
                     x: targetX,
                     y: targetY,
-                    duration: 250, // 250ms = camminata classica fluida e scattante
-                    onUpdate: () => {
-                        // Trascina il nome in modo sicuro durante l'animazione
-                        if (this.playerNameText) {
-                            this.playerNameText.setPosition(this.player.x, this.player.y - 15);
-                        }
-                    },
+                    duration: 250,
                     onComplete: () => {
-                        this.isMovingGrid = false; // Sblocca gli input
-                        this.player.anims.stop(); // Ferma le gambine
-                        
-                        // Controllo Erba Alta a passo finito
+                        this.isMovingGrid = false;
+                        this.player.anims.stop();
+
                         let grassTile = this.grassLayer.getTileAtWorldXY(targetX, targetY, true);
                         if (this.canEncounter && grassTile && grassTile.index !== -1) {
-                            if (Phaser.Math.Between(1, 100) <= 5) { // 5% di probabilità
-                                this.startEncounter({ isWild: true, socket: this.socket }, "POKÉMON SELVATICO!");
+                            if (Phaser.Math.Between(1, 100) <= 5) {
+                                this.startEncounter({ isWild: true }, "POKÉMON SELVATICO!");
                             }
                             this.canEncounter = false;
                             this.time.delayedCall(250, () => this.canEncounter = true);
                         }
 
-                        // Controllo porte automatiche calpestate
                         if (this.zoneInterattive && !this.isDialogActive && !this.isTransitioning) {
                             let interazioneCalpestata = this.zoneInterattive.find(z => Phaser.Math.Distance.Between(this.player.x, this.player.y, z.x + (z.width || 0) / 2, z.y + (z.height || 0) / 2) < 20);
-                            if (interazioneCalpestata && interazioneCalpestata.nomeInterazione === 'Porta PVE') {
-                                this.gestisciPortaPVE();
+                            if (interazioneCalpestata) {
+                                if (interazioneCalpestata.nomeInterazione === 'Porta PVE') {
+                                    this.gestisciPortaPVE();
+                                } else if (interazioneCalpestata.nomeInterazione === 'Porta PVP') {
+                                    this.gestisciPortaPvP();
+                                } else if (interazioneCalpestata.nomeInterazione === 'Porta Centro') {
+                                    this.gestisciPortaCPK();
+                                }
                             }
                         }
                     }
                 });
             } else {
-                // Sbatte contro un muro e si ferma sul posto
-                this.player.anims.stop(); 
+                this.player.anims.stop();
             }
         } else {
-            // Se rilascio il tasto
             this.player.anims.stop();
         }
 
-        // --- 3. INTERAZIONI TASTO INVIO ---
         if (Phaser.Input.Keyboard.JustDown(this.enterKey) && !this.isTransitioning && !this.isDialogActive) {
-            
-            // Cerca un PC o altre interazioni vicine
+
             if (this.zoneInterattive) {
                 let interazioneVicino = this.zoneInterattive.find(z => Phaser.Math.Distance.Between(this.player.x, this.player.y, z.x + (z.width || 0) / 2, z.y + (z.height || 0) / 2) < 40);
                 if (interazioneVicino) {
@@ -718,20 +667,13 @@ class WorldScene extends Phaser.Scene {
                 }
             }
 
-            // Cerca un NPC vicino
             if (this.npc) {
                 let distToNpc = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.npc.x, this.npc.y);
                 if (distToNpc < 50) {
                     this.player.anims.stop();
-                    this.startEncounter({ isWild: true, isNPC: true, socket: this.socket }, "SFIDA CONTRO NPC!");
+                    this.startEncounter({ isWild: true, isNPC: true }, "SFIDA CONTRO NPC!");
                     return;
                 }
-            }
-
-            // Cerca altri giocatori per il PvP
-            if (this.otherPlayers && this.otherPlayers.getChildren) {
-                let closest = this.otherPlayers.getChildren().find(op => Phaser.Math.Distance.Between(this.player.x, this.player.y, op.x, op.y) < 150);
-                if (closest && this.socket) this.socket.emit('challengePlayer', closest.playerId);
             }
         }
     }
@@ -758,10 +700,10 @@ class WorldScene extends Phaser.Scene {
             this.createDialogUI();
 
             // 3. Mostra i testi in sequenza
-            let dialoghi = hasSave 
-                ? ["Hai un salvataggio in corso nella modalità PvE.", "Vuoi riprendere la tua avventura?"] 
+            let dialoghi = hasSave
+                ? ["Hai un salvataggio in corso nella modalità PvE.", "Vuoi riprendere la tua avventura?"]
                 : ["Benvenuto nella modalità PvE!", "Vuoi iniziare una nuova avventura?"];
-            
+
             this.mostraTestiDialogo(dialoghi, () => {
                 this.mostraSceltaSiNo((scelta) => {
                     this.chiudiDialogo();
@@ -801,7 +743,7 @@ class WorldScene extends Phaser.Scene {
             container.style.flexDirection = 'column';
             container.style.justifyContent = 'flex-start';
             container.style.boxShadow = '0px 10px 20px rgba(0,0,0,0.8)';
-            
+
             let textEl = document.createElement('div');
             textEl.id = 'dialog-ui-text';
             textEl.style.color = '#ffffff';
@@ -828,12 +770,12 @@ class WorldScene extends Phaser.Scene {
     mostraTestiDialogo(testi, onComplete) {
         let index = 0;
         let textEl = document.getElementById('dialog-ui-text');
-        
+
         const mostraProssimo = () => {
             if (index < testi.length) {
                 textEl.innerHTML = testi[index] + '<span style="color:#ffcc00;"> ▼</span>';
                 index++;
-                
+
                 setTimeout(() => {
                     const handleEnter = (e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
@@ -890,10 +832,10 @@ class WorldScene extends Phaser.Scene {
             choiceContainer.appendChild(optNo);
             document.body.appendChild(choiceContainer);
         }
-        
+
         choiceContainer.style.display = 'flex';
         this.sceltaAttuale = 0; // 0 = SÌ, 1 = NO
-        
+
         const aggiornaCursoreScelta = () => {
             let optSi = document.getElementById('dialog-opt-si');
             let optNo = document.getElementById('dialog-opt-no');
@@ -930,7 +872,7 @@ class WorldScene extends Phaser.Scene {
         this.createDialogUI();
 
         this.mostraTestiDialogo([
-            "BENVENUTO A NEOMON!", 
+            "BENVENUTO A NEOMON!",
             "Esplora la mappa, incontra altri giocatori e preparati per l'avventura.",
             "Usa il PC per gestire la tua squadra."
         ], () => {
@@ -939,9 +881,31 @@ class WorldScene extends Phaser.Scene {
         });
     }
 
-    async avviaPVE(hasSave) {
+    gestisciPortaPvP() {
+        if (this.isDialogActive) return;
+        this.isDialogActive = true;
+        this.player.body.setVelocity(0);
+        this.player.anims.stop();
+
+        this.createDialogUI();
+
+        this.mostraTestiDialogo(["Vuoi entrare nell'Arena PvP? ▼"], () => {
+            this.mostraSceltaSiNo((scelta) => {
+                this.chiudiDialogo();
+                if (scelta === 'SI') {
+                    this.avviaPvP();
+                } else {
+                    this.time.delayedCall(100, () => {
+                        this.isDialogActive = false;
+                    });
+                }
+            });
+        });
+    }
+
+    avviaPvP() {
         this.isTransitioning = true;
-        
+
         let overlay = document.createElement('div');
         overlay.style.position = 'absolute';
         overlay.style.top = '0';
@@ -953,7 +917,85 @@ class WorldScene extends Phaser.Scene {
         overlay.style.justifyContent = 'center';
         overlay.style.alignItems = 'center';
         overlay.style.zIndex = '9999';
-        
+
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 3rem; color: #fff;">CARICAMENTO ARENA PVP...</h1>`;
+        document.getElementById('game-container').appendChild(overlay);
+
+        setTimeout(() => {
+            if (overlay) overlay.remove();
+            this.isTransitioning = false;
+            this.isDialogActive = false;
+
+            this.scene.stop('WorldScene');
+            this.scene.start('PvPScene', { name: this.myPlayerName, user: this.registry.get('playerProfile') });
+        }, 1000);
+    }
+
+    gestisciPortaCPK() {
+        if (this.isDialogActive) return;
+        this.isDialogActive = true;
+        this.player.body.setVelocity(0);
+        this.player.anims.stop();
+
+        this.createDialogUI();
+
+        this.mostraTestiDialogo(["Vuoi entrare nel Centro Pokémon? ▼"], () => {
+            this.mostraSceltaSiNo((scelta) => {
+                this.chiudiDialogo();
+                if (scelta === 'SI') {
+                    this.avviaCPK();
+                } else {
+                    this.time.delayedCall(100, () => {
+                        this.isDialogActive = false;
+                    });
+                }
+            });
+        });
+    }
+
+    avviaCPK() {
+        this.isTransitioning = true;
+
+        let overlay = document.createElement('div');
+        overlay.style.position = 'absolute';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.backgroundColor = '#000';
+        overlay.style.display = 'flex';
+        overlay.style.justifyContent = 'center';
+        overlay.style.alignItems = 'center';
+        overlay.style.zIndex = '9999';
+
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 3rem; color: #fff;">CARICAMENTO CENTRO POKÉMON...</h1>`;
+        document.getElementById('game-container').appendChild(overlay);
+
+        setTimeout(() => {
+            if (overlay) overlay.remove();
+            this.isTransitioning = false;
+            this.isDialogActive = false;
+
+            this.scene.stop('WorldScene');
+            this.scene.start('CPKScene', { name: this.myPlayerName, user: this.registry.get('playerProfile') });
+        }, 1000);
+    }
+
+    async avviaPVE(hasSave) {
+        this.isTransitioning = true;
+
+        let overlay = document.createElement('div');
+        overlay.style.position = 'absolute';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.backgroundColor = '#000';
+        overlay.style.display = 'flex';
+        overlay.style.justifyContent = 'center';
+        overlay.style.alignItems = 'center';
+        overlay.style.zIndex = '9999';
+
         overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 3rem; color: #fff;">CARICAMENTO PVE...</h1>`;
         document.getElementById('game-container').appendChild(overlay);
 
@@ -970,10 +1012,10 @@ class WorldScene extends Phaser.Scene {
         }
 
         setTimeout(() => {
-            if(overlay) overlay.remove();
+            if (overlay) overlay.remove();
             this.isTransitioning = false;
             this.isDialogActive = false;
-            
+
             this.scene.stop('WorldScene');
             this.scene.start('PVEScene', { name: this.myPlayerName, user: this.registry.get('playerProfile') });
         }, 1000);
@@ -981,20 +1023,17 @@ class WorldScene extends Phaser.Scene {
 
     togglePauseMenu() {
         if (this.isPaused) {
-            // Se è in pausa, distruggiamo il div HTML e riprendiamo il gioco
             this.isPaused = false;
             let existingMenu = document.getElementById('pause-menu-overlay');
             if (existingMenu) existingMenu.remove();
         } else {
-            // Attiva la pausa e ferma il giocatore
             this.isPaused = true;
             this.player.body.setVelocity(0);
             this.player.anims.stop();
 
-            // Creiamo il contenitore HTML bypassando Phaser
             let overlay = document.createElement('div');
             overlay.id = 'pause-menu-overlay';
-            overlay.className = 'modal-overlay'; // Usiamo lo stesso magico blur del PC!
+            overlay.className = 'modal-overlay';
 
             const renderMainPause = () => {
                 overlay.innerHTML = `
@@ -1007,19 +1046,12 @@ class WorldScene extends Phaser.Scene {
             };
 
             renderMainPause();
-
-            // Lo incolliamo fisicamente sopra al canvas di gioco
             document.getElementById('game-container').appendChild(overlay);
 
-            // Gestiamo il click nativo sul tasto ESCI
             overlay.addEventListener('click', async (e) => {
                 if (e.target.id === 'logout-btn') {
                     e.target.innerText = "USCITA IN CORSO...";
-
-                    // Disconnette l'utente da Supabase
                     await supabaseClient.auth.signOut();
-
-                    // Riavvia l'intera pagina pulendo tutto
                     window.location.reload();
                 } else if (e.target.id === 'profile-btn') {
                     let profilo = this.registry.get('playerProfile');
@@ -1029,7 +1061,6 @@ class WorldScene extends Phaser.Scene {
                             <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">PROFILO ALLENATORE</h2>
                             <div style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; border: 2px solid #ff7477; width: 85%; text-align: left; color: #fff; font-family: 'Courier New', monospace; font-size: 1.2rem;">
                                 <p style="margin: 10px 0;"><strong>NOME:</strong> ${profilo.username || 'Sconosciuto'}</p>
-                                <p style="margin: 10px 0;"><strong>ID:</strong> ${profilo.id_profilo ? profilo.id_profilo.substring(0,8).toUpperCase() : '---'}</p>
                                 <p style="margin: 10px 0;"><strong>VITTORIE:</strong> ${profilo.vittorie || 0}</p>
                                 <p style="margin: 10px 0;"><strong>PARTITE GIOCATE:</strong> ${profilo.partite_giocate || 0}</p>
                             </div>
@@ -1446,7 +1477,7 @@ class WorldScene extends Phaser.Scene {
         document.getElementById('game-container').appendChild(overlay);
 
         setTimeout(() => {
-            if(overlay) overlay.remove();
+            if (overlay) overlay.remove();
             this.isTransitioning = false;
             this.isDialogActive = false;
             this.scene.pause();
@@ -1467,6 +1498,935 @@ class WorldScene extends Phaser.Scene {
 }
 
 // ==============================================================================
+// CPK SCENE: Centro Pokémon
+// ==============================================================================
+class CPKScene extends Phaser.Scene {
+    constructor() { super({ key: 'CPKScene' }); }
+    init(data) {
+        this.myPlayerName = data.name;
+        this.user = data.user;
+    }
+
+    create() {
+        this.player = null;
+        this.isMovingGrid = false;
+
+        this.setupMap();
+        this.setupNPCs();
+
+        let startX = 80;
+        let startY = 140;
+        if (this.zoneInterattive) {
+            let startZone = this.zoneInterattive.find(z => z.nomeInterazione === 'Porta Inizio');
+            if (startZone) {
+                startX = startZone.x + (startZone.width || 16) / 2;
+                startY = startZone.y - 16; // Appare leggermente sopra la porta
+            }
+        }
+
+        this.setupPlayer(startX, startY);
+
+        if (!this.anims.exists('down')) {
+            ['down', 'left', 'right', 'up'].forEach((key, i) => {
+                this.anims.create({ key, frames: this.anims.generateFrameNumbers('player', { start: i * 4, end: i * 4 + 3 }), frameRate: 10, repeat: -1 });
+            });
+        }
+
+        this.cursors = this.input.keyboard.createCursorKeys();
+        this.enterKey = this.input.keyboard.addKey('ENTER');
+        this.escKey = this.input.keyboard.addKey('ESC');
+
+        this.isPaused = false;
+        this.isDialogActive = false;
+        this.isTransitioning = false;
+        this.pcOpen = false;
+    }
+
+    setupMap() {
+        const map = this.make.tilemap({ key: 'mapCPK' });
+
+        // Omesso margin e spacing: Phaser li leggerà direttamente dal file .tmj per allinearli in modo perfetto!
+        const tilesetA = map.addTilesetImage('a', 'tilesA');
+        const tilesetE = map.addTilesetImage('e', 'tilesE');
+        const tilesetD = map.addTilesetImage('d', 'tilesD');
+
+        const allTilesets = [tilesetA, tilesetD, tilesetE];
+
+        map.createLayer('Sfondo', allTilesets, 0, 0);
+        map.createLayer('Erba', allTilesets, 0, 0);
+        this.wallLayer = map.createLayer('Ostacoli', allTilesets, 0, 0);
+
+        this.mapWidth = map.widthInPixels;
+        this.mapHeight = map.heightInPixels;
+        this.physics.world.setBounds(0, 0, this.mapWidth, this.mapHeight);
+
+        this.wallLayer.setCollisionByExclusion([-1]);
+
+        this.zoneInterattive = [];
+        const objLayer = map.getObjectLayer('Interazioni');
+        if (objLayer && objLayer.objects) {
+            objLayer.objects.forEach(obj => {
+                let zone = this.add.zone(obj.x, obj.y, obj.width, obj.height).setOrigin(0);
+                zone.nomeInterazione = obj.name;
+                this.zoneInterattive.push(zone);
+            });
+        }
+    }
+
+    setupNPCs() {
+        // Crea solo l'NPC di sinistra (assicurati che le coordinate x e y combacino con la tua mappa)
+        this.npc = this.physics.add.sprite(64, 30, 'allenatore').setScale(1).setImmovable(true);
+        this.physics.add.collider(this.npc, this.wallLayer);
+    }
+
+    setupPlayer(startX, startY) {
+        this.player = this.physics.add.sprite(startX, startY, 'player').setCollideWorldBounds(true);
+        this.player.setScale(0.5);
+        this.player.body.setSize(32, 32).setOffset(16, 32);
+
+        this.physics.add.collider(this.player, this.wallLayer);
+        this.cameras.main.startFollow(this.player, true).setZoom(4).setBounds(0, 0, this.mapWidth, this.mapHeight);
+    }
+
+    update() {
+        if (Phaser.Input.Keyboard.JustDown(this.escKey) && !this.isTransitioning && !this.pcOpen) {
+            this.togglePauseMenu();
+        }
+
+        if (this.isTransitioning || !this.player || this.isPaused || this.pcOpen || this.isMovingGrid || this.isDialogActive) return;
+
+        const TILE_SIZE = 16;
+        let currentAnim = null;
+        let dx = 0;
+        let dy = 0;
+
+        if (this.cursors.left.isDown) { dx = -TILE_SIZE; currentAnim = 'left'; }
+        else if (this.cursors.right.isDown) { dx = TILE_SIZE; currentAnim = 'right'; }
+        else if (this.cursors.up.isDown) { dy = -TILE_SIZE; currentAnim = 'up'; }
+        else if (this.cursors.down.isDown) { dy = TILE_SIZE; currentAnim = 'down'; }
+
+        if (dx !== 0 || dy !== 0) {
+            let targetX = this.player.x + dx;
+            let targetY = this.player.y + dy;
+
+            this.player.anims.play(currentAnim, true);
+
+            let isOutOfBounds = targetX < 0 || targetX >= this.mapWidth || targetY < 0 || targetY >= this.mapHeight;
+            let ostacolo = this.wallLayer.getTileAtWorldXY(targetX, targetY, true);
+            let isWall = (ostacolo && ostacolo.index !== -1);
+            let isNpc1 = this.npc ? Phaser.Math.Distance.Between(targetX, targetY, this.npc.x, this.npc.y) < 16 : false;
+
+            if (!isWall && !isNpc1 && !isOutOfBounds) {
+                this.isMovingGrid = true;
+
+                this.tweens.add({
+                    targets: this.player,
+                    x: targetX,
+                    y: targetY,
+                    duration: 250,
+                    onComplete: () => {
+                        this.isMovingGrid = false;
+                        this.player.anims.stop();
+
+                        // Controllo porta d'uscita
+                        if (this.zoneInterattive && !this.isDialogActive && !this.isTransitioning) {
+                            let interazioneCalpestata = this.zoneInterattive.find(z => Phaser.Math.Distance.Between(this.player.x, this.player.y, z.x + (z.width || 0) / 2, z.y + (z.height || 0) / 2) < 20);
+                            if (interazioneCalpestata && interazioneCalpestata.nomeInterazione === 'Porta Inizio') {
+                                this.gestisciUscita();
+                            }
+                        }
+                    }
+                });
+            } else {
+                this.player.anims.stop();
+            }
+        } else {
+            this.player.anims.stop();
+        }
+
+        if (Phaser.Input.Keyboard.JustDown(this.enterKey) && !this.isTransitioning && !this.isDialogActive) {
+            let interactionHandled = false;
+
+            if (this.npc && Phaser.Math.Distance.Between(this.player.x, this.player.y, this.npc.x, this.npc.y) < 40) {
+                this.player.anims.stop();
+                this.parlaConNPC();
+                interactionHandled = true;
+            }
+
+            if (!interactionHandled && this.zoneInterattive) {
+                let interazioneVicino = this.zoneInterattive.find(z => Phaser.Math.Distance.Between(this.player.x, this.player.y, z.x + (z.width || 0) / 2, z.y + (z.height || 0) / 2) < 40);
+                if (interazioneVicino && interazioneVicino.nomeInterazione === 'PC') {
+                    this.player.anims.stop();
+                    this.apriPC();
+                }
+            }
+        }
+    }
+
+    apriPC() {
+        this.scene.manager.getScene('WorldScene').apriPC.call(this);
+    }
+
+    parlaConNPC() {
+        if (this.isDialogActive) return;
+        this.isDialogActive = true;
+        this.createDialogUI();
+
+        this.mostraTestiDialogo([
+            "Benvenuto al Centro Pokémon!",
+            "I tuoi Pokémon vengono curati completamente in automatico dopo ogni lotta.",
+            "Usa il PC per gestire e organizzare la tua squadra.",
+        ], () => {
+            this.chiudiDialogo();
+            this.time.delayedCall(100, () => { this.isDialogActive = false; });
+        });
+    }
+
+    gestisciUscita() {
+        if (this.isDialogActive) return;
+        this.isDialogActive = true;
+        this.player.body.setVelocity(0);
+        this.player.anims.stop();
+
+        this.createDialogUI();
+
+        this.mostraTestiDialogo(["Vuoi tornare alla Lobby? ▼"], () => {
+            this.mostraSceltaSiNo((scelta) => {
+                this.chiudiDialogo();
+                if (scelta === 'SI') {
+                    this.tornaAllaLobby();
+                } else {
+                    this.time.delayedCall(100, () => {
+                        this.isDialogActive = false;
+                        this.player.y -= 16; // Allontana di un passo per non re-innescare il tap
+                    });
+                }
+            });
+        });
+    }
+
+    mostraSceltaSiNo(onChoice) {
+        let choiceContainer = document.getElementById('dialog-choice-container');
+        if (!choiceContainer) {
+            choiceContainer = document.createElement('div');
+            choiceContainer.id = 'dialog-choice-container';
+            choiceContainer.style.position = 'fixed';
+            choiceContainer.style.bottom = '175px';
+            choiceContainer.style.left = '50%';
+            choiceContainer.style.transform = 'translateX(250px)';
+            choiceContainer.style.width = '150px';
+            choiceContainer.style.backgroundColor = '#2b2b2b';
+            choiceContainer.style.border = '4px solid #d05050';
+            choiceContainer.style.boxSizing = 'border-box';
+            choiceContainer.style.padding = '15px';
+            choiceContainer.style.zIndex = '999999';
+            choiceContainer.style.display = 'flex';
+            choiceContainer.style.flexDirection = 'column';
+            choiceContainer.style.gap = '15px';
+            choiceContainer.style.boxShadow = '0px 10px 20px rgba(0,0,0,0.8)';
+
+            let optSi = document.createElement('div');
+            optSi.id = 'dialog-opt-si';
+            optSi.style.color = '#ffffff';
+            optSi.style.fontFamily = '"Courier New", Courier, monospace';
+            optSi.style.fontSize = '26px';
+            optSi.style.fontWeight = 'bold';
+            optSi.style.textShadow = '2px 2px 0 #000';
+
+            let optNo = document.createElement('div');
+            optNo.id = 'dialog-opt-no';
+            optNo.style.color = '#ffffff';
+            optNo.style.fontFamily = '"Courier New", Courier, monospace';
+            optNo.style.fontSize = '26px';
+            optNo.style.fontWeight = 'bold';
+            optNo.style.textShadow = '2px 2px 0 #000';
+
+            choiceContainer.appendChild(optSi);
+            choiceContainer.appendChild(optNo);
+            document.body.appendChild(choiceContainer);
+        }
+
+        choiceContainer.style.display = 'flex';
+        this.sceltaAttuale = 0;
+
+        const aggiornaCursoreScelta = () => {
+            let optSi = document.getElementById('dialog-opt-si');
+            let optNo = document.getElementById('dialog-opt-no');
+            if (this.sceltaAttuale === 0) {
+                optSi.innerHTML = `<span style="display:inline-block; width: 25px; color: #ffcc00;">▶</span><span style="color: #ffcc00;">SÌ</span>`;
+                optNo.innerHTML = `<span style="display:inline-block; width: 25px;"></span><span style="color: #ffffff;">NO</span>`;
+            } else {
+                optSi.innerHTML = `<span style="display:inline-block; width: 25px;"></span><span style="color: #ffffff;">SÌ</span>`;
+                optNo.innerHTML = `<span style="display:inline-block; width: 25px; color: #ffcc00;">▶</span><span style="color: #ffcc00;">NO</span>`;
+            }
+        };
+        aggiornaCursoreScelta();
+        const handleChoiceInput = (e) => {
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'ArrowDown' || e.key === 's') { this.sceltaAttuale = this.sceltaAttuale === 0 ? 1 : 0; aggiornaCursoreScelta(); }
+            else if (e.key === 'Enter' || e.key === ' ') { window.removeEventListener('keydown', handleChoiceInput); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
+        };
+        setTimeout(() => { window.addEventListener('keydown', handleChoiceInput); }, 100);
+    }
+
+    createDialogUI() {
+        let container = document.getElementById('dialog-ui-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'dialog-ui-container';
+            container.style.position = 'fixed';
+            container.style.bottom = '20px';
+            container.style.left = '50%';
+            container.style.transform = 'translateX(-50%)';
+            container.style.width = '800px';
+            container.style.height = '140px';
+            container.style.backgroundColor = '#2b2b2b';
+            container.style.border = '6px solid #d05050';
+            container.style.boxSizing = 'border-box';
+            container.style.padding = '20px 30px';
+            container.style.zIndex = '999999';
+            container.style.display = 'flex';
+            container.style.flexDirection = 'column';
+            container.style.justifyContent = 'flex-start';
+            container.style.boxShadow = '0px 10px 20px rgba(0,0,0,0.8)';
+
+            let textEl = document.createElement('div');
+            textEl.id = 'dialog-ui-text';
+            textEl.style.color = '#ffffff';
+            textEl.style.fontFamily = '"Courier New", Courier, monospace';
+            textEl.style.fontSize = '26px';
+            textEl.style.fontWeight = 'bold';
+            textEl.style.textShadow = '2px 2px 0 #000';
+            textEl.style.lineHeight = '1.3';
+            container.appendChild(textEl);
+            document.body.appendChild(container);
+        }
+        container.style.display = 'flex';
+        document.getElementById('dialog-ui-text').innerText = '';
+    }
+
+    chiudiDialogo() {
+        let container = document.getElementById('dialog-ui-container');
+        if (container) container.style.display = 'none';
+        let choiceContainer = document.getElementById('dialog-choice-container');
+        if (choiceContainer) choiceContainer.style.display = 'none';
+    }
+
+    mostraTestiDialogo(testi, onComplete) {
+        let index = 0;
+        let textEl = document.getElementById('dialog-ui-text');
+        const mostraProssimo = () => {
+            if (index < testi.length) {
+                textEl.innerHTML = testi[index].replace(' ▼', '') + '<span style="color:#ffcc00;"> ▼</span>';
+                index++;
+                setTimeout(() => {
+                    const handleEnter = (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            window.removeEventListener('keydown', handleEnter);
+                            mostraProssimo();
+                        }
+                    };
+                    window.addEventListener('keydown', handleEnter);
+                }, 100);
+            } else { if (onComplete) onComplete(); }
+        };
+        mostraProssimo();
+    }
+
+    tornaAllaLobby() {
+        this.isTransitioning = true;
+        let overlay = document.createElement('div');
+        overlay.style.position = 'absolute';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.backgroundColor = '#000';
+        overlay.style.display = 'flex';
+        overlay.style.justifyContent = 'center';
+        overlay.style.alignItems = 'center';
+        overlay.style.zIndex = '9999';
+
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 3rem; color: #fff;">TORNO ALLA LOBBY...</h1>`;
+        document.getElementById('game-container').appendChild(overlay);
+
+        setTimeout(() => {
+            if (overlay) overlay.remove();
+            this.isTransitioning = false;
+
+            this.scene.stop('CPKScene');
+            this.scene.start('WorldScene', { name: this.myPlayerName, user: this.user, vengoDa: 'Porta Centro' });
+        }, 1000);
+    }
+
+    togglePauseMenu() {
+        if (this.isPaused) {
+            this.isPaused = false;
+            let existingMenu = document.getElementById('pause-menu-overlay');
+            if (existingMenu) existingMenu.remove();
+        } else {
+            this.isPaused = true;
+            this.player.body.setVelocity(0);
+            this.player.anims.stop();
+
+            let overlay = document.createElement('div');
+            overlay.id = 'pause-menu-overlay';
+            overlay.className = 'modal-overlay';
+
+            const renderMainPause = () => {
+                overlay.innerHTML = `
+                    <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 500px; max-width: 90%;">
+                        <h2 class="text-shadows" style="font-size: 4rem; margin-bottom: 30px; text-align: center;">CENTRO POKÉMON</h2>
+                        <button id="profile-btn" style="width: 300px; padding: 15px; margin-top: 10px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">PROFILO</button>
+                        <button id="lobby-btn" style="width: 300px; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">TORNA ALLA LOBBY</button>
+                        <p style="color: #fff; margin-top: 40px; font-size: 1.2rem; font-family: 'Courier New'; font-weight: bold; text-align: center;">Premi ESC per tornare al gioco</p>
+                    </div>`;
+            };
+
+            renderMainPause();
+            document.getElementById('game-container').appendChild(overlay);
+
+            overlay.addEventListener('click', (e) => {
+                if (e.target.id === 'lobby-btn') {
+                    e.target.innerText = "USCITA...";
+                    this.isPaused = false;
+                    let existingMenu = document.getElementById('pause-menu-overlay');
+                    if (existingMenu) existingMenu.remove();
+                    this.tornaAllaLobby();
+                } else if (e.target.id === 'profile-btn') {
+                    let profilo = this.registry.get('playerProfile');
+                    let box = document.getElementById('pause-box');
+                    if (box) {
+                        box.innerHTML = `
+                            <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">PROFILO ALLENATORE</h2>
+                            <div style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; border: 2px solid #ff7477; width: 85%; text-align: left; color: #fff; font-family: 'Courier New', monospace; font-size: 1.2rem;">
+                                <p style="margin: 10px 0;"><strong>NOME:</strong> ${profilo.username || 'Sconosciuto'}</p>
+                                <p style="margin: 10px 0;"><strong>VITTORIE:</strong> ${profilo.vittorie || 0}</p>
+                                <p style="margin: 10px 0;"><strong>PARTITE GIOCATE:</strong> ${profilo.partite_giocate || 0}</p>
+                            </div>
+                            <button id="back-pause-btn" style="width: 300px; padding: 15px; margin-top: 30px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">INDIETRO</button>
+                        `;
+                    }
+                } else if (e.target.id === 'back-pause-btn') {
+                    renderMainPause();
+                }
+            });
+        }
+    }
+}
+
+// ==============================================================================
+// PVP SCENE: Arena Lotta Giocatore vs Giocatore
+// ==============================================================================
+class PvPScene extends Phaser.Scene {
+    constructor() { super({ key: 'PvPScene' }); }
+    init(data) {
+        this.myPlayerName = data.name;
+        this.user = data.user;
+    }
+
+    create() {
+        this.player = null;
+        this.playerNameText = null;
+        this.isMovingGrid = false;
+
+        this.setupMap();
+        this.setupAnimations();
+        this.setupNetwork();
+
+        this.cursors = this.input.keyboard.createCursorKeys();
+        this.enterKey = this.input.keyboard.addKey('ENTER');
+        this.escKey = this.input.keyboard.addKey('ESC');
+
+        this.isPaused = false;
+        this.isDialogActive = false;
+        this.isTransitioning = false;
+        this.pcOpen = false;
+
+        this.events.on('shutdown', () => {
+            if (this.socket) {
+                this.socket.disconnect();
+                this.socket = null;
+            }
+        });
+    }
+
+    setupMap() {
+        const map = this.make.tilemap({ key: 'mapPvP' });
+
+        // Stessa soluzione anti-corruzione grafica adottata nel CPK
+        const tilesetA = map.addTilesetImage('a', 'tilesA');
+        const tilesetD = map.addTilesetImage('d', 'tilesD');
+        const tilesetE = map.addTilesetImage('e', 'tilesE');
+
+        const allTilesets = [tilesetA, tilesetD, tilesetE];
+
+        map.createLayer('Sfondo', allTilesets, 0, 0);
+        map.createLayer('Erba', allTilesets, 0, 0);
+        this.wallLayer = map.createLayer('Ostacoli', allTilesets, 0, 0);
+
+        this.mapWidth = map.widthInPixels;
+        this.mapHeight = map.heightInPixels;
+        this.physics.world.setBounds(0, 0, this.mapWidth, this.mapHeight);
+
+        this.wallLayer.setCollisionByExclusion([-1]);
+
+        this.zoneInterattive = [];
+        const objLayer = map.getObjectLayer('Interazioni');
+        if (objLayer && objLayer.objects) {
+            objLayer.objects.forEach(obj => {
+                let zone = this.add.zone(obj.x, obj.y, obj.width, obj.height).setOrigin(0);
+                zone.nomeInterazione = obj.name;
+                this.zoneInterattive.push(zone);
+            });
+        }
+    }
+
+    setupNetwork() {
+        this.otherPlayers = this.physics.add.group();
+        this.socket = io();
+        this.socket.emit('joinGame', this.myPlayerName); // Rimosso + " (PvP)"
+
+        this.socket.on('currentPlayers', (players) => {
+            Object.values(players).forEach(p => p.playerId === this.socket.id ? this.addPlayer(p) : this.addOtherPlayer(p));
+        });
+        this.socket.on('newPlayer', (p) => this.addOtherPlayer(p));
+        this.socket.on('playerDisconnected', (id) => {
+            this.otherPlayers.getChildren().forEach(op => {
+                if (op.playerId === id) { op.nameText.destroy(); op.destroy(); }
+            });
+        });
+        this.socket.on('playerMoved', (p) => {
+            this.otherPlayers.getChildren().forEach(op => {
+                if (op.playerId === p.playerId) {
+                    op.setPosition(p.x, p.y);
+                    op.nameText.setPosition(p.x, p.y - 15);
+                    p.anim ? op.anims.play(p.anim, true) : op.anims.stop();
+                }
+            });
+        });
+
+        this.socket.on('challengeReceived', (id) => this.socket.emit('acceptChallenge', id));
+        this.socket.on('opponentBusy', () => window.showBanner("Questo allenatore è già impegnato!"));
+
+        this.socket.on('startPvP', (data) => {
+            data.socket = this.socket;
+            data.isWild = false;
+            this.startEncounter(data, "SFIDA PVP!");
+        });
+    }
+
+    setupAnimations() {
+        if (!this.anims.exists('down')) {
+            ['down', 'left', 'right', 'up'].forEach((key, i) => {
+                this.anims.create({ key, frames: this.anims.generateFrameNumbers('player', { start: i * 4, end: i * 4 + 3 }), frameRate: 10, repeat: -1 });
+            });
+        }
+    }
+
+    addPlayer(info) {
+        let startX = this.mapWidth / 2;
+        let startY = this.mapHeight / 2;
+
+        if (this.zoneInterattive) {
+            let startZone = this.zoneInterattive.find(z => z.nomeInterazione === 'Porta Inizio');
+            if (startZone) {
+                startX = startZone.x + (startZone.width || 16) / 2;
+                startY = startZone.y + 32;
+            }
+        }
+
+        this.player = this.physics.add.sprite(startX, startY, 'player').setCollideWorldBounds(true);
+        this.player.setScale(0.5);
+        this.player.body.setSize(32, 32).setOffset(16, 32);
+        this.player.setDepth(10);
+
+        this.physics.add.collider(this.player, this.wallLayer);
+
+        // Inizializzazione corretta del NameTag locale
+        this.playerNameText = this.createNameTag(startX, startY, info.name);
+        this.playerNameText.setDepth(10);
+
+        this.cameras.main.startFollow(this.player, true).setZoom(4).setBounds(0, 0, this.mapWidth, this.mapHeight);
+    }
+
+    addOtherPlayer(info) {
+        let op = this.add.sprite(info.x, info.y, 'player');
+        op.playerId = info.playerId;
+        op.setScale(0.5); // Ridimensionamento sistemato
+        op.setDepth(10);
+
+        let colori = ['#ff4444', '#44ff44', '#4444ff', '#ffff44', '#ff44ff', '#44ffff', '#ff8800'];
+        let coloreCasuale = Phaser.Utils.Array.GetRandom(colori);
+
+        op.nameText = this.createNameTag(info.x, info.y, info.name, coloreCasuale);
+        op.nameText.setDepth(10);
+        this.otherPlayers.add(op);
+    }
+
+    createNameTag(x, y, name, color = '#3E1E68') {
+        return this.add.text(x, y - 15, name, {
+            fontSize: '10px',
+            fill: color,
+            fontStyle: 'bold'
+        }).setOrigin(0.5, 1);
+    }
+
+    update() {
+        if (Phaser.Input.Keyboard.JustDown(this.escKey) && !this.isTransitioning && !this.pcOpen) {
+            this.togglePauseMenu();
+        }
+
+        if (this.isTransitioning || !this.player || this.isPaused || this.pcOpen || this.isMovingGrid || this.isDialogActive) return;
+
+        const TILE_SIZE = 16;
+        let currentAnim = null;
+        let dx = 0;
+        let dy = 0;
+
+        if (this.cursors.left.isDown) { dx = -TILE_SIZE; currentAnim = 'left'; }
+        else if (this.cursors.right.isDown) { dx = TILE_SIZE; currentAnim = 'right'; }
+        else if (this.cursors.up.isDown) { dy = -TILE_SIZE; currentAnim = 'up'; }
+        else if (this.cursors.down.isDown) { dy = TILE_SIZE; currentAnim = 'down'; }
+
+        if (dx !== 0 || dy !== 0) {
+            let targetX = this.player.x + dx;
+            let targetY = this.player.y + dy;
+
+            this.player.anims.play(currentAnim, true);
+
+            let isOutOfBounds = targetX < 0 || targetX >= this.mapWidth || targetY < 0 || targetY >= this.mapHeight;
+            let ostacolo = this.wallLayer.getTileAtWorldXY(targetX, targetY, true);
+            let isWall = (ostacolo && ostacolo.index !== -1);
+
+            if (!isWall && !isOutOfBounds) {
+                this.isMovingGrid = true;
+                if (this.socket) this.socket.emit('playerMovement', { x: targetX, y: targetY, anim: currentAnim });
+
+                this.tweens.add({
+                    targets: this.player,
+                    x: targetX,
+                    y: targetY,
+                    duration: 250,
+                    onUpdate: () => {
+                        if (this.playerNameText) this.playerNameText.setPosition(this.player.x, this.player.y - 15);
+                    },
+                    onComplete: () => {
+                        this.isMovingGrid = false;
+                        this.player.anims.stop();
+
+                        // Controllo porta d'uscita PvP
+                        if (this.zoneInterattive && !this.isDialogActive && !this.isTransitioning) {
+                            let interazioneCalpestata = this.zoneInterattive.find(z => Phaser.Math.Distance.Between(this.player.x, this.player.y, z.x + (z.width || 0) / 2, z.y + (z.height || 0) / 2) < 20);
+                            if (interazioneCalpestata && interazioneCalpestata.nomeInterazione === 'Porta Inizio') {
+                                this.gestisciUscita();
+                            }
+                        }
+                    }
+                });
+            } else {
+                this.player.anims.stop();
+            }
+        } else {
+            this.player.anims.stop();
+        }
+
+        if (Phaser.Input.Keyboard.JustDown(this.enterKey) && !this.isTransitioning && !this.isDialogActive) {
+            if (this.zoneInterattive) {
+                let interazioneVicino = this.zoneInterattive.find(z => Phaser.Math.Distance.Between(this.player.x, this.player.y, z.x + (z.width || 0) / 2, z.y + (z.height || 0) / 2) < 40);
+                if (interazioneVicino) {
+                    if (interazioneVicino.nomeInterazione === 'PC') {
+                        this.player.anims.stop();
+                        this.apriPC();
+                        return;
+                    } else if (interazioneVicino.nomeInterazione && interazioneVicino.nomeInterazione.includes('Cartello')) {
+                        this.player.anims.stop();
+                        this.leggiCartello();
+                        return;
+                    }
+                }
+            }
+
+            if (this.otherPlayers && this.otherPlayers.getChildren) {
+                let closest = this.otherPlayers.getChildren().find(op => Phaser.Math.Distance.Between(this.player.x, this.player.y, op.x, op.y) < 150);
+                if (closest && this.socket) this.socket.emit('challengePlayer', closest.playerId);
+            }
+        }
+    }
+
+    gestisciUscita() {
+        if (this.isDialogActive) return;
+        this.isDialogActive = true;
+        this.player.body.setVelocity(0);
+        this.player.anims.stop();
+
+        this.createDialogUI();
+
+        this.mostraTestiDialogo(["Vuoi tornare alla Lobby? ▼"], () => {
+            this.mostraSceltaSiNo((scelta) => {
+                this.chiudiDialogo();
+                if (scelta === 'SI') {
+                    this.tornaAllaLobby();
+                } else {
+                    this.time.delayedCall(100, () => {
+                        this.isDialogActive = false;
+                        this.player.y += 32; // Allontana di un passo
+                        if (this.socket) this.socket.emit('playerMovement', { x: this.player.x, y: this.player.y, anim: 'up' });
+                    });
+                }
+            });
+        });
+    }
+
+    mostraSceltaSiNo(onChoice) {
+        let choiceContainer = document.getElementById('dialog-choice-container');
+        if (!choiceContainer) {
+            choiceContainer = document.createElement('div');
+            choiceContainer.id = 'dialog-choice-container';
+            choiceContainer.style.position = 'fixed';
+            choiceContainer.style.bottom = '175px';
+            choiceContainer.style.left = '50%';
+            choiceContainer.style.transform = 'translateX(250px)';
+            choiceContainer.style.width = '150px';
+            choiceContainer.style.backgroundColor = '#2b2b2b';
+            choiceContainer.style.border = '4px solid #d05050';
+            choiceContainer.style.boxSizing = 'border-box';
+            choiceContainer.style.padding = '15px';
+            choiceContainer.style.zIndex = '999999';
+            choiceContainer.style.display = 'flex';
+            choiceContainer.style.flexDirection = 'column';
+            choiceContainer.style.gap = '15px';
+            choiceContainer.style.boxShadow = '0px 10px 20px rgba(0,0,0,0.8)';
+            let optSi = document.createElement('div'); optSi.id = 'dialog-opt-si'; optSi.style.color = '#ffffff'; optSi.style.fontFamily = '"Courier New", Courier, monospace'; optSi.style.fontSize = '26px'; optSi.style.fontWeight = 'bold'; optSi.style.textShadow = '2px 2px 0 #000';
+            let optNo = document.createElement('div'); optNo.id = 'dialog-opt-no'; optNo.style.color = '#ffffff'; optNo.style.fontFamily = '"Courier New", Courier, monospace'; optNo.style.fontSize = '26px'; optNo.style.fontWeight = 'bold'; optNo.style.textShadow = '2px 2px 0 #000';
+            choiceContainer.appendChild(optSi); choiceContainer.appendChild(optNo); document.body.appendChild(choiceContainer);
+        }
+        choiceContainer.style.display = 'flex';
+        this.sceltaAttuale = 0;
+        const aggiornaCursoreScelta = () => {
+            let optSi = document.getElementById('dialog-opt-si'); let optNo = document.getElementById('dialog-opt-no');
+            if (this.sceltaAttuale === 0) { optSi.innerHTML = `<span style="display:inline-block; width: 25px; color: #ffcc00;">▶</span><span style="color: #ffcc00;">SÌ</span>`; optNo.innerHTML = `<span style="display:inline-block; width: 25px;"></span><span style="color: #ffffff;">NO</span>`; }
+            else { optSi.innerHTML = `<span style="display:inline-block; width: 25px;"></span><span style="color: #ffffff;">SÌ</span>`; optNo.innerHTML = `<span style="display:inline-block; width: 25px; color: #ffcc00;">▶</span><span style="color: #ffcc00;">NO</span>`; }
+        };
+        aggiornaCursoreScelta();
+        const handleChoiceInput = (e) => {
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'ArrowDown' || e.key === 's') { this.sceltaAttuale = this.sceltaAttuale === 0 ? 1 : 0; aggiornaCursoreScelta(); }
+            else if (e.key === 'Enter' || e.key === ' ') { window.removeEventListener('keydown', handleChoiceInput); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
+        };
+        setTimeout(() => { window.addEventListener('keydown', handleChoiceInput); }, 100);
+    }
+
+    startEncounter(battleData, testo = "BATTAGLIA!") {
+        this.isTransitioning = true;
+        this.player.body.setVelocity(0);
+        this.player.anims.stop();
+
+        let overlay = document.createElement('div');
+        overlay.style.position = 'absolute';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.display = 'flex';
+        overlay.style.justifyContent = 'center';
+        overlay.style.alignItems = 'center';
+        overlay.style.pointerEvents = 'none';
+        overlay.style.zIndex = '9999';
+
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 4rem;">${testo}</h1>`;
+        document.getElementById('game-container').appendChild(overlay);
+
+        setTimeout(() => {
+            if (overlay) overlay.remove();
+            this.isTransitioning = false;
+            this.isDialogActive = false;
+            this.scene.pause();
+
+            let myDbTeam = this.registry.get('userPokemon').filter(p => p.in_squadra).sort((a, b) => a.posizione_slot - b.posizione_slot);
+            if (myDbTeam.length === 0) {
+                alert("Non hai Pokémon in squadra! Visita il PC.");
+                this.scene.resume('PvPScene');
+                if (battleData.socket) battleData.socket.emit('setInBattle', false);
+                return;
+            }
+
+            battleData.parentScene = 'PvPScene';
+            this.scene.launch('BattleScene', battleData);
+        }, 2000);
+    }
+
+    tornaAllaLobby() {
+        this.isTransitioning = true;
+        let overlay = document.createElement('div');
+        overlay.style.position = 'absolute';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.backgroundColor = '#000';
+        overlay.style.display = 'flex';
+        overlay.style.justifyContent = 'center';
+        overlay.style.alignItems = 'center';
+        overlay.style.zIndex = '9999';
+
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 3rem; color: #fff;">TORNO ALLA LOBBY...</h1>`;
+        document.getElementById('game-container').appendChild(overlay);
+
+        setTimeout(() => {
+            if (overlay) overlay.remove();
+            this.isTransitioning = false;
+
+            this.scene.stop('PvPScene');
+            this.scene.start('WorldScene', { name: this.myPlayerName, user: this.user, vengoDa: 'Porta Centro' });
+            this.scene.start('WorldScene', { name: this.myPlayerName, user: this.user, vengoDa: 'Porta PVP' });
+        }, 1000);
+    }
+
+    togglePauseMenu() {
+        if (this.isPaused) {
+            this.isPaused = false;
+            let existingMenu = document.getElementById('pause-menu-overlay');
+            if (existingMenu) existingMenu.remove();
+        } else {
+            this.isPaused = true;
+            this.player.body.setVelocity(0);
+            this.player.anims.stop();
+
+            let overlay = document.createElement('div');
+            overlay.id = 'pause-menu-overlay';
+            overlay.className = 'modal-overlay';
+
+            const renderMainPause = () => {
+                overlay.innerHTML = `
+                    <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 500px; max-width: 90%;">
+                        <h2 class="text-shadows" style="font-size: 4rem; margin-bottom: 30px; text-align: center;">ARENA PVP</h2>
+                        <button id="profile-btn" style="width: 300px; padding: 15px; margin-top: 10px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">PROFILO</button>
+                        <button id="lobby-btn" style="width: 300px; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">TORNA ALLA LOBBY</button>
+                        <p style="color: #fff; margin-top: 40px; font-size: 1.2rem; font-family: 'Courier New'; font-weight: bold; text-align: center;">Premi ESC per tornare al gioco</p>
+                    </div>`;
+            };
+
+            renderMainPause();
+            document.getElementById('game-container').appendChild(overlay);
+
+            overlay.addEventListener('click', (e) => {
+                if (e.target.id === 'lobby-btn') {
+                    e.target.innerText = "USCITA...";
+                    this.isPaused = false;
+                    let existingMenu = document.getElementById('pause-menu-overlay');
+                    if (existingMenu) existingMenu.remove();
+                    this.tornaAllaLobby();
+                } else if (e.target.id === 'profile-btn') {
+                    let profilo = this.registry.get('playerProfile');
+                    let box = document.getElementById('pause-box');
+                    if (box) {
+                        box.innerHTML = `
+                            <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">PROFILO ALLENATORE</h2>
+                            <div style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; border: 2px solid #ff7477; width: 85%; text-align: left; color: #fff; font-family: 'Courier New', monospace; font-size: 1.2rem;">
+                                <p style="margin: 10px 0;"><strong>NOME:</strong> ${profilo.username || 'Sconosciuto'}</p>
+                                <p style="margin: 10px 0;"><strong>VITTORIE:</strong> ${profilo.vittorie || 0}</p>
+                                <p style="margin: 10px 0;"><strong>PARTITE GIOCATE:</strong> ${profilo.partite_giocate || 0}</p>
+                            </div>
+                            <button id="back-pause-btn" style="width: 300px; padding: 15px; margin-top: 30px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">INDIETRO</button>
+                        `;
+                    }
+                } else if (e.target.id === 'back-pause-btn') {
+                    renderMainPause();
+                }
+            });
+        }
+    }
+
+    createDialogUI() {
+        let container = document.getElementById('dialog-ui-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'dialog-ui-container';
+            container.style.position = 'fixed';
+            container.style.bottom = '20px';
+            container.style.left = '50%';
+            container.style.transform = 'translateX(-50%)';
+            container.style.width = '800px';
+            container.style.height = '140px';
+            container.style.backgroundColor = '#2b2b2b';
+            container.style.border = '6px solid #d05050';
+            container.style.boxSizing = 'border-box';
+            container.style.padding = '20px 30px';
+            container.style.zIndex = '999999';
+            container.style.display = 'flex';
+            container.style.flexDirection = 'column';
+            container.style.justifyContent = 'flex-start';
+            container.style.boxShadow = '0px 10px 20px rgba(0,0,0,0.8)';
+
+            let textEl = document.createElement('div');
+            textEl.id = 'dialog-ui-text';
+            textEl.style.color = '#ffffff';
+            textEl.style.fontFamily = '"Courier New", Courier, monospace';
+            textEl.style.fontSize = '26px';
+            textEl.style.fontWeight = 'bold';
+            textEl.style.textShadow = '2px 2px 0 #000';
+            textEl.style.lineHeight = '1.3';
+
+            container.appendChild(textEl);
+            document.body.appendChild(container);
+        }
+        container.style.display = 'flex';
+        document.getElementById('dialog-ui-text').innerText = '';
+    }
+
+    chiudiDialogo() {
+        let container = document.getElementById('dialog-ui-container');
+        if (container) container.style.display = 'none';
+        let choiceContainer = document.getElementById('dialog-choice-container');
+        if (choiceContainer) choiceContainer.style.display = 'none';
+    }
+
+    mostraTestiDialogo(testi, onComplete) {
+        let index = 0;
+        let textEl = document.getElementById('dialog-ui-text');
+
+        const mostraProssimo = () => {
+            if (index < testi.length) {
+                textEl.innerHTML = testi[index].replace(' ▼', '') + '<span style="color:#ffcc00;"> ▼</span>';
+                index++;
+
+                setTimeout(() => {
+                    const handleEnter = (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            window.removeEventListener('keydown', handleEnter);
+                            mostraProssimo();
+                        }
+                    };
+                    window.addEventListener('keydown', handleEnter);
+                }, 100);
+            } else {
+                if (onComplete) onComplete();
+            }
+        };
+        mostraProssimo();
+    }
+
+    leggiCartello() {
+        if (this.isDialogActive) return;
+        this.isDialogActive = true;
+        this.createDialogUI();
+
+        this.mostraTestiDialogo([
+            "BENVENUTO NELL'ARENA PVP!",
+            "Qui puoi lottare con i tuoi amici o contro giocatori sconosciuti.",
+            "Puoi utilizzare i PC ai lati della stanza per cambiare la tua squadra prima della lotta.",
+            "Una volta pronto, avvicinati a un giocatore e premi INVIO!"
+        ], () => {
+            this.chiudiDialogo();
+            this.time.delayedCall(100, () => { this.isDialogActive = false; });
+        });
+    }
+
+    apriPC() {
+        this.scene.manager.getScene('WorldScene').apriPC.call(this);
+    }
+}
+
+// ==============================================================================
 // 4. BATTLE SCENE: Il motore grafico della battaglia
 // ==============================================================================
 class BattleScene extends Phaser.Scene {
@@ -1483,6 +2443,8 @@ class BattleScene extends Phaser.Scene {
     preload() {
         this.bgKey = `background_${Phaser.Math.Between(0, 11)}`;
         this.load.image(this.bgKey, `DB/Immagini/Sfondi/${this.bgKey}.png`);
+        this.load.image('pokeball_lancio', 'assets/Pokeball Lancio.png');
+        this.load.image('pokeball_scuoti', 'assets/Pokeball.png');
     }
 
     buildTeamData(dbTeam) {
@@ -1602,18 +2564,17 @@ class BattleScene extends Phaser.Scene {
         this.logText = this.add.text(30, 690, '', {
             fontSize: '26px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', wordWrap: { width: 530 }, lineSpacing: 8, shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true }
         });
-
-        this.infoTipoLabel = this.add.text(610, 685, 'TIPO:', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
-        this.infoTipoVal = this.add.text(700, 685, 'NORMALE', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
-        this.infoCatLabel = this.add.text(610, 725, 'CAT.:', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
-        this.infoCatVal = this.add.text(700, 725, 'FISICO', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
-        this.infoPPLabel = this.add.text(610, 765, 'PP:', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
-        this.infoPPVal = this.add.text(700, 765, '15/15', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
-        this.infoPotLabel = this.add.text(840, 765, 'POT:', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
-        this.infoPotVal = this.add.text(910, 765, '90', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold', shadow: { offsetX: 2, offsetY: 2, color: '#000000', fill: true } });
-
-        this.moveInfoUI = [this.infoTipoLabel, this.infoTipoVal, this.infoCatLabel, this.infoCatVal, this.infoPPLabel, this.infoPPVal, this.infoPotLabel, this.infoPotVal];
-        this.createButtons();
+    this.infoTipoLabel = this.add.text(610, 685, 'TIPO:', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold' });
+    this.infoTipoVal   = this.add.text(700, 685, '---', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold' });
+    this.infoCatLabel  = this.add.text(610, 725, 'CAT:', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold' });
+    this.infoCatVal    = this.add.text(700, 725, '---', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold' });
+    this.infoPotLabel  = this.add.text(840, 685, 'POT:', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold' });
+    this.infoPotVal    = this.add.text(920, 685, '--', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold' });
+    this.infoPrecLabel = this.add.text(840, 725, 'PREC:', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold' });
+    this.infoPrecVal   = this.add.text(920, 725, '--', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold' });
+    this.infoPPLabel   = this.add.text(840, 765, 'PP:', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold' });
+    this.infoPPVal     = this.add.text(920, 765, '--/--', { fontSize: '22px', fill: '#ffffff', fontFamily: '"Courier New", Courier, monospace', fontStyle: 'bold' });
+    this.moveInfoUI = [this.infoTipoLabel, this.infoTipoVal, this.infoCatLabel, this.infoCatVal, this.infoPPLabel, this.infoPPVal, this.infoPotLabel, this.infoPotVal, this.infoPrecLabel, this.infoPrecVal];        this.createButtons();
 
         if (!this.isWild) {
             this.socket.off('resolveTurn');
@@ -1713,353 +2674,541 @@ class BattleScene extends Phaser.Scene {
                 this.infoTipoVal.setText(m.Tipo.toUpperCase()).setColor(this.getColorForType(m.Tipo));
                 this.infoCatVal.setText(m.Categoria.toUpperCase()).setColor(m.Categoria === "Fisico" ? '#ff4444' : (m.Categoria === "Speciale" ? '#4444ff' : '#aaaaaa'));
                 this.infoPPVal.setText(`${m.ppAttuali}/${m.ppMassimi}`).setColor(m.ppAttuali <= 0 ? '#ff4444' : '#ffffff');
-                this.infoPotVal.setText(m.Potenza > 0 ? m.Potenza : '-').setColor('#ffffff');
-                this.moveInfoUI.forEach(element => element.setVisible(true));
-            } else {
+                this.infoPPLabel.setText('PP:');
+                this.infoPotLabel.setText('POT:');
+                this.infoPrecLabel.setText('PREC:');
+                
+                this.infoPotVal.setText(m.Potenza > 0 ? m.Potenza : '--');
+                this.infoPrecVal.setText(m.Precisione > 0 ? m.Precisione : '--');
+
+                this.moveInfoUI.forEach(element => element.setVisible(true));} else {
                 this.moveInfoUI.forEach(element => element.setVisible(false));
             }
+        } else {
+            this.moveInfoUI.forEach(element => element.setVisible(false));
         }
     }
 
-    getColorForType(tipo) {
-        const typeColors = { "Normale": "#A8A878", "Fuoco": "#F08030", "Acqua": "#6890F0", "Elettro": "#F8D030", "Erba": "#78C850", "Ghiaccio": "#98D8D8", "Lotta": "#C03028", "Veleno": "#A040A0", "Terra": "#E0C068", "Volante": "#A890F0", "Psico": "#F85888", "Coleottero": "#A8B820", "Roccia": "#B8A038", "Spettro": "#705898", "Drago": "#7038F8", "Buio": "#705848", "Acciaio": "#B8B8D0", "Folletto": "#EE99AC" };
-        return typeColors[tipo] || "#777777";
-    }
+getColorForType(tipo) {
+    const typeColors = { "Normale": "#A8A878", "Fuoco": "#F08030", "Acqua": "#6890F0", "Elettro": "#F8D030", "Erba": "#78C850", "Ghiaccio": "#98D8D8", "Lotta": "#C03028", "Veleno": "#A040A0", "Terra": "#E0C068", "Volante": "#A890F0", "Psico": "#F85888", "Coleottero": "#A8B820", "Roccia": "#B8A038", "Spettro": "#705898", "Drago": "#7038F8", "Buio": "#705848", "Acciaio": "#B8B8D0", "Folletto": "#EE99AC" };
+    return typeColors[tipo] || "#777777";
+}
 
-    update() {
-        if (!this.isInputActive) return;
+update() {
+    if (!this.isInputActive) return;
 
-        if (Phaser.Input.Keyboard.JustDown(this.moveKeys.left)) {
-            if (this.selectedMoveIndex % 2 !== 0) this.selectedMoveIndex--;
-            this.updateMenuSelection();
-        } else if (Phaser.Input.Keyboard.JustDown(this.moveKeys.right)) {
-            if (this.selectedMoveIndex % 2 === 0) this.selectedMoveIndex++;
-            this.updateMenuSelection();
-        } else if (Phaser.Input.Keyboard.JustDown(this.moveKeys.up)) {
-            if (this.selectedMoveIndex >= 2) this.selectedMoveIndex -= 2;
-            this.updateMenuSelection();
-        } else if (Phaser.Input.Keyboard.JustDown(this.moveKeys.down)) {
-            if (this.selectedMoveIndex <= 1) this.selectedMoveIndex += 2;
-            this.updateMenuSelection();
-        }
-
-        if (Phaser.Input.Keyboard.JustDown(this.confirmKey)) {
-            this.handleButtonClick(this.selectedMoveIndex);
-        }
-
-        if (Phaser.Input.Keyboard.JustDown(this.cancelKey)) {
-            if (this.menuState === 'MOVES') {
-                this.menuState = 'MAIN';
-                this.selectedMoveIndex = 0;
-                this.updateMenuSelection();
-            }
-        }
-    }
-
-    startTurn() {
-        this.logText.setVisible(false);
-        this.isInputActive = true;
-        this.menuState = 'MAIN';
-        this.selectedMoveIndex = 0;
-
-        if (this.pEntity.mossaForzata) {
-            let forcedMoveName = this.pEntity.mossaForzata;
-            let forcedMoveData = this.pEntity.moves.find(m => m && m.Nome === forcedMoveName);
-
-            if (forcedMoveData && forcedMoveData.ppAttuali <= 0 && forcedMoveName !== "Ricarica") {
-                this.pEntity.mossaForzata = null;
-            } else {
-                this.btns.forEach(b => b.setVisible(false));
-                this.moveInfoUI.forEach(element => element.setVisible(false));
-                this.isInputActive = false;
-                this.time.delayedCall(1000, () => this.handleMoveClick(forcedMoveName));
-                return;
-            }
-        }
-
-        let haMosseDisponibili = this.pEntity.moves.some(m => m && m.ppAttuali > 0);
-        if (!haMosseDisponibili) {
-            this.pEntity.moves = [this.moveDB["Scontro"] || { Nome: "Scontro", Tipo: "Normale", Categoria: "Fisico", ppAttuali: 1, ppMassimi: 1 }];
-            this.selectedMoveIndex = 0;
-        }
-
+    if (Phaser.Input.Keyboard.JustDown(this.moveKeys.left)) {
+        if (this.selectedMoveIndex % 2 !== 0) this.selectedMoveIndex--;
+        this.updateMenuSelection();
+    } else if (Phaser.Input.Keyboard.JustDown(this.moveKeys.right)) {
+        if (this.selectedMoveIndex % 2 === 0) this.selectedMoveIndex++;
+        this.updateMenuSelection();
+    } else if (Phaser.Input.Keyboard.JustDown(this.moveKeys.up)) {
+        if (this.selectedMoveIndex >= 2) this.selectedMoveIndex -= 2;
+        this.updateMenuSelection();
+    } else if (Phaser.Input.Keyboard.JustDown(this.moveKeys.down)) {
+        if (this.selectedMoveIndex <= 1) this.selectedMoveIndex += 2;
         this.updateMenuSelection();
     }
 
-    handleMoveClick(moveName) {
-        let myMoveData = this.pEntity.moves.find(m => m.Nome === moveName);
+    if (Phaser.Input.Keyboard.JustDown(this.confirmKey)) {
+        this.handleButtonClick(this.selectedMoveIndex);
+    }
 
-        if (moveName !== "Ricarica" && moveName !== "Scontro" && myMoveData && myMoveData.ppAttuali !== undefined && myMoveData.ppAttuali <= 0) {
-            let warningText = this.add.text(500, 400, "PP ESAURITI!", { fontSize: '40px', fill: '#ff0000', fontStyle: 'bold', stroke: '#000', strokeThickness: 6 }).setOrigin(0.5);
-            this.tweens.add({ targets: warningText, y: 350, alpha: 0, duration: 1500, onComplete: () => warningText.destroy() });
-            return;
+    if (Phaser.Input.Keyboard.JustDown(this.cancelKey)) {
+        if (this.menuState === 'MOVES') {
+            this.menuState = 'MAIN';
+            this.selectedMoveIndex = 0;
+            this.updateMenuSelection();
         }
+    }
+}
 
-        this.isInputActive = false;
-        this.btns.forEach(b => b.setVisible(false));
-        this.moveInfoUI.forEach(element => element.setVisible(false));
-        this.logText.setVisible(true);
+startTurn() {
+    this.logText.setVisible(false);
+    this.isInputActive = true;
+    this.menuState = 'MAIN';
+    this.selectedMoveIndex = 0;
 
-        if (this.isWild) {
-            let activeBot = this.partita.p2.squadra[this.partita.p2.attivoIdx];
-            let activePlayer = this.partita.p1.squadra[this.partita.p1.attivoIdx]; // Serve per fargli leggere le tue stat!
-            let mosseDisponibiliBot = activeBot.mosse.filter(m => m.ppAttuali > 0);
-            let botMoveData;
+    if (this.pEntity.mossaForzata) {
+        let forcedMoveName = this.pEntity.mossaForzata;
+        let forcedMoveData = this.pEntity.moves.find(m => m && m.Nome === forcedMoveName);
 
-            if (this.eEntity.mossaForzata) {
-                botMoveData = activeBot.mosse.find(m => m && m.Nome === this.eEntity.mossaForzata);
-                if (this.eEntity.mossaForzata === "Ricarica") {
-                    botMoveData = { Nome: "Ricarica", Tipo: "Normale", Categoria: "Stato", Potenza: 0, Precisione: 100, CodiceFunzione: [] };
-                } else if (botMoveData && botMoveData.ppAttuali <= 0) {
-                    this.eEntity.mossaForzata = null;
-                    // FIX: Anche nel caso in cui finisca i PP della mossa forzata, usa l'IA!
-                    botMoveData = (mosseDisponibiliBot.length > 0) ? this.partita.scegliMossaBotIntelligente(activeBot, activePlayer, this.partita.p2, this.partita.p1) : this.moveDB["Scontro"];
-                }
-            } else if (mosseDisponibiliBot.length > 0) {
-                // MAGIA: Chiamiamo l'IA!
-                botMoveData = this.partita.scegliMossaBotIntelligente(activeBot, activePlayer, this.partita.p2, this.partita.p1);
-            } else {
-                botMoveData = this.moveDB["Scontro"];
-            }
-
-            if (!botMoveData) botMoveData = { Nome: "Scontro", Tipo: "Normale", Categoria: "Fisico" };
-            if (!myMoveData) myMoveData = { Nome: moveName, Tipo: "Normale", Categoria: "Fisico" };
-
-            let statoAggiornato = this.partita.processaTurno({ mossa: myMoveData }, { mossa: botMoveData });
-            this.applicaStatoPartita(statoAggiornato, false);
+        if (forcedMoveData && forcedMoveData.ppAttuali <= 0 && forcedMoveName !== "Ricarica") {
+            this.pEntity.mossaForzata = null;
         } else {
-            this.logText.setText("In attesa dell'avversario...");
-            this.socket.emit('pvpUseMove', { roomId: this.roomId, moveName: moveName });
+            this.btns.forEach(b => b.setVisible(false));
+            this.moveInfoUI.forEach(element => element.setVisible(false));
+            this.isInputActive = false;
+            this.time.delayedCall(1000, () => this.handleMoveClick(forcedMoveName));
+            return;
         }
     }
 
-    handleButtonClick(index) {
-        if (this.menuState === 'MAIN') {
-            if (index === 0) {
-                this.menuState = 'MOVES'; this.selectedMoveIndex = 0; this.updateMenuSelection();
-            } else if (index === 1) {
-                this.isInputActive = false; this.btns.forEach(b => b.setVisible(false));
-                this.logText.setVisible(true); this.logText.setText("Non puoi catturare i Pokémon altrui!");
-                this.time.delayedCall(1500, () => this.startTurn());
-            } else if (index === 2) {
-                this.openTeamModal();
-            } else if (index === 3) {
-                this.isInputActive = false; this.btns.forEach(b => b.setVisible(false));
-                this.logText.setVisible(true);
-                if (this.isWild) {
-                    this.logText.setText("Sei fuggito con successo!");
-                    this.time.delayedCall(1500, () => {
+    let haMosseDisponibili = this.pEntity.moves.some(m => m && m.ppAttuali > 0);
+    if (!haMosseDisponibili) {
+        this.pEntity.moves = [this.moveDB["Scontro"] || { Nome: "Scontro", Tipo: "Normale", Categoria: "Fisico", ppAttuali: 1, ppMassimi: 1 }];
+        this.selectedMoveIndex = 0;
+    }
+
+    this.updateMenuSelection();
+}
+
+handleMoveClick(moveName) {
+    let myMoveData = this.pEntity.moves.find(m => m.Nome === moveName);
+
+    if (moveName !== "Ricarica" && moveName !== "Scontro" && myMoveData && myMoveData.ppAttuali !== undefined && myMoveData.ppAttuali <= 0) {
+        let warningText = this.add.text(500, 400, "PP ESAURITI!", { fontSize: '40px', fill: '#ff0000', fontStyle: 'bold', stroke: '#000', strokeThickness: 6 }).setOrigin(0.5);
+        this.tweens.add({ targets: warningText, y: 350, alpha: 0, duration: 1500, onComplete: () => warningText.destroy() });
+        return;
+    }
+
+    this.isInputActive = false;
+    this.btns.forEach(b => b.setVisible(false));
+    this.moveInfoUI.forEach(element => element.setVisible(false));
+    this.logText.setVisible(true);
+
+    if (this.isWild) {
+        let activeBot = this.partita.p2.squadra[this.partita.p2.attivoIdx];
+        let activePlayer = this.partita.p1.squadra[this.partita.p1.attivoIdx]; // Serve per fargli leggere le tue stat!
+        let mosseDisponibiliBot = activeBot.mosse.filter(m => m.ppAttuali > 0);
+        let botMoveData;
+
+        if (this.eEntity.mossaForzata) {
+            botMoveData = activeBot.mosse.find(m => m && m.Nome === this.eEntity.mossaForzata);
+            if (this.eEntity.mossaForzata === "Ricarica") {
+                botMoveData = { Nome: "Ricarica", Tipo: "Normale", Categoria: "Stato", Potenza: 0, Precisione: 100, CodiceFunzione: [] };
+            } else if (botMoveData && botMoveData.ppAttuali <= 0) {
+                this.eEntity.mossaForzata = null;
+                // FIX: Anche nel caso in cui finisca i PP della mossa forzata, usa l'IA!
+                botMoveData = (mosseDisponibiliBot.length > 0) ? this.partita.scegliMossaBotIntelligente(activeBot, activePlayer, this.partita.p2, this.partita.p1) : this.moveDB["Scontro"];
+            }
+        } else if (mosseDisponibiliBot.length > 0) {
+            // MAGIA: Chiamiamo l'IA!
+            botMoveData = this.partita.scegliMossaBotIntelligente(activeBot, activePlayer, this.partita.p2, this.partita.p1);
+        } else {
+            botMoveData = this.moveDB["Scontro"];
+        }
+
+        if (!botMoveData) botMoveData = { Nome: "Scontro", Tipo: "Normale", Categoria: "Fisico" };
+        if (!myMoveData) myMoveData = { Nome: moveName, Tipo: "Normale", Categoria: "Fisico" };
+
+        let statoAggiornato = this.partita.processaTurno({ mossa: myMoveData }, { mossa: botMoveData });
+        this.applicaStatoPartita(statoAggiornato, false);
+    } else {
+        this.logText.setText("In attesa dell'avversario...");
+        this.socket.emit('pvpUseMove', { roomId: this.roomId, moveName: moveName });
+    }
+}
+
+handleButtonClick(index) {
+    if (this.menuState === 'MAIN') {
+        if (index === 0) {
+            this.menuState = 'MOVES'; this.selectedMoveIndex = 0; this.updateMenuSelection();
+        } else if (index === 1) {
+            this.tentaCattura();
+        } else if (index === 2) {
+            this.openTeamModal();
+        } else if (index === 3) {
+            this.isInputActive = false; this.btns.forEach(b => b.setVisible(false));
+            this.logText.setVisible(true);
+            if (this.isWild) {
+                this.logText.setText("Sei fuggito con successo!");
+                this.time.delayedCall(1500, () => {
+                    if (this.socket) this.socket.emit('setInBattle', false);
+                    this.scene.stop(); this.scene.resume(this.parentScene);
+                });
+            } else {
+                this.logText.setText("In attesa dell'avversario...");
+                this.socket.emit('pvpUseMove', { roomId: this.roomId, tipo: 'flee' });
+            }
+        }
+    } else if (this.menuState === 'MOVES') {
+        let m = this.pEntity.moves[index];
+        if (m) this.handleMoveClick(m.Nome);
+    }
+}
+tentaCattura() {
+    this.isInputActive = false;
+    this.btns.forEach(b => b.setVisible(false));
+    this.moveInfoUI.forEach(element => element.setVisible(false));
+    this.logText.setVisible(true);
+
+    if (!this.isWild || this.isNPC) {
+        this.logText.setText("Non puoi catturare i Pokémon di un altro allenatore!");
+        this.time.delayedCall(1500, () => this.startTurn());
+        return;
+    }
+
+    // 1. Controllo immediato: se già posseduto, avvisa e torna al menu
+    let myPokemonList = this.registry.get('userPokemon');
+    let giaPosseduto = myPokemonList.some(p => p.id_specie === this.eEntity.name);
+
+    if (giaPosseduto) {
+        console.log(`Pokémon già presente: ${this.eEntity.name}`); // Scrive in console
+        this.logText.setText("Hai già questo Pokémon nel PC! Scegli un'altra azione.");
+
+        // Aspetta 2 secondi per far leggere il messaggio, poi riabilita il menu principale
+        this.time.delayedCall(2000, () => {
+            this.startTurn(); // Torna al menu principale (LOTTA, ZAINO, ecc.)
+        });
+        return;
+    }
+
+    // 2. Se non è posseduto, procedi col lancio grafico
+    this.logText.setText("Lanci la Pokéball...");
+    let ball = this.add.image(250, 600, 'pokeball_lancio').setScale(0.5);
+    this.tweens.add({
+        targets: ball,
+        x: 750, y: 290,
+        duration: 800,
+        ease: 'Power2',
+        onComplete: () => {
+            ball.destroy();
+            this.avviaAnimazioneCattura();
+        }
+    });
+}
+avviaAnimazioneCattura() {
+    let prob = this.calcolaProbabilitaCattura();
+    let catturato = Phaser.Math.Between(1, 100) <= prob;
+
+    // --- CORREZIONE: Fai sparire il Pokémon selvatico all'inizio dei rintocchi ---
+    if (this.eSprite) {
+        this.eSprite.setAlpha(0);
+    }
+
+    // 2. Pokéball sul terreno (quella per i rintocchi)
+    let ball = this.add.image(750, 320, 'pokeball_scuoti').setScale(0.6);
+
+    // Animazione rintocchi (3 volte)
+    this.tweens.add({
+        targets: ball,
+        angle: 20, duration: 200, yoyo: true, repeat: 2,
+        onComplete: () => {
+            if (catturato) {
+                this.mostraSuccessoCattura(ball);
+            } else {
+                // --- CORREZIONE: Se fallisce, il Pokémon riappare ---
+                if (this.eSprite) this.eSprite.setAlpha(1);
+                this.mostraFallimentoCattura(ball);
+            }
+        }
+    });
+}
+mostraSuccessoCattura(ball) {
+    this.logText.setText(`Preso! Hai catturato ${this.eEntity.name.toUpperCase()}! 🎉`);
+    this.salvaPokemonCatturato(this.eEntity.name);
+
+    // Brillio finale
+    ball.setTint(0xffff00);
+    this.time.delayedCall(2000, () => {
+        this.registry.set('lastBattleResult', 'win');
+        this.scene.stop();
+        this.scene.resume(this.parentScene);
+    });
+}
+mostraFallimentoCattura(ball) {
+    this.logText.setText("Oh no! Il Pokémon si è liberato!");
+    // Effetto uscita
+    this.tweens.add({ targets: ball, alpha: 0, duration: 500, onComplete: () => ball.destroy() });
+
+    this.time.delayedCall(1500, () => {
+        // Turno del bot dopo il fallimento
+        let activeBot = this.partita.p2.squadra[this.partita.p2.attivoIdx];
+        let botMoveData = this.partita.scegliMossaBotIntelligente(activeBot, this.partita.p1.squadra[this.partita.p1.attivoIdx], this.partita.p2, this.partita.p1);
+        let stato = this.partita.processaTurno({ mossa: { Nome: "Fallita" } }, { mossa: botMoveData });
+        this.applicaStatoPartita(stato, false);
+    });
+}
+calcolaProbabilitaCattura() {
+    let base = 20; // Probabilità base
+    let bonus = 0;
+
+    // Bonus Vita (HP)
+    let hpPct = (this.eEntity.hp / this.eEntity.maxHp) * 100;
+    if (hpPct <= 25) bonus += 30;      // Sotto 25% +30%
+    else if (hpPct <= 50) bonus += 15; // Sotto 50% +15%
+
+    // Bonus Stato
+    if (this.eEntity.stato) {
+        bonus += 15; // +15% se ha uno stato alterato (Sonno, Paralisi, ecc.)
+    }
+
+    let probTotale = Math.min(base + bonus, 90); // Massimo 90% per non renderlo sicuro al 100%
+    return probTotale;
+}
+
+    async salvaPokemonCatturato(nomeSpecie) {
+    try {
+        let myPokemonList = this.registry.get('userPokemon');
+        let inSquadraCount = myPokemonList.filter(p => p.in_squadra).length;
+
+        let mettiInSquadra = inSquadraCount < 3;
+        let posSlot = mettiInSquadra ? inSquadraCount + 1 : null;
+
+        let nuovoPkmn = {
+            id_specie: nomeSpecie,
+            id_profilo_proprietario: this.registry.get('playerProfile').id_profilo,
+            in_squadra: mettiInSquadra,
+            posizione_slot: posSlot
+        };
+
+        const { data, error } = await supabaseClient.from('pokemon').insert([nuovoPkmn]).select();
+
+        if (!error && data && data.length > 0) {
+            myPokemonList.push(data[0]);
+            this.registry.set('userPokemon', myPokemonList);
+        }
+    } catch (err) {
+        console.error("Errore durante il salvataggio del Pokémon:", err);
+    }
+}
+resolveTurn(turnData) {
+    this.applicaStatoPartita(turnData.stato, turnData.inverti);
+}
+
+applicaStatoPartita(stato, inverti) {
+    this.invertiLogs = inverti;
+    this.currentTurn = stato.turno;
+    let p1Data = inverti ? stato.p2 : stato.p1;
+    let p2Data = inverti ? stato.p1 : stato.p2;
+
+    this.myActiveIdx = p1Data.attivoIdx;
+
+    p1Data.squadra.forEach((p, i) => {
+        if (this.myTeamData[i]) this.myTeamData[i].hp = p.hp;
+    });
+    if (this.oppTeamData) {
+        p2Data.squadra.forEach((p, i) => {
+            if (this.oppTeamData[i]) this.oppTeamData[i].hp = p.hp;
+        });
+    }
+
+    this.myTeamData[this.myActiveIdx].mosse = [...p1Data.mosse];
+    if (this.oppTeamData) this.oppTeamData[p2Data.attivoIdx].mosse = [...p2Data.mosse];
+
+    // FIX CRASH 1: Aggiorniamo tramite DOM updateUI() invece di cercare il vecchio setText di Phaser
+    if (p1Data.nome !== this.pEntity.name) {
+        let myNewActive = this.myTeamData[this.myActiveIdx];
+        this.pEntity = { name: myNewActive.nome, types: myNewActive.tipi, hp: myNewActive.hp, maxHp: myNewActive.maxHp, moves: myNewActive.mosse, alive: myNewActive.hp > 0 };
+        if (this.pSprite.node) this.pSprite.node.querySelector('img').src = this.pkmnDB[myNewActive.nome].sprite.normal;
+        this.updateUI();
+        this.updateStatusOverlay(true, null);
+    }
+
+    if (p2Data.nome !== this.eEntity.name) {
+        let oppNewActive = this.oppTeamData[p2Data.attivoIdx];
+        this.eEntity = { name: oppNewActive.nome, types: oppNewActive.tipi, hp: oppNewActive.hp, maxHp: oppNewActive.maxHp, moves: oppNewActive.mosse, alive: oppNewActive.hp > 0 };
+        if (this.eSprite.node) this.eSprite.node.querySelector('img').src = this.pkmnDB[oppNewActive.nome].sprite.normal;
+        this.updateUI();
+        this.updateStatusOverlay(false, null);
+    }
+
+    this.pEntity.mossaForzata = p1Data.mossaForzata;
+    this.eEntity.mossaForzata = p2Data.mossaForzata;
+
+    if (p1Data.trasformato && this.pSprite.node) this.pSprite.node.querySelector('img').src = this.pkmnDB[this.eEntity.name].sprite.normal;
+    if (p2Data.trasformato && this.eSprite.node) this.eSprite.node.querySelector('img').src = this.pkmnDB[this.pEntity.name].sprite.normal;
+
+    let iAmDead = p1Data.hp <= 0;
+    let oppIsDead = p2Data.hp <= 0;
+    this.mostraLogsSequenziali(stato.logs, () => {
+        this.updateUI();
+
+        if (stato.finito) {
+            this.time.delayedCall(1500, async () => {
+                let ioSconfitto = p1Data.sconfitto !== undefined ? p1Data.sconfitto : p1Data.squadra.every(p => p.hp <= 0);
+                let oppSconfitto = p2Data.sconfitto !== undefined ? p2Data.sconfitto : p2Data.squadra.every(p => p.hp <= 0);
+
+                let esito = '';
+                if (!ioSconfitto && oppSconfitto) {
+                    this.logText.setText('HAI VINTO! 🎉');
+                    esito = 'win';
+                } else if (ioSconfitto && !oppSconfitto) {
+                    this.logText.setText('HAI PERSO... 💀');
+                    esito = 'lose';
+                } else {
+                    this.logText.setText('PAREGGIO! ⚖️');
+                    esito = 'draw';
+                }
+
+                this.registry.set('lastBattleResult', esito);
+
+                // AGGIORNAMENTO STATISTICHE NEL DB DOPO LA PARTITA (SOLO PVP)
+                if (!this.isWild) {
+                    try {
+                        let profilo = this.registry.get('playerProfile');
+                        if (profilo) {
+                            profilo.partite_giocate = (profilo.partite_giocate || 0) + 1;
+                            if (esito === 'win') profilo.vittorie = (profilo.vittorie || 0) + 1;
+                            await supabaseClient.from('profilo').update({
+                                partite_giocate: profilo.partite_giocate,
+                                vittorie: profilo.vittorie
+                            }).eq('id_profilo', profilo.id_profilo);
+                            this.registry.set('playerProfile', profilo);
+                        }
+                    } catch (e) {
+                        console.error("Errore salvataggio statistiche fine partita:", e);
+                    }
+                }
+
+                let loserSprite = (esito === 'lose') ? this.pSprite : this.eSprite;
+                let fadeTweens = esito === 'draw' ? [this.pSprite, this.eSprite] : [loserSprite];
+
+                this.tweens.add({
+                    targets: fadeTweens, y: '+=100', alpha: 0, duration: 1000,
+                    onComplete: () => {
                         if (this.socket) this.socket.emit('setInBattle', false);
                         this.scene.stop(); this.scene.resume(this.parentScene);
-                    });
-                } else {
-                    this.logText.setText("Non puoi fuggire da una lotta tra allenatori!");
-                    this.time.delayedCall(1500, () => this.startTurn());
-                }
-            }
-        } else if (this.menuState === 'MOVES') {
-            let m = this.pEntity.moves[index];
-            if (m) this.handleMoveClick(m.Nome);
-        }
-    }
-
-    resolveTurn(turnData) {
-        this.applicaStatoPartita(turnData.stato, turnData.inverti);
-    }
-
-    applicaStatoPartita(stato, inverti) {
-        this.invertiLogs = inverti;
-        this.currentTurn = stato.turno;
-        let p1Data = inverti ? stato.p2 : stato.p1;
-        let p2Data = inverti ? stato.p1 : stato.p2;
-
-        this.myActiveIdx = p1Data.attivoIdx;
-
-        p1Data.squadra.forEach((p, i) => {
-            if (this.myTeamData[i]) this.myTeamData[i].hp = p.hp;
-        });
-        if (this.oppTeamData) {
-            p2Data.squadra.forEach((p, i) => {
-                if (this.oppTeamData[i]) this.oppTeamData[i].hp = p.hp;
-            });
-        }
-
-        this.myTeamData[this.myActiveIdx].mosse = [...p1Data.mosse];
-        if (this.oppTeamData) this.oppTeamData[p2Data.attivoIdx].mosse = [...p2Data.mosse];
-
-        // FIX CRASH 1: Aggiorniamo tramite DOM updateUI() invece di cercare il vecchio setText di Phaser
-        if (p1Data.nome !== this.pEntity.name) {
-            let myNewActive = this.myTeamData[this.myActiveIdx];
-            this.pEntity = { name: myNewActive.nome, types: myNewActive.tipi, hp: myNewActive.hp, maxHp: myNewActive.maxHp, moves: myNewActive.mosse, alive: myNewActive.hp > 0 };
-            if (this.pSprite.node) this.pSprite.node.querySelector('img').src = this.pkmnDB[myNewActive.nome].sprite.normal;
-            this.updateUI();
-            this.updateStatusOverlay(true, null);
-        }
-
-        if (p2Data.nome !== this.eEntity.name) {
-            let oppNewActive = this.oppTeamData[p2Data.attivoIdx];
-            this.eEntity = { name: oppNewActive.nome, types: oppNewActive.tipi, hp: oppNewActive.hp, maxHp: oppNewActive.maxHp, moves: oppNewActive.mosse, alive: oppNewActive.hp > 0 };
-            if (this.eSprite.node) this.eSprite.node.querySelector('img').src = this.pkmnDB[oppNewActive.nome].sprite.normal;
-            this.updateUI();
-            this.updateStatusOverlay(false, null);
-        }
-
-        this.pEntity.mossaForzata = p1Data.mossaForzata;
-        this.eEntity.mossaForzata = p2Data.mossaForzata;
-
-        if (p1Data.trasformato && this.pSprite.node) this.pSprite.node.querySelector('img').src = this.pkmnDB[this.eEntity.name].sprite.normal;
-        if (p2Data.trasformato && this.eSprite.node) this.eSprite.node.querySelector('img').src = this.pkmnDB[this.pEntity.name].sprite.normal;
-
-        let iAmDead = p1Data.hp <= 0;
-        let oppIsDead = p2Data.hp <= 0;
-        this.mostraLogsSequenziali(stato.logs, () => {
-            this.updateUI();
-
-            if (stato.finito) {
-                this.time.delayedCall(1500, () => {
-                    let vinto = p1Data.squadra.some(p => p.hp > 0);
-                    this.logText.setText(vinto ? 'HAI VINTO! 🎉' : 'HAI PERSO... 💀');
-                    this.registry.set('lastBattleResult', vinto ? 'win' : 'lose');
-                    let loserSprite = vinto ? this.eSprite : this.pSprite;
-                    this.tweens.add({
-                        targets: loserSprite, y: loserSprite.y + 100, alpha: 0, duration: 1000,
-                        onComplete: () => {
-                            if (this.socket) this.socket.emit('setInBattle', false);
-                            this.scene.stop(); this.scene.resume(this.parentScene);
-                        }
-                    });
+                    }
                 });
-            } else if (iAmDead) {
-                this.isInputActive = false;
-                this.btns.forEach(b => b.setVisible(false));
-                this.logText.setText(`${p1Data.nome} è esausto! Scegli un sostituto!`);
+            });
+        } else if (iAmDead) {
+            this.isInputActive = false;
+            this.btns.forEach(b => b.setVisible(false));
+
+            // CONTROLLA SE HAI ALTRI POKEMON IN SQUADRA
+            let altriDisponibili = this.myTeamData.some((p, idx) => p.hp > 0 && idx !== this.myActiveIdx);
+
+            if (altriDisponibili) {
+                this.logText.setText(`${this.pEntity.name} è esausto! Scegli il sostituto!`);
                 this.time.delayedCall(1500, () => this.forceSwitchMenu());
-            } else if (oppIsDead) {
-                this.isInputActive = false;
-                this.btns.forEach(b => b.setVisible(false));
-
-                if (this.isWild) {
-                    this.logText.setText(`${p2Data.nome} è esausto!`);
-                    this.time.delayedCall(1500, () => {
-                        let nextBotIdx = this.partita.p2.squadra.findIndex(p => p.hp > 0);
-                        if (nextBotIdx !== -1) {
-                            this.partita.p2.attivoIdx = nextBotIdx;
-                            let nuovoPk = this.partita.p2.squadra[nextBotIdx];
-                            this.partita.logs = [`L'avversario manda in campo ${nuovoPk.nome}! `];
-                            let nuovoStato = this.partita.ottieniStatoAggiornato();
-                            this.applicaStatoPartita(nuovoStato, false);
-                        } else {
-                            this.startTurn();
-                        }
-                    });
-                } else {
-                    this.logText.setText("L'avversario sta scegliendo chi mandare in campo...");
-                }
             } else {
-                this.startTurn();
+                // Solo qui la run fallisce davvero
+                this.logText.setText("Tutti i tuoi Pokémon sono esausti! Sei tornato alla base.");
+                this.time.delayedCall(2000, () => {
+                    this.registry.set('lastBattleResult', 'lose');
+                    this.scene.stop();
+                    this.scene.resume(this.parentScene);
+                });
             }
-        });
-    }
+        } else if (oppIsDead) {
+            this.isInputActive = false;
+            this.btns.forEach(b => b.setVisible(false));
 
-    forceSwitchMenu() {
-        this.isInputActive = false;
-        this.isForcedSwitch = true;
-        this.openTeamModal();
-    }
-
-    mostraLogsSequenziali(logs, onComplete) {
-        if (!logs || logs.length === 0) { if (onComplete) onComplete(); return; }
-        let index = 0; let ultimoAttaccanteEraPlayer = null;
-
-        let mostraProssimo = () => {
-            if (index < logs.length) {
-                let logObj = logs[index];
-                let riga = typeof logObj === 'object' ? logObj.testo : logObj;
-
-                if (typeof logObj === 'object') {
-                    this.pEntity.hp = this.invertiLogs ? logObj.p2Hp : logObj.p1Hp;
-                    this.eEntity.hp = this.invertiLogs ? logObj.p1Hp : logObj.p2Hp;
-                    this.updateUI();
-                }
-
-                let targetHp = null;
-                if (typeof riga === 'string' && riga.includes("|HP:")) {
-                    let parts = riga.split("|HP:");
-                    riga = parts[0]; targetHp = parseInt(parts[1]);
-                }
-
-                this.logText.setText(riga);
-                let isPlayerTarget = riga.includes(this.pEntity.name);
-                let isEnemyTarget = riga.includes(this.eEntity.name);
-
-                if (riga.includes(" usa ")) {
-                    ultimoAttaccanteEraPlayer = riga.includes(this.pEntity.name);
-                    this.playDash(ultimoAttaccanteEraPlayer);
-                }
-
-                if (riga.includes("Inflitti") || riga.includes("efficace") || riga.includes("subisce danni") || riga.includes("rubano energia") || riga.includes("recupera") || riga.includes("rigenera") || riga.includes("contraccolpo")) {
-                    let targetEnt = isPlayerTarget ? this.pEntity : (isEnemyTarget ? this.eEntity : null);
-                    if (targetEnt && targetHp !== null) targetEnt.hp = targetHp;
-                    this.updateUI(targetEnt);
-
-                    if (riga.includes("Inflitti") || riga.includes("efficace")) { if (ultimoAttaccanteEraPlayer !== null) this.playDamage(!ultimoAttaccanteEraPlayer); }
-                    else if (riga.includes("subisce danni") || riga.includes("rubano energia") || riga.includes("contraccolpo")) { this.playDamage(isPlayerTarget); }
-                }
-
-                if (riga.includes("aumenta")) this.playStatAnim(isPlayerTarget, true);
-                else if (riga.includes("diminuisce")) this.playStatAnim(isPlayerTarget, false);
-
-                if (riga.includes("stato di")) {
-                    let stato = riga.split("stato di ")[1].replace("!", "").trim();
-                    this.updateStatusOverlay(isPlayerTarget, stato);
-                } else if (riga.includes("addormentato per la sonnolenza")) this.updateStatusOverlay(isPlayerTarget, "Sonno");
-                else if (riga.includes("si è svegliato") || riga.includes("si è scongelato") || riga.includes("curato dal suo problema di stato")) this.updateStatusOverlay(isPlayerTarget, null);
-
-                if ((riga.includes("confuso") || riga.includes("Confusione")) && !riga.includes("non è più confuso")) this.playConfusion(isPlayerTarget);
-                if (riga.includes("intrappolato") || riga.includes("Legatutto") || riga.includes("Parassiseme")) this.playTrap(isPlayerTarget);
-
-                index++;
-                this.time.delayedCall(1500, mostraProssimo);
+            if (this.isWild) {
+                this.logText.setText(`${p2Data.nome} è esausto!`);
+                this.time.delayedCall(1500, () => {
+                    let nextBotIdx = this.partita.p2.squadra.findIndex(p => p.hp > 0);
+                    if (nextBotIdx !== -1) {
+                        this.partita.p2.attivoIdx = nextBotIdx;
+                        let nuovoPk = this.partita.p2.squadra[nextBotIdx];
+                        this.partita.logs = [`L'avversario manda in campo ${nuovoPk.nome}! `];
+                        let nuovoStato = this.partita.ottieniStatoAggiornato();
+                        this.applicaStatoPartita(nuovoStato, false);
+                    } else {
+                        this.startTurn();
+                    }
+                });
             } else {
-                this.updateUI();
-                if (onComplete) onComplete();
+                this.logText.setText("L'avversario sta scegliendo chi mandare in campo...");
             }
-        };
-        mostraProssimo();
-    }
-
-    playDash(isPlayer) { let sprite = isPlayer ? this.pSprite : this.eSprite; let dist = isPlayer ? 60 : -60; this.tweens.add({ targets: sprite, x: sprite.x + dist, duration: 100, yoyo: true, ease: 'Power2' }); }
-    playDamage(isPlayer) { let sprite = isPlayer ? this.pSprite : this.eSprite; this.tweens.add({ targets: sprite, alpha: 0.5, x: sprite.x + (isPlayer ? 5 : -5), duration: 50, yoyo: true, repeat: 5, onComplete: () => sprite.alpha = 1 }); }
-    playStatAnim(isPlayer, isUp) { let x = isPlayer ? 250 : 750; let y = isPlayer ? 550 : 280; let color = isUp ? '#00FF00' : '#FF0000'; let label = isUp ? '↑ STATS' : '↓ STATS'; let t = this.add.text(x, y, label, { fontSize: '32px', fill: color, fontStyle: 'bold', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5); this.tweens.add({ targets: t, y: y - 100, alpha: 0, duration: 1500, onComplete: () => t.destroy() }); }
-    updateStatusOverlay(isPlayer, stato) {
-        let ui = isPlayer ? this.pUI : this.eUI;
-        if (!ui || !ui.node) return;
-
-        let statusLabel = ui.node.querySelector('.battle-status-label');
-        if (!statusLabel) return;
-
-        if (!stato) {
-            statusLabel.innerText = '';
-            statusLabel.style.backgroundColor = 'transparent';
-            return;
+        } else {
+            this.startTurn();
         }
+    });
+}
 
-        const colori = { 'Scottatura': '#f08030', 'Paralisi': '#f8d030', 'Sonno': '#8c888c', 'Avvelenamento': '#a040a0', 'Iperavvelenamento': '#a040a0', 'Congelamento': '#98d8d8' };
-        statusLabel.innerText = stato.toUpperCase();
-        statusLabel.style.backgroundColor = colori[stato] || '#777';
+forceSwitchMenu() {
+    this.isInputActive = false;
+    this.isForcedSwitch = true;
+    this.openTeamModal();
+}
+
+mostraLogsSequenziali(logs, onComplete) {
+    if (!logs || logs.length === 0) { if (onComplete) onComplete(); return; }
+    let index = 0; let ultimoAttaccanteEraPlayer = null;
+
+    let mostraProssimo = () => {
+        if (index < logs.length) {
+            let logObj = logs[index];
+            let riga = typeof logObj === 'object' ? logObj.testo : logObj;
+
+            if (typeof logObj === 'object') {
+                this.pEntity.hp = this.invertiLogs ? logObj.p2Hp : logObj.p1Hp;
+                this.eEntity.hp = this.invertiLogs ? logObj.p1Hp : logObj.p2Hp;
+                this.updateUI();
+            }
+
+            let targetHp = null;
+            if (typeof riga === 'string' && riga.includes("|HP:")) {
+                let parts = riga.split("|HP:");
+                riga = parts[0]; targetHp = parseInt(parts[1]);
+            }
+
+            this.logText.setText(riga);
+            let isPlayerTarget = riga.includes(this.pEntity.name);
+            let isEnemyTarget = riga.includes(this.eEntity.name);
+
+            if (riga.includes(" usa ")) {
+                ultimoAttaccanteEraPlayer = riga.includes(this.pEntity.name);
+                this.playDash(ultimoAttaccanteEraPlayer);
+            }
+
+            if (riga.includes("Inflitti") || riga.includes("efficace") || riga.includes("subisce danni") || riga.includes("rubano energia") || riga.includes("recupera") || riga.includes("rigenera") || riga.includes("contraccolpo")) {
+                let targetEnt = isPlayerTarget ? this.pEntity : (isEnemyTarget ? this.eEntity : null);
+                if (targetEnt && targetHp !== null) targetEnt.hp = targetHp;
+                this.updateUI(targetEnt);
+
+                if (riga.includes("Inflitti") || riga.includes("efficace")) { if (ultimoAttaccanteEraPlayer !== null) this.playDamage(!ultimoAttaccanteEraPlayer); }
+                else if (riga.includes("subisce danni") || riga.includes("rubano energia") || riga.includes("contraccolpo")) { this.playDamage(isPlayerTarget); }
+            }
+
+            if (riga.includes("aumenta")) this.playStatAnim(isPlayerTarget, true);
+            else if (riga.includes("diminuisce")) this.playStatAnim(isPlayerTarget, false);
+
+            if (riga.includes("stato di")) {
+                let stato = riga.split("stato di ")[1].replace("!", "").trim();
+                this.updateStatusOverlay(isPlayerTarget, stato);
+            } else if (riga.includes("addormentato per la sonnolenza")) this.updateStatusOverlay(isPlayerTarget, "Sonno");
+            else if (riga.includes("si è svegliato") || riga.includes("si è scongelato") || riga.includes("curato dal suo problema di stato")) this.updateStatusOverlay(isPlayerTarget, null);
+
+            if ((riga.includes("confuso") || riga.includes("Confusione")) && !riga.includes("non è più confuso")) this.playConfusion(isPlayerTarget);
+            if (riga.includes("intrappolato") || riga.includes("Legatutto") || riga.includes("Parassiseme")) this.playTrap(isPlayerTarget);
+
+            index++;
+            this.time.delayedCall(1500, mostraProssimo);
+        } else {
+            this.updateUI();
+            if (onComplete) onComplete();
+        }
+    };
+    mostraProssimo();
+}
+
+playDash(isPlayer) { let sprite = isPlayer ? this.pSprite : this.eSprite; let dist = isPlayer ? 60 : -60; this.tweens.add({ targets: sprite, x: sprite.x + dist, duration: 100, yoyo: true, ease: 'Power2' }); }
+playDamage(isPlayer) { let sprite = isPlayer ? this.pSprite : this.eSprite; this.tweens.add({ targets: sprite, alpha: 0.5, x: sprite.x + (isPlayer ? 5 : -5), duration: 50, yoyo: true, repeat: 5, onComplete: () => sprite.alpha = 1 }); }
+playStatAnim(isPlayer, isUp) { let x = isPlayer ? 250 : 750; let y = isPlayer ? 550 : 280; let color = isUp ? '#00FF00' : '#FF0000'; let label = isUp ? '↑ STATS' : '↓ STATS'; let t = this.add.text(x, y, label, { fontSize: '32px', fill: color, fontStyle: 'bold', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5); this.tweens.add({ targets: t, y: y - 100, alpha: 0, duration: 1500, onComplete: () => t.destroy() }); }
+updateStatusOverlay(isPlayer, stato) {
+    let ui = isPlayer ? this.pUI : this.eUI;
+    if (!ui || !ui.node) return;
+
+    let statusLabel = ui.node.querySelector('.battle-status-label');
+    if (!statusLabel) return;
+
+    if (!stato) {
+        statusLabel.innerText = '';
+        statusLabel.style.backgroundColor = 'transparent';
+        return;
     }
-    playConfusion(isPlayer) { let x = isPlayer ? 250 : 750; let y = isPlayer ? 470 : 200; let d1 = this.add.text(x - 30, y, '🦆', { fontSize: '30px' }).setOrigin(0.5); let d2 = this.add.text(x + 30, y, '🦆', { fontSize: '30px' }).setOrigin(0.5); this.tweens.add({ targets: [d1, d2], angle: 360, duration: 1000, repeat: 1, onComplete: () => { d1.destroy(); d2.destroy(); } }); }
-    playTrap(isPlayer) { let targetX = isPlayer ? 250 : 750; let targetY = isPlayer ? 550 : 280; let trap = this.add.text(targetX, targetY, '🔗', { fontSize: '100px' }).setOrigin(0.5); this.tweens.add({ targets: trap, scale: { from: 2, to: 1 }, alpha: { from: 1, to: 0 }, duration: 1500, onComplete: () => trap.destroy() }); }
 
-    openTeamModal() {
-        this.isInputActive = false;
-        this.modalSelection = 0;
-        this.currentView = 'list';
-        this.summaryPage = 0;
+    const colori = { 'Scottatura': '#f08030', 'Paralisi': '#f8d030', 'Sonno': '#8c888c', 'Avvelenamento': '#a040a0', 'Iperavvelenamento': '#a040a0', 'Congelamento': '#98d8d8' };
+    statusLabel.innerText = stato.toUpperCase();
+    statusLabel.style.backgroundColor = colori[stato] || '#777';
+}
+playConfusion(isPlayer) { let x = isPlayer ? 250 : 750; let y = isPlayer ? 470 : 200; let d1 = this.add.text(x - 30, y, '🦆', { fontSize: '30px' }).setOrigin(0.5); let d2 = this.add.text(x + 30, y, '🦆', { fontSize: '30px' }).setOrigin(0.5); this.tweens.add({ targets: [d1, d2], angle: 360, duration: 1000, repeat: 1, onComplete: () => { d1.destroy(); d2.destroy(); } }); }
+playTrap(isPlayer) { let targetX = isPlayer ? 250 : 750; let targetY = isPlayer ? 550 : 280; let trap = this.add.text(targetX, targetY, '🔗', { fontSize: '100px' }).setOrigin(0.5); this.tweens.add({ targets: trap, scale: { from: 2, to: 1 }, alpha: { from: 1, to: 0 }, duration: 1500, onComplete: () => trap.destroy() }); }
 
-        let teamData = this.myTeamData;
+openTeamModal() {
+    this.isInputActive = false;
+    this.modalSelection = 0;
+    this.currentView = 'list';
+    this.summaryPage = 0;
 
-        const html = `
+    let teamData = this.myTeamData;
+
+    const html = `
             <div class="pkmn-modal-content">
                     <div id="modal-list-view" style="display: flex; flex-direction: column; width: 100%; flex: 1; overflow: hidden;">
                         <div class="pkmn-modal-header" style="margin-bottom: 25px;">SQUADRA POKÉMON</div> <div class="pokemon-list" id="pkmn-list-container" style="overflow-y: auto; overflow-x: hidden; flex: 1;"></div>
@@ -2096,29 +3245,29 @@ class BattleScene extends Phaser.Scene {
                 </div>
             </div>`;
 
-        // MAGIA: Creiamo il div nativo HTML e lo ancoriamo allo schermo bypassando Phaser!
-        let tempDiv = document.createElement('div');
-        tempDiv.className = 'pkmn-modal-overlay';
-        tempDiv.innerHTML = html;
-        this.teamModalDom = tempDiv;
-        document.getElementById('game-container').appendChild(this.teamModalDom);
+    // MAGIA: Creiamo il div nativo HTML e lo ancoriamo allo schermo bypassando Phaser!
+    let tempDiv = document.createElement('div');
+    tempDiv.className = 'pkmn-modal-overlay';
+    tempDiv.innerHTML = html;
+    this.teamModalDom = tempDiv;
+    document.getElementById('game-container').appendChild(this.teamModalDom);
 
-        this.populateTeamList(teamData);
-        this.setupModalNavigation(teamData);
-    }
+    this.populateTeamList(teamData);
+    this.setupModalNavigation(teamData);
+}
 
-    populateTeamList(teamData) {
-        let container = document.getElementById('pkmn-list-container');
-        if (!container) return;
+populateTeamList(teamData) {
+    let container = document.getElementById('pkmn-list-container');
+    if (!container) return;
 
-        let listHTML = '';
-        teamData.forEach((pkmn, index) => {
-            let localData = (this.pkmnDB && this.pkmnDB[pkmn.nome]) ? this.pkmnDB[pkmn.nome] : null;
-            let spriteUrl = pkmn.sprite?.normal || localData?.sprite?.normal || '';
-            let hpPercent = (pkmn.hp / pkmn.maxHp) * 100;
-            let hpColor = hpPercent > 50 ? '#4caf50' : (hpPercent > 20 ? '#ffeb3b' : '#f44336');
+    let listHTML = '';
+    teamData.forEach((pkmn, index) => {
+        let localData = (this.pkmnDB && this.pkmnDB[pkmn.nome]) ? this.pkmnDB[pkmn.nome] : null;
+        let spriteUrl = pkmn.sprite?.normal || localData?.sprite?.normal || '';
+        let hpPercent = (pkmn.hp / pkmn.maxHp) * 100;
+        let hpColor = hpPercent > 50 ? '#4caf50' : (hpPercent > 20 ? '#ffeb3b' : '#f44336');
 
-            listHTML += `
+        listHTML += `
                 <div class="pokemon-item" data-index="${index}">
                     <img src="${spriteUrl}" style="width: 85px; height: 85px; display: block; image-rendering: pixelated; filter: drop-shadow(2px 2px 0 rgba(0,0,0,0.5));">
                     <div class="pkmn-info">
@@ -2137,22 +3286,22 @@ class BattleScene extends Phaser.Scene {
                         <div class="action-btn-inline">INDIETRO</div>
                     </div>
                 </div>`;
-        });
-        container.innerHTML = listHTML;
-        this.updateModalVisuals();
-    }
-    openSummary(pkmn) {
-        this.currentView = 'summary'; this.summaryPage = 0; this.moveSelectionIdx = 0;
-        document.getElementById('modal-list-view').style.display = 'none';
-        document.getElementById('modal-summary-view').style.display = 'flex';
+    });
+    container.innerHTML = listHTML;
+    this.updateModalVisuals();
+}
+openSummary(pkmn) {
+    this.currentView = 'summary'; this.summaryPage = 0; this.moveSelectionIdx = 0;
+    document.getElementById('modal-list-view').style.display = 'none';
+    document.getElementById('modal-summary-view').style.display = 'flex';
 
-        let localData = (this.pkmnDB && this.pkmnDB[pkmn.nome]) ? this.pkmnDB[pkmn.nome] : null;
-        document.getElementById('summary-name').innerText = pkmn.nome.toUpperCase();
-        document.getElementById('summary-sprite').src = pkmn.sprite?.normal || localData?.sprite?.normal || '';
-        document.getElementById('summary-types').innerHTML = (pkmn.tipi || localData?.tipi || []).map(t => `<div class="badge" style="background-color: ${this.getColorForType(t)}">${t.toUpperCase()}</div>`).join('');
+    let localData = (this.pkmnDB && this.pkmnDB[pkmn.nome]) ? this.pkmnDB[pkmn.nome] : null;
+    document.getElementById('summary-name').innerText = pkmn.nome.toUpperCase();
+    document.getElementById('summary-sprite').src = pkmn.sprite?.normal || localData?.sprite?.normal || '';
+    document.getElementById('summary-types').innerHTML = (pkmn.tipi || localData?.tipi || []).map(t => `<div class="badge" style="background-color: ${this.getColorForType(t)}">${t.toUpperCase()}</div>`).join('');
 
-        let stats = pkmn.statistiche || (localData ? { attacco: localData.statistiche.attack.base_stat, difesa: localData.statistiche.defense.base_stat, attaccoSpeciale: localData.statistiche['special-attack'].base_stat, difesaSpeciale: localData.statistiche['special-defense'].base_stat, velocita: localData.statistiche.speed.base_stat } : {});
-        document.getElementById('summary-page-0').innerHTML = `
+    let stats = pkmn.statistiche || (localData ? { attacco: localData.statistiche.attack.base_stat, difesa: localData.statistiche.defense.base_stat, attaccoSpeciale: localData.statistiche['special-attack'].base_stat, difesaSpeciale: localData.statistiche['special-defense'].base_stat, velocita: localData.statistiche.speed.base_stat } : {});
+    document.getElementById('summary-page-0').innerHTML = `
             <div class="stat-row"><span class="stat-label">HP </span><span class="stat-value">${pkmn.hp}/${pkmn.maxHp}</span></div>
             <div class="stat-row"><span class="stat-label">ATTACCO </span><span class="stat-value">${stats.attacco || 0}</span></div>
             <div class="stat-row"><span class="stat-label">DIFESA </span><span class="stat-value">${stats.difesa || 0}</span></div>
@@ -2161,247 +3310,247 @@ class BattleScene extends Phaser.Scene {
             <div class="stat-row"><span class="stat-label">VELOCITÀ </span><span class="stat-value">${stats.velocita || 0}</span></div>
         `;
 
-        let mosseRaw = pkmn.mosse && pkmn.mosse.length > 0 ? pkmn.mosse : (localData?.mosse || []);
-        let movesHtml = ``;
+    let mosseRaw = pkmn.mosse && pkmn.mosse.length > 0 ? pkmn.mosse : (localData?.mosse || []);
+    let movesHtml = ``;
 
-        mosseRaw.forEach((mRaw, i) => {
-            let nomeMossa = typeof mRaw === 'object' ? mRaw.Nome : mRaw;
-            const m = this.moveDB[nomeMossa] || { Nome: nomeMossa, Tipo: '???', PP: '--', Potenza: '--', Precisione: '--', Descrizione: 'Nessuna descrizione.' };
-            const catColor = m.Categoria === "Fisico" ? '#ff7477' : (m.Categoria === "Speciale" ? '#6874e8' : '#aaaaaa');
+    mosseRaw.forEach((mRaw, i) => {
+        let nomeMossa = typeof mRaw === 'object' ? mRaw.Nome : mRaw;
+        const m = this.moveDB[nomeMossa] || { Nome: nomeMossa, Tipo: '???', PP: '--', Potenza: '--', Precisione: '--', Descrizione: 'Nessuna descrizione.' };
+        const catColor = m.Categoria === "Fisico" ? '#ff7477' : (m.Categoria === "Speciale" ? '#6874e8' : '#aaaaaa');
 
-            // FIX: Usa i PP attuali dell'oggetto mRaw, altrimenti usa quelli base del DB
-            let ppAtt = mRaw.ppAttuali !== undefined ? mRaw.ppAttuali : m.PP;
-            let ppMax = mRaw.ppMassimi !== undefined ? mRaw.ppMassimi : m.PP;
+        // FIX: Usa i PP attuali dell'oggetto mRaw, altrimenti usa quelli base del DB
+        let ppAtt = mRaw.ppAttuali !== undefined ? mRaw.ppAttuali : m.PP;
+        let ppMax = mRaw.ppMassimi !== undefined ? mRaw.ppMassimi : m.PP;
 
-            movesHtml += `
+        movesHtml += `
             <div class="move-entry" id="move-item-${i}" data-desc="${m.Descrizione || 'Nessuna descrizione.'}" data-pot="${m.Potenza > 0 ? m.Potenza : '--'}" data-prec="${m.Precisione > 0 ? m.Precisione : '--'}">
                 <div class="move-name-line"><span>${String(m.Nome).toUpperCase()}</span><span>PP ${ppAtt}/${ppMax}</span></div>
                 <div class="move-summary-badges"><span class="badge" style="background:${this.getColorForType(m.Tipo)}">${String(m.Tipo).toUpperCase()}</span><span class="badge" style="background:${catColor}">${(m.Categoria || '???').toUpperCase()}</span></div>
             </div>`;
-        });
+    });
 
-        document.getElementById('moves-list-container').innerHTML = movesHtml;
-        this.updateSummaryPage();
-        this.updateModalVisuals();
-    }
-    setupModalNavigation(teamData) {
-        // [Tutto il blocco modalKeyListener rimane invariato, omettilo se vuoi, ma lo riscrivo qui per sicurezza]
-        this.modalKeyListener = (event) => {
-            if (this.isInputActive) return;
-            const key = event.key;
-            if (this.currentView === 'list') {
-                let max = document.querySelectorAll('.pokemon-item').length;
-                if (max > 0) {
-                    if (key === 'ArrowDown' || key === 's') { this.modalSelection = (this.modalSelection + 1) % max; this.updateModalVisuals(); }
-                    if (key === 'ArrowUp' || key === 'w') { this.modalSelection = (this.modalSelection - 1 + max) % max; this.updateModalVisuals(); }
-                }
-            } else if (this.currentView === 'inline-actions') {
-                let max = 3;
-                if (key === 'ArrowDown' || key === 's') { this.actionSelectionIdx = (this.actionSelectionIdx + 1) % max; this.updateModalVisuals(); }
-                if (key === 'ArrowUp' || key === 'w') { this.actionSelectionIdx = (this.actionSelectionIdx - 1 + max) % max; this.updateModalVisuals(); }
-            } else if (this.currentView === 'summary') {
-                if (this.summaryPage === 1) {
-                    let numMoves = document.querySelectorAll('.move-entry').length;
-                    if (numMoves > 0) {
-                        if (key === 'ArrowDown' || key === 's') { this.moveSelectionIdx = Math.min(numMoves - 1, this.moveSelectionIdx + 1); this.updateModalVisuals(); }
-                        if (key === 'ArrowUp' || key === 'w') { this.moveSelectionIdx = Math.max(0, this.moveSelectionIdx - 1); this.updateModalVisuals(); }
-                    }
-                }
-                if (key === 'ArrowRight' || key === 'd' || key === 'ArrowLeft' || key === 'a') {
-                    this.summaryPage = this.summaryPage === 0 ? 1 : 0;
-                    this.moveSelectionIdx = 0;
-                    this.updateSummaryPage();
-                    this.updateModalVisuals();
-                }
-            }
-
-            if (key === 'Enter' || key === ' ') this.confirmModalSelection(teamData);
-            if (key === 'Escape' || key === 'Backspace') {
-                if (this.currentView === 'inline-actions') { this.currentView = 'list'; this.updateModalVisuals(); }
-                else if (this.currentView === 'summary') this.cancelModalSelection();
-                else this.cancelModalSelection(true);
-            }
-        };
-
-        window.addEventListener('keydown', this.modalKeyListener);
-
-        // USIAMO ADDEVENTLISTENER NATIVO (Non il .addListener di Phaser!)
-        this.teamModalDom.addEventListener('click', (e) => {
-            if (e.target.id === 'summary-page-indicator') {
-                this.summaryPage = this.summaryPage === 0 ? 1 : 0; this.updateSummaryPage(); this.updateModalVisuals(); return;
-            }
-
-            let moveItem = e.target.closest('.move-entry');
-            if (moveItem && this.currentView === 'summary' && this.summaryPage === 1) {
-                let idx = Array.from(moveItem.parentNode.children).indexOf(moveItem);
-                this.moveSelectionIdx = idx;
-                this.updateModalVisuals();
-                return;
-            }
-
-            let item = e.target.closest('.pokemon-item');
-            if (item && this.currentView === 'list') {
-                this.modalSelection = parseInt(item.dataset.index); this.confirmModalSelection(teamData); return;
-            }
-            if (e.target.classList.contains('action-btn-inline')) {
-                let actionText = e.target.innerText.trim();
-                let parentItem = e.target.closest('.pokemon-item');
-                this.modalSelection = parseInt(parentItem.dataset.index);
-
-                if (actionText === 'SOSTITUISCI') this.executeSwitch(this.modalSelection);
-                else if (actionText === 'SUMMARY') this.openSummary(teamData[this.modalSelection]);
-                else if (actionText === 'INDIETRO') { this.currentView = 'list'; this.updateModalVisuals(); }
-                return;
-            }
-            if (e.target.id === 'btn-back-to-action') this.cancelModalSelection();
-        });
-    }
-
-    updateModalVisuals() {
-        document.querySelectorAll('.move-entry').forEach(el => el.classList.remove('selected'));
-        document.querySelectorAll('.pokemon-item, .action-btn, .move-entry').forEach(el => el.classList.remove('selected'));
-
-        if (this.currentView === 'list' || this.currentView === 'inline-actions') {
-            document.querySelectorAll('.pokemon-item').forEach((el, index) => {
-                el.classList.remove('selected', 'show-actions');
-                el.querySelectorAll('.action-btn-inline').forEach(btn => btn.classList.remove('selected'));
-
-                if (index === this.modalSelection) {
-                    el.classList.add('selected');
-                    if (this.currentView === 'inline-actions') {
-                        el.classList.add('show-actions');
-                        let btns = el.querySelectorAll('.action-btn-inline');
-                        if (btns[this.actionSelectionIdx]) btns[this.actionSelectionIdx].classList.add('selected');
-                    }
-                }
-            });
-        } else if (this.currentView === 'summary' && this.summaryPage === 1) {
-            const moves = document.querySelectorAll('.move-entry');
-            if (moves[this.moveSelectionIdx]) {
-                let activeMove = moves[this.moveSelectionIdx];
-                activeMove.classList.add('selected');
-                activeMove.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
-                // Aggiornamento pulito del Box Descrizione senza distruggere i tag
-                document.getElementById('desc-text').innerText = activeMove.getAttribute('data-desc');
-                document.getElementById('desc-pot').innerText = activeMove.getAttribute('data-pot');
-                document.getElementById('desc-prec').innerText = activeMove.getAttribute('data-prec');
-            }
-        }
-    }
-
-    confirmModalSelection(teamData) {
+    document.getElementById('moves-list-container').innerHTML = movesHtml;
+    this.updateSummaryPage();
+    this.updateModalVisuals();
+}
+setupModalNavigation(teamData) {
+    // [Tutto il blocco modalKeyListener rimane invariato, omettilo se vuoi, ma lo riscrivo qui per sicurezza]
+    this.modalKeyListener = (event) => {
+        if (this.isInputActive) return;
+        const key = event.key;
         if (this.currentView === 'list') {
-            this.currentView = 'inline-actions';
-            this.actionSelectionIdx = 0;
-            this.updateModalVisuals();
+            let max = document.querySelectorAll('.pokemon-item').length;
+            if (max > 0) {
+                if (key === 'ArrowDown' || key === 's') { this.modalSelection = (this.modalSelection + 1) % max; this.updateModalVisuals(); }
+                if (key === 'ArrowUp' || key === 'w') { this.modalSelection = (this.modalSelection - 1 + max) % max; this.updateModalVisuals(); }
+            }
         } else if (this.currentView === 'inline-actions') {
-            if (this.actionSelectionIdx === 0) {
-                this.executeSwitch(this.modalSelection);
-            } else if (this.actionSelectionIdx === 1) {
-                this.openSummary(teamData[this.modalSelection]);
-            } else if (this.actionSelectionIdx === 2) {
-                // FIX: Permette di tornare liberamente alla lista dei Pokémon
-                // senza far scattare falsi allarmi del banner!
-                this.currentView = 'list';
+            let max = 3;
+            if (key === 'ArrowDown' || key === 's') { this.actionSelectionIdx = (this.actionSelectionIdx + 1) % max; this.updateModalVisuals(); }
+            if (key === 'ArrowUp' || key === 'w') { this.actionSelectionIdx = (this.actionSelectionIdx - 1 + max) % max; this.updateModalVisuals(); }
+        } else if (this.currentView === 'summary') {
+            if (this.summaryPage === 1) {
+                let numMoves = document.querySelectorAll('.move-entry').length;
+                if (numMoves > 0) {
+                    if (key === 'ArrowDown' || key === 's') { this.moveSelectionIdx = Math.min(numMoves - 1, this.moveSelectionIdx + 1); this.updateModalVisuals(); }
+                    if (key === 'ArrowUp' || key === 'w') { this.moveSelectionIdx = Math.max(0, this.moveSelectionIdx - 1); this.updateModalVisuals(); }
+                }
+            }
+            if (key === 'ArrowRight' || key === 'd' || key === 'ArrowLeft' || key === 'a') {
+                this.summaryPage = this.summaryPage === 0 ? 1 : 0;
+                this.moveSelectionIdx = 0;
+                this.updateSummaryPage();
                 this.updateModalVisuals();
             }
         }
-    }
 
-    cancelModalSelection(forceClose = false) {
-        if (forceClose && this.isForcedSwitch) {
-            window.showBanner("Devi scegliere un sostituto!");
+        if (key === 'Enter' || key === ' ') this.confirmModalSelection(teamData);
+        if (key === 'Escape' || key === 'Backspace') {
+            if (this.currentView === 'inline-actions') { this.currentView = 'list'; this.updateModalVisuals(); }
+            else if (this.currentView === 'summary') this.cancelModalSelection();
+            else this.cancelModalSelection(true);
+        }
+    };
+
+    window.addEventListener('keydown', this.modalKeyListener);
+
+    // USIAMO ADDEVENTLISTENER NATIVO (Non il .addListener di Phaser!)
+    this.teamModalDom.addEventListener('click', (e) => {
+        if (e.target.id === 'summary-page-indicator') {
+            this.summaryPage = this.summaryPage === 0 ? 1 : 0; this.updateSummaryPage(); this.updateModalVisuals(); return;
+        }
+
+        let moveItem = e.target.closest('.move-entry');
+        if (moveItem && this.currentView === 'summary' && this.summaryPage === 1) {
+            let idx = Array.from(moveItem.parentNode.children).indexOf(moveItem);
+            this.moveSelectionIdx = idx;
+            this.updateModalVisuals();
             return;
         }
 
-        if (forceClose) {
-            window.removeEventListener('keydown', this.modalKeyListener);
-            if (this.teamModalDom) {
-                this.teamModalDom.remove(); // NATIVO: .remove() invece di .destroy()
-                this.teamModalDom = null;
+        let item = e.target.closest('.pokemon-item');
+        if (item && this.currentView === 'list') {
+            this.modalSelection = parseInt(item.dataset.index); this.confirmModalSelection(teamData); return;
+        }
+        if (e.target.classList.contains('action-btn-inline')) {
+            let actionText = e.target.innerText.trim();
+            let parentItem = e.target.closest('.pokemon-item');
+            this.modalSelection = parseInt(parentItem.dataset.index);
+
+            if (actionText === 'SOSTITUISCI') this.executeSwitch(this.modalSelection);
+            else if (actionText === 'SUMMARY') this.openSummary(teamData[this.modalSelection]);
+            else if (actionText === 'INDIETRO') { this.currentView = 'list'; this.updateModalVisuals(); }
+            return;
+        }
+        if (e.target.id === 'btn-back-to-action') this.cancelModalSelection();
+    });
+}
+
+updateModalVisuals() {
+    document.querySelectorAll('.move-entry').forEach(el => el.classList.remove('selected'));
+    document.querySelectorAll('.pokemon-item, .action-btn, .move-entry').forEach(el => el.classList.remove('selected'));
+
+    if (this.currentView === 'list' || this.currentView === 'inline-actions') {
+        document.querySelectorAll('.pokemon-item').forEach((el, index) => {
+            el.classList.remove('selected', 'show-actions');
+            el.querySelectorAll('.action-btn-inline').forEach(btn => btn.classList.remove('selected'));
+
+            if (index === this.modalSelection) {
+                el.classList.add('selected');
+                if (this.currentView === 'inline-actions') {
+                    el.classList.add('show-actions');
+                    let btns = el.querySelectorAll('.action-btn-inline');
+                    if (btns[this.actionSelectionIdx]) btns[this.actionSelectionIdx].classList.add('selected');
+                }
             }
-            this.isInputActive = true;
-            if (typeof this.updateMenuSelection === 'function') this.updateMenuSelection();
-        } else {
-            this.currentView = 'inline-actions';
-            document.getElementById('modal-summary-view').style.display = 'none';
-            document.getElementById('modal-list-view').style.display = 'block';
+        });
+    } else if (this.currentView === 'summary' && this.summaryPage === 1) {
+        const moves = document.querySelectorAll('.move-entry');
+        if (moves[this.moveSelectionIdx]) {
+            let activeMove = moves[this.moveSelectionIdx];
+            activeMove.classList.add('selected');
+            activeMove.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            // Aggiornamento pulito del Box Descrizione senza distruggere i tag
+            document.getElementById('desc-text').innerText = activeMove.getAttribute('data-desc');
+            document.getElementById('desc-pot').innerText = activeMove.getAttribute('data-pot');
+            document.getElementById('desc-prec').innerText = activeMove.getAttribute('data-prec');
+        }
+    }
+}
+
+confirmModalSelection(teamData) {
+    if (this.currentView === 'list') {
+        this.currentView = 'inline-actions';
+        this.actionSelectionIdx = 0;
+        this.updateModalVisuals();
+    } else if (this.currentView === 'inline-actions') {
+        if (this.actionSelectionIdx === 0) {
+            this.executeSwitch(this.modalSelection);
+        } else if (this.actionSelectionIdx === 1) {
+            this.openSummary(teamData[this.modalSelection]);
+        } else if (this.actionSelectionIdx === 2) {
+            // FIX: Permette di tornare liberamente alla lista dei Pokémon
+            // senza far scattare falsi allarmi del banner!
+            this.currentView = 'list';
             this.updateModalVisuals();
         }
     }
+}
 
-    updateSummaryPage() {
-        let ind = document.getElementById('summary-page-indicator');
-        ind.innerText = this.summaryPage === 0 ? '◀ INFO E STATISTICHE ▶' : '◀ MOSSE ▶';
-        document.getElementById('summary-page-0').style.display = this.summaryPage === 0 ? 'grid' : 'none';
-        document.getElementById('summary-page-1').style.display = this.summaryPage === 1 ? 'flex' : 'none';
-        document.getElementById('summary-move-desc').style.display = this.summaryPage === 1 ? 'flex' : 'none';
+cancelModalSelection(forceClose = false) {
+    if (forceClose && this.isForcedSwitch) {
+        window.showBanner("Devi scegliere un sostituto!");
+        return;
     }
 
-    executeSwitch(index) {
-        let pkmn = this.myTeamData[index];
-        let activeIdx = this.myActiveIdx !== undefined ? this.myActiveIdx : 0;
-
-        if (pkmn.hp <= 0) {
-            window.showBanner("Questo Pokémon è esausto!");
-            return;
-        }
-
-        if (index === activeIdx && !this.isForcedSwitch) {
-            this.cancelModalSelection(true);
-            this.isInputActive = false; this.btns.forEach(b => b.setVisible(false)); this.logText.setVisible(true);
-            this.logText.setText(`${this.pEntity.name.toUpperCase()} è già in campo!`);
-            this.time.delayedCall(1500, () => this.startTurn());
-            return;
-        }
-
+    if (forceClose) {
+        window.removeEventListener('keydown', this.modalKeyListener);
         if (this.teamModalDom) {
             this.teamModalDom.remove(); // NATIVO: .remove() invece di .destroy()
             this.teamModalDom = null;
         }
-        window.removeEventListener('keydown', this.modalKeyListener);
-        this.btns.forEach(b => b.setVisible(false)); this.logText.setVisible(true);
-
-        const switchAction = { tipo: 'switch', nuovoIdx: index };
-
-        let wasForced = this.isForcedSwitch;
-        this.isForcedSwitch = false;
-
-        if (wasForced) {
-            if (this.isWild) {
-                this.partita.p1.attivoIdx = index;
-                let nuovoPk = this.partita.p1.squadra[index];
-                this.partita.logs = [`Vai, ${nuovoPk.nome}! `];
-                let nuovoStato = this.partita.ottieniStatoAggiornato();
-                this.applicaStatoPartita(nuovoStato, false);
-            } else {
-                this.logText.setText("Mando in campo...");
-                this.socket.emit('pvpUseMove', { roomId: this.roomId, tipo: 'forced_switch', nuovoIdx: index });
-            }
-            return;
-        }
-
-        if (this.isWild) {
-            let activeBot = this.partita.p2.squadra[this.partita.p2.attivoIdx];
-
-            // IL SEGRETO È QUI: Il bot deve valutare i danni sul Pokémon che STA ENTRANDO (usando "index")
-            let playerTarget = this.partita.p1.squadra[index];
-
-            // Facciamo ragionare l'algoritmo intelligente
-            let botMoveData = this.partita.scegliMossaBotIntelligente(activeBot, playerTarget, this.partita.p2, this.partita.p1);
-
-            // Creiamo l'azione finale del bot
-            let botAction = { mossa: botMoveData };
-
-            // Processiamo il turno: tu fai lo switch, lui ti attacca!
-            let stato = this.partita.processaTurno(switchAction, botAction);
-            this.applicaStatoPartita(stato, false);
-        } else {
-            this.logText.setText("In attesa dell'avversario...");
-            this.socket.emit('pvpUseMove', { roomId: this.roomId, ...switchAction });
-        }
+        this.isInputActive = true;
+        if (typeof this.updateMenuSelection === 'function') this.updateMenuSelection();
+    } else {
+        this.currentView = 'inline-actions';
+        document.getElementById('modal-summary-view').style.display = 'none';
+        document.getElementById('modal-list-view').style.display = 'block';
+        this.updateModalVisuals();
     }
+}
+
+updateSummaryPage() {
+    let ind = document.getElementById('summary-page-indicator');
+    ind.innerText = this.summaryPage === 0 ? '◀ INFO E STATISTICHE ▶' : '◀ MOSSE ▶';
+    document.getElementById('summary-page-0').style.display = this.summaryPage === 0 ? 'grid' : 'none';
+    document.getElementById('summary-page-1').style.display = this.summaryPage === 1 ? 'flex' : 'none';
+    document.getElementById('summary-move-desc').style.display = this.summaryPage === 1 ? 'flex' : 'none';
+}
+
+executeSwitch(index) {
+    let pkmn = this.myTeamData[index];
+    let activeIdx = this.myActiveIdx !== undefined ? this.myActiveIdx : 0;
+
+    if (pkmn.hp <= 0) {
+        window.showBanner("Questo Pokémon è esausto!");
+        return;
+    }
+
+    if (index === activeIdx && !this.isForcedSwitch) {
+        this.cancelModalSelection(true);
+        this.isInputActive = false; this.btns.forEach(b => b.setVisible(false)); this.logText.setVisible(true);
+        this.logText.setText(`${this.pEntity.name.toUpperCase()} è già in campo!`);
+        this.time.delayedCall(1500, () => this.startTurn());
+        return;
+    }
+
+    if (this.teamModalDom) {
+        this.teamModalDom.remove(); // NATIVO: .remove() invece di .destroy()
+        this.teamModalDom = null;
+    }
+    window.removeEventListener('keydown', this.modalKeyListener);
+    this.btns.forEach(b => b.setVisible(false)); this.logText.setVisible(true);
+
+    const switchAction = { tipo: 'switch', nuovoIdx: index };
+
+    let wasForced = this.isForcedSwitch;
+    this.isForcedSwitch = false;
+
+    if (wasForced) {
+        if (this.isWild) {
+            this.partita.p1.attivoIdx = index;
+            let nuovoPk = this.partita.p1.squadra[index];
+            this.partita.logs = [`Vai, ${nuovoPk.nome}! `];
+            let nuovoStato = this.partita.ottieniStatoAggiornato();
+            this.applicaStatoPartita(nuovoStato, false);
+        } else {
+            this.logText.setText("Mando in campo...");
+            this.socket.emit('pvpUseMove', { roomId: this.roomId, tipo: 'forced_switch', nuovoIdx: index });
+        }
+        return;
+    }
+
+    if (this.isWild) {
+        let activeBot = this.partita.p2.squadra[this.partita.p2.attivoIdx];
+
+        // IL SEGRETO È QUI: Il bot deve valutare i danni sul Pokémon che STA ENTRANDO (usando "index")
+        let playerTarget = this.partita.p1.squadra[index];
+
+        // Facciamo ragionare l'algoritmo intelligente
+        let botMoveData = this.partita.scegliMossaBotIntelligente(activeBot, playerTarget, this.partita.p2, this.partita.p1);
+
+        // Creiamo l'azione finale del bot
+        let botAction = { mossa: botMoveData };
+
+        // Processiamo il turno: tu fai lo switch, lui ti attacca!
+        let stato = this.partita.processaTurno(switchAction, botAction);
+        this.applicaStatoPartita(stato, false);
+    } else {
+        this.logText.setText("In attesa dell'avversario...");
+        this.socket.emit('pvpUseMove', { roomId: this.roomId, ...switchAction });
+    }
+}
 }
 
 // ==============================================================================
@@ -2413,7 +3562,7 @@ class PVEScene extends Phaser.Scene {
         this.myPlayerName = data.name;
         this.user = data.user;
     }
-    
+
     create() {
         this.player = null;
         this.npcInSfida = null;
@@ -2424,7 +3573,7 @@ class PVEScene extends Phaser.Scene {
         // const map = this.make.tilemap({ key: 'mapPVE' });
         this.setupMap();
         this.setupNPCs();
-        
+
         let startX = 100;
         let startY = 100;
         if (this.zoneInterattive) {
@@ -2452,7 +3601,7 @@ class PVEScene extends Phaser.Scene {
         this.canEncounter = true;
         this.isTransitioning = false;
         this.isMovingGrid = false;
-        
+
         this.events.on('resume', () => {
             this.cursors.left.reset(); this.cursors.right.reset();
             this.cursors.up.reset(); this.cursors.down.reset();
@@ -2491,7 +3640,7 @@ class PVEScene extends Phaser.Scene {
         const tilesetA = map.addTilesetImage('a', 'tilesA', 16, 16, 1, 1);
         const tilesetE = map.addTilesetImage('e', 'tilesE', 16, 16, 0, 0);
         const tilesetC = map.addTilesetImage('c', 'tilesC', 16, 16, 1, 1);
-        const tilesetD = map.addTilesetImage('d', 'tilesD', 16, 16, 1, 1); 
+        const tilesetD = map.addTilesetImage('d', 'tilesD', 16, 16, 1, 1);
 
         const allTilesets = [tilesetA, tilesetC, tilesetD, tilesetE];
 
@@ -2518,7 +3667,7 @@ class PVEScene extends Phaser.Scene {
 
     setupNPCs() {
         this.npcs = this.physics.add.group();
-        
+
         let npcPositions = [
             { x: 120, y: 350 },
             { x: 180, y: 200 },
@@ -2550,8 +3699,8 @@ class PVEScene extends Phaser.Scene {
 
         if (this.isTransitioning || !this.player || this.isPaused || this.isMovingGrid || this.isDialogActive) return;
 
-        const TILE_SIZE = 16; 
-        
+        const TILE_SIZE = 16;
+
         let currentAnim = null;
         let dx = 0;
         let dy = 0;
@@ -2570,7 +3719,7 @@ class PVEScene extends Phaser.Scene {
             let isOutOfBounds = targetX < 0 || targetX >= this.mapWidth || targetY < 0 || targetY >= this.mapHeight;
             let ostacolo = this.wallLayer.getTileAtWorldXY(targetX, targetY, true);
             let isWall = (ostacolo && ostacolo.index !== -1);
-            
+
             let isNpc = false;
             if (this.npcs) {
                 this.npcs.getChildren().forEach(n => {
@@ -2582,7 +3731,7 @@ class PVEScene extends Phaser.Scene {
 
             if (!isWall && !isNpc && !isOutOfBounds) {
                 this.isMovingGrid = true;
-                
+
                 this.tweens.add({
                     targets: this.player,
                     x: targetX,
@@ -2591,7 +3740,7 @@ class PVEScene extends Phaser.Scene {
                     onComplete: () => {
                         this.isMovingGrid = false;
                         this.player.anims.stop();
-                        
+
                         // Controllo Erba Alta
                         let grassTile = this.grassLayer.getTileAtWorldXY(targetX, targetY, true);
                         if (this.canEncounter && grassTile && grassTile.index !== -1) {
@@ -2638,7 +3787,7 @@ class PVEScene extends Phaser.Scene {
                     }
                 });
             } else {
-                this.player.anims.stop(); 
+                this.player.anims.stop();
             }
         } else {
             this.player.anims.stop();
@@ -2686,7 +3835,7 @@ class PVEScene extends Phaser.Scene {
         document.getElementById('game-container').appendChild(overlay);
 
         setTimeout(() => {
-            if(overlay) overlay.remove();
+            if (overlay) overlay.remove();
             this.isTransitioning = false;
             this.isDialogActive = false;
             this.scene.pause();
@@ -2745,9 +3894,7 @@ class PVEScene extends Phaser.Scene {
                 if (scelta === 'SI') {
                     this.tornaAllaLobby(true);
                 } else {
-                    this.time.delayedCall(100, () => {
-                        this.isDialogActive = false;
-                    });
+                    this.scene.start('WorldScene', { name: this.myPlayerName, user: this.user, vengoDa: 'Porta PVE' });
                 }
             });
         });
@@ -2755,7 +3902,7 @@ class PVEScene extends Phaser.Scene {
 
     async tornaAllaLobby(salvaRun = false) {
         this.isTransitioning = true;
-        
+
         let overlay = document.createElement('div');
         overlay.style.position = 'absolute';
         overlay.style.top = '0';
@@ -2767,21 +3914,21 @@ class PVEScene extends Phaser.Scene {
         overlay.style.justifyContent = 'center';
         overlay.style.alignItems = 'center';
         overlay.style.zIndex = '9999';
-        
+
         overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 3rem; color: #fff;">TORNO ALLA LOBBY...</h1>`;
         document.getElementById('game-container').appendChild(overlay);
 
         try {
             let profilo = this.registry.get('playerProfile');
             let mappaDaSalvare = salvaRun ? 'mappa_pve' : 'mappa_base';
-            
+
             const { error } = await supabaseClient.from('profilo').update({ id_mappa: mappaDaSalvare }).eq('id_profilo', profilo.id_profilo);
             if (error) {
                 console.error("Errore aggiornamento DB (Mappa):", error);
             } else {
                 profilo.id_mappa = mappaDaSalvare;
             }
-            
+
             let myDbTeam = this.registry.get('userPokemon');
             let allUpdates = myDbTeam.map(p => ({
                 id_pokemon: p.id_pokemon, id_specie: p.id_specie, id_profilo_proprietario: p.id_profilo_proprietario, in_squadra: p.in_squadra, posizione_slot: p.posizione_slot
@@ -2792,11 +3939,11 @@ class PVEScene extends Phaser.Scene {
         }
 
         setTimeout(() => {
-            if(overlay) overlay.remove();
+            if (overlay) overlay.remove();
             this.isTransitioning = false;
-            
+
             this.scene.stop('PVEScene');
-            this.scene.start('WorldScene', { name: this.myPlayerName, user: this.user });
+            this.scene.start('WorldScene', { name: this.myPlayerName, user: this.user, vengoDa: 'Porta PVE' });
         }, 1000);
     }
 
@@ -2825,7 +3972,6 @@ class PVEScene extends Phaser.Scene {
             };
 
             renderMainPause();
-
             document.getElementById('game-container').appendChild(overlay);
 
             overlay.addEventListener('click', (e) => {
@@ -2843,7 +3989,6 @@ class PVEScene extends Phaser.Scene {
                             <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">PROFILO ALLENATORE</h2>
                             <div style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; border: 2px solid #ff7477; width: 85%; text-align: left; color: #fff; font-family: 'Courier New', monospace; font-size: 1.2rem;">
                                 <p style="margin: 10px 0;"><strong>NOME:</strong> ${profilo.username || 'Sconosciuto'}</p>
-                                <p style="margin: 10px 0;"><strong>ID:</strong> ${profilo.id_profilo ? profilo.id_profilo.substring(0,8).toUpperCase() : '---'}</p>
                                 <p style="margin: 10px 0;"><strong>VITTORIE:</strong> ${profilo.vittorie || 0}</p>
                                 <p style="margin: 10px 0;"><strong>PARTITE GIOCATE:</strong> ${profilo.partite_giocate || 0}</p>
                             </div>
@@ -2877,7 +4022,7 @@ class PVEScene extends Phaser.Scene {
             container.style.flexDirection = 'column';
             container.style.justifyContent = 'flex-start';
             container.style.boxShadow = '0px 10px 20px rgba(0,0,0,0.8)';
-            
+
             let textEl = document.createElement('div');
             textEl.id = 'dialog-ui-text';
             textEl.style.color = '#ffffff';
@@ -2904,12 +4049,12 @@ class PVEScene extends Phaser.Scene {
     mostraTestiDialogo(testi, onComplete) {
         let index = 0;
         let textEl = document.getElementById('dialog-ui-text');
-        
+
         const mostraProssimo = () => {
             if (index < testi.length) {
                 textEl.innerHTML = testi[index].replace(' ▼', '') + '<span style="color:#ffcc00;"> ▼</span>';
                 index++;
-                
+
                 setTimeout(() => {
                     const handleEnter = (e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
@@ -2966,10 +4111,10 @@ class PVEScene extends Phaser.Scene {
             choiceContainer.appendChild(optNo);
             document.body.appendChild(choiceContainer);
         }
-        
+
         choiceContainer.style.display = 'flex';
         this.sceltaAttuale = 0; // 0 = SÌ, 1 = NO
-        
+
         const aggiornaCursoreScelta = () => {
             let optSi = document.getElementById('dialog-opt-si');
             let optNo = document.getElementById('dialog-opt-no');
@@ -3006,9 +4151,9 @@ class PVEScene extends Phaser.Scene {
         this.createDialogUI();
 
         this.mostraTestiDialogo([
-            "BENVENUTO NELLA MODALITÀ PVE!", 
-            "Qui puoi esplorare l'erba alta per trovare Pokémon selvatici...", 
-            "Oppure sfidare gli allenatori presenti per allenare la tua squadra.", 
+            "BENVENUTO NELLA MODALITÀ PVE!",
+            "Qui puoi esplorare l'erba alta per trovare Pokémon selvatici...",
+            "Oppure sfidare gli allenatori presenti per allenare la tua squadra.",
             "Trova l'uscita alla fine del percorso per completare l'area!"
         ], () => {
             this.chiudiDialogo();
@@ -3028,6 +4173,6 @@ const config = {
     roundPixels: true,
     dom: { createContainer: true },
     physics: { default: 'arcade', arcade: { gravity: { y: 0 } } },
-    scene: [BootScene, LoginScene, StarterScene, WorldScene, PVEScene, BattleScene]
+    scene: [BootScene, LoginScene, StarterScene, WorldScene, PVEScene, CPKScene, PvPScene, BattleScene]
 };
 new Phaser.Game(config);
