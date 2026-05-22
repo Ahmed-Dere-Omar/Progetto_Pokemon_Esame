@@ -1,5 +1,5 @@
 class Effetti {
-    
+
     static verificaCondizione(Condizione, target, utente, Partita) {
         if (!Condizione) return true;
 
@@ -29,7 +29,7 @@ class Effetti {
             case "BersaglioMinimizzato":
                 return target.statiVolatili && target.statiVolatili["Minimizzato"] === true;
             case "PrimoTurno":
-                return utente.statiVolatili && utente.statiVolatili.primoTurnoInCampo === true; 
+                return utente.statiVolatili && utente.statiVolatili.primoTurnoInCampo === true;
             case "BersaglioSottoMetaPS":
                 return target.hp <= (target.hpMax / 2);
             case "BersaglioConStato":
@@ -39,7 +39,11 @@ class Effetti {
             case "UtenteMuoveDopo":
                 return target.haGiaAgito === true;
             case "AlTermine":
-                return false; 
+                if (utente.statiVolatili && utente.statiVolatili.applicaConfusioneAlTermine) {
+                    utente.statiVolatili.applicaConfusioneAlTermine = false; // Consuma il flag
+                    return true;
+                }
+                return false;
             default:
                 console.warn(`[Sistema Effetti] Condizione non riconosciuta: ${Condizione}`);
                 return true;
@@ -50,8 +54,8 @@ class Effetti {
         // Applica o rimuove gradi alle statistiche del bersaglio fino a un massimo di +/-6.
         let prob = Probabilità !== undefined ? Probabilità : Probabilita;
         if (Math.random() * 100 > prob) return false;
-        
-        let target = (typeof Bersaglio === "string" && Bersaglio === "Utente") ? Utente : Bersaglio; 
+
+        let target = (typeof Bersaglio === "string" && Bersaglio === "Utente") ? Utente : Bersaglio;
         if (!target) return false;
         if (Condizione && !this.verificaCondizione(Condizione, target, Utente, Partita)) return false;
 
@@ -60,11 +64,11 @@ class Effetti {
         let statAttuale = target.modificatori[statKey] || 0;
         if ((Gradi > 0 && statAttuale >= 6) || (Gradi < 0 && statAttuale <= -6)) {
             if (Logs) Logs.push(`La statistica ${Statistica} di ${target.nome} non può andare oltre!`);
-            return false; 
+            return false;
         }
 
         target.modificatori[statKey] = Math.max(-6, Math.min(6, statAttuale + Gradi));
-        
+
         if (Logs) {
             let verbo = Gradi > 0 ? "aumenta" : "diminuisce";
             Logs.push(`La statistica ${Statistica} di ${target.nome} ${verbo} di ${Math.abs(Gradi)}!`);
@@ -76,7 +80,7 @@ class Effetti {
         // Blocca l'uso della stessa mossa per alcuni turni e causa confusione alla fine.
         let utente = Utente;
         if (!utente) return false;
-        
+
         utente.statiVolatili = utente.statiVolatili || {};
         if (!utente.statiVolatili.bloccoMosse || utente.statiVolatili.bloccoMosse.mossa !== MossaNome) {
             let durata = Turni !== null ? Turni : Math.floor(Math.random() * (TurniMax - TurniMin + 1)) + TurniMin;
@@ -97,9 +101,9 @@ class Effetti {
         // Applica uno stato alterato primario al bersaglio (es. Scottatura, Paralisi, Sonno).
         let prob = Probabilità !== undefined ? Probabilità : Probabilita;
         if (Math.random() * 100 > prob) return false;
-        
+
         let target = (typeof Bersaglio === "string" && Bersaglio === "Utente") ? Utente : Bersaglio;
-        if (!target || (target.stato !== null && target.stato !== undefined)) return false; 
+        if (!target || (target.stato !== null && target.stato !== undefined)) return false;
 
         if (Condizione && !this.verificaCondizione(Condizione, target, Utente, Partita)) return false;
 
@@ -110,9 +114,9 @@ class Effetti {
 
         target.stato = Stato;
         target.contatoriStato = target.contatoriStato || {};
-        
+
         if (Stato === "Sonno") {
-            target.contatoriStato.sonno = Durata || Math.floor(Math.random() * 3) + 1; 
+            target.contatoriStato.sonno = Durata || Math.floor(Math.random() * 3) + 1;
         } else if (Stato === "Iperavvelenamento") {
             target.contatoriStato.tossina = 1;
         } else if (Stato === "Sonnolenza") {
@@ -122,21 +126,35 @@ class Effetti {
         return true;
     }
 
-    static ApplicaStatoUnico({ Tipo, Bersaglio, Turni = null, Utente, Logs }) {
+    static ApplicaStatoUnico({ Tipo, Bersaglio, Turni = null, Utente, Proprietario, Avversario, Logs }) {
         // Applica stati alterati volatili al bersaglio come Parassiseme o Confusione.
+        if (Tipo === "Ultimocanto") {
+            let tutti = [];
+            if (Proprietario && Proprietario.squadra[Proprietario.attivoIdx]) tutti.push(Proprietario.squadra[Proprietario.attivoIdx]);
+            if (Avversario && Avversario.squadra[Avversario.attivoIdx]) tutti.push(Avversario.squadra[Avversario.attivoIdx]);
+            tutti.forEach(t => {
+                t.statiVolatili = t.statiVolatili || {};
+                if (!t.statiVolatili.ultimocanto) {
+                    t.statiVolatili.ultimocanto = { attivo: true, turniRimanenti: Turni || 3 };
+                    if (Logs) Logs.push(`Chiunque oda Ultimocanto andrà KO in 3 turni!`);
+                }
+            });
+            return true;
+        }
+
         let target = (typeof Bersaglio === "string" && Bersaglio === "Utente") ? Utente : Bersaglio;
         if (!target) return false;
-        
+
         target.statiVolatili = target.statiVolatili || {};
-        if (target.statiVolatili[Tipo]) return false; 
+        if (target.statiVolatili[Tipo]) return false;
 
         if (Tipo === "Parassiseme" && target.tipi.includes("Erba")) return false;
 
         target.statiVolatili[Tipo] = true;
-        
+
         if (Tipo === "Confusione") {
             target.contatoriStato = target.contatoriStato || {};
-            target.contatoriStato.confusione = Turni || Math.floor(Math.random() * 4) + 2; 
+            target.contatoriStato.confusione = Turni || Math.floor(Math.random() * 4) + 2;
         }
         if (Logs) Logs.push(`${target.nome} subisce l'effetto ${Tipo}!`);
         return true;
@@ -154,8 +172,8 @@ class Effetti {
             danno = Math.floor(utente.hpMax * (Percentuale / 100));
         }
 
-        if (danno === 0 && DannoInflitto > 0) danno = 1; 
-        
+        if (danno === 0 && DannoInflitto > 0) danno = 1;
+
         utente.hp = Math.max(0, utente.hp - danno);
         if (Logs) Logs.push(`${utente.nome} subisce ${danno} danni per il contraccolpo!`);
         return true;
@@ -175,6 +193,7 @@ class Effetti {
             let meteo = typeof getMeteo !== "undefined" ? getMeteo() : "Normale";
             if (meteo === "Sole") psDaCurare = Math.floor(target.hpMax * (2 / 3));
             else if (["Pioggia", "TempestaSabbia", "Neve"].includes(meteo)) psDaCurare = Math.floor(target.hpMax * 0.25);
+            else if (["Pioggia", "TempestaSabbia", "Grandine", "Neve"].includes(meteo)) psDaCurare = Math.floor(target.hpMax * 0.25);
             else psDaCurare = Math.floor(target.hpMax * 0.5);
         } else if (Tipo === "DipendenteDaAccumulo") {
             let accumuli = target.statiVolatili.accumuli || 0;
@@ -199,13 +218,13 @@ class Effetti {
             utente.statiVolatili.inCarica = false;
             utente.statiVolatili.statoSeminvulnerabile = null;
             utente.statiVolatili.mossaForzata = null;
-            return true; 
+            return true;
         }
 
         utente.statiVolatili.inCarica = true;
         utente.statiVolatili.mossaForzata = MossaNome;
         if (StatoSeminvulnerabile) utente.statiVolatili.statoSeminvulnerabile = StatoSeminvulnerabile;
-        
+
         return "IN_CARICA";
     }
 
@@ -213,7 +232,7 @@ class Effetti {
         // Costringe il bersaglio a tentennare impedendogli di agire nel turno corrente.
         let prob = Probabilita !== null ? Probabilita : Probabilità;
         if (Math.random() * 100 > prob) return false;
-        
+
         let target = (typeof Bersaglio === "string" && Bersaglio === "Utente") ? Utente : Bersaglio;
         if (!target || target.haGiaAgito) return false;
         target.statiVolatili = target.statiVolatili || {};
@@ -272,7 +291,7 @@ class Effetti {
             successo = true;
             if (Logs) Logs.push(`${utente.nome} si è liberato!`);
         }
-        
+
         return successo;
     }
 
@@ -282,8 +301,8 @@ class Effetti {
         if (!target) return false;
 
         target.contatoriStato = target.contatoriStato || {};
-        let probabilitaSuccesso = target.contatoriStato.usciteProtezione ? Math.pow(1/3, target.contatoriStato.usciteProtezione) : 1;
-        
+        let probabilitaSuccesso = target.contatoriStato.usciteProtezione ? Math.pow(1 / 3, target.contatoriStato.usciteProtezione) : 1;
+
         if (Math.random() > probabilitaSuccesso) {
             target.contatoriStato.usciteProtezione = 0;
             return false;
@@ -317,14 +336,13 @@ class Effetti {
         return 5;
     }
 
-    static AumentaPotenzaConsecutiva({ Max = null, Turni = null, Incremento = null, Moltiplicatore = null, Utente }) {
-        // Aumenta un contatore che fa crescere i danni della mossa se usata in turni consecutivi.
+    static AumentaPotenzaConsecutiva({ Max = null, Turni = null, Incremento = null, Moltiplicatore = null, Utente, MossaNome }) {
         let utente = Utente;
         if (!utente) return false;
         utente.statiVolatili = utente.statiVolatili || {};
 
-        let mossaAttuale = utente.mossaInUso;
-        
+        let mossaAttuale = MossaNome || utente.ultimaMossaUsata;
+
         if (!utente.statiVolatili.potenzaConsecutiva || utente.statiVolatili.potenzaConsecutiva.mossa !== mossaAttuale) {
             utente.statiVolatili.potenzaConsecutiva = { mossa: mossaAttuale, contatore: 1 };
         } else {
@@ -333,7 +351,6 @@ class Effetti {
                 utente.statiVolatili.potenzaConsecutiva.contatore = 1;
             }
         }
-        
         return true;
     }
 
@@ -341,7 +358,7 @@ class Effetti {
         // Rende infallibilmente critico il prossimo attacco dell'utente.
         let target = (typeof Bersaglio === "string" && Bersaglio === "Utente") ? Utente : Bersaglio;
         if (!target) return false;
-        
+
         target.statiVolatili = target.statiVolatili || {};
         target.statiVolatili.prossimoColpoCritico = true;
         return true;
@@ -351,11 +368,11 @@ class Effetti {
         // Incrementa la probabilità dell'utente di infliggere brutti colpi fino al massimo consentito.
         let target = (typeof Bersaglio === "string" && Bersaglio === "Utente") ? Utente : Bersaglio;
         if (!target) return false;
-        
+
         target.modificatori = target.modificatori || {};
         if (!target.modificatori.tassoCritico) target.modificatori.tassoCritico = 0;
         if (target.modificatori.tassoCritico >= 3) return false;
-        
+
         target.modificatori.tassoCritico = Math.min(3, target.modificatori.tassoCritico + Gradi);
         return true;
     }
@@ -364,7 +381,7 @@ class Effetti {
         // Ritorna un moltiplicatore di danno se le condizioni richieste sono soddisfatte.
         let target = Bersaglio;
         let utente = Utente;
-        
+
         if (this.verificaCondizione(Condizione, target, utente, Partita)) {
             return Moltiplicatore;
         }
@@ -375,9 +392,9 @@ class Effetti {
         // Piazza trappole sul lato nemico che penalizzeranno i Pokémon entranti.
         let latoTarget = (Lato === "Nemico" || Lato === "LatoNemico") ? Avversario : Proprietario;
         if (!latoTarget) return false;
-        
+
         if (!latoTarget.trappole) latoTarget.trappole = {};
-        
+
         switch (Tipo) {
             case "Levitoroccia":
             case "ReteVischiosa":
@@ -399,7 +416,7 @@ class Effetti {
             default:
                 return false;
         }
-        
+
         latoTarget.trappoleAttive = true;
         return true;
     }
@@ -428,9 +445,9 @@ class Effetti {
         // Modifica temporaneamente il controllo di precisione se una specifica condizione è vera.
         let target = Bersaglio;
         if (Condizione && this.verificaCondizione(Condizione, target, Utente, Partita)) {
-            return Valore; 
+            return Valore;
         }
-        return null; 
+        return null;
     }
 
     static ForzaSostituzione({ Bersaglio = "Bersaglio", Utente }) {
@@ -478,9 +495,9 @@ class Effetti {
             if (targetTeam.effetti[Effetto]) return false;
             targetTeam.effetti[Effetto] = Turni;
 
-            let dicitura = (Effetto === "Riflesso") ? "Riflesso ridurrà i danni fisici!" : 
-                           (Effetto === "SchermoLuce") ? "Schermoluce ridurrà i danni speciali!" : 
-                           (Effetto === "Ventoincoda") ? "Ventoincoda aumenta la Velocità!" : `È attivo l'effetto ${Effetto}!`;
+            let dicitura = (Effetto === "Riflesso") ? "Riflesso ridurrà i danni fisici!" :
+                (Effetto === "SchermoLuce") ? "Schermoluce ridurrà i danni speciali!" :
+                    (Effetto === "Ventoincoda") ? "Ventoincoda aumenta la Velocità!" : `È attivo l'effetto ${Effetto}!`;
 
             if (Logs) Logs.push(`Sul lato di ${Utente.nome}: ${dicitura}`);
             return true;
@@ -491,9 +508,9 @@ class Effetti {
         // Controlla se la condizione indicata si applica, determinando il successo o fallimento.
         let utente = Utente;
         let target = Bersaglio;
-        
+
         let soddisfatta = this.verificaCondizione(Condizione, target, utente, Partita);
-        
+
         if (!soddisfatta && Altrimenti === "Fallisci") {
             return false;
         }
@@ -507,9 +524,9 @@ class Effetti {
         utente.statiVolatili = utente.statiVolatili || {};
 
         if (!utente.statiVolatili.accumuli) utente.statiVolatili.accumuli = 0;
-        
+
         if (utente.statiVolatili.accumuli >= Max) {
-            return false; 
+            return false;
         }
 
         utente.statiVolatili.accumuli++;
@@ -527,21 +544,21 @@ class Effetti {
         if (Tipo === "DipendenteDaAccumulo") {
             let accumuli = utente.statiVolatili.accumuli || 0;
             if (accumuli === 0) return false;
-            
+
             potenzaBase = accumuli * 100;
-            
+
             if (ConsumaAccumulo) {
                 utente.statiVolatili.accumuli = 0;
             }
         }
-        
-        return potenzaBase; 
+
+        return potenzaBase;
     }
 
     static ResettaStatistiche({ Bersaglio = "Tutti", Utente, Proprietario, Avversario, Logs }) {
         // Azzera i cambiamenti positivi e negativi delle statistiche sui Pokémon scelti.
         let targets = [];
-        
+
         if (Bersaglio === "Tutti") {
             if (Proprietario && Proprietario.squadra[Proprietario.attivoIdx]) targets.push(Proprietario.squadra[Proprietario.attivoIdx]);
             if (Avversario && Avversario.squadra[Avversario.attivoIdx]) targets.push(Avversario.squadra[Avversario.attivoIdx]);
@@ -567,7 +584,7 @@ class Effetti {
         // Rimuove lo stato di protezione del bersaglio annullandone le difese.
         let target = (typeof Bersaglio === "string" && Bersaglio === "Utente") ? Utente : Bersaglio;
         if (!target || !target.protetto) return false;
-        
+
         target.protetto = false;
         return true;
     }
@@ -584,16 +601,16 @@ class Effetti {
             let velBersaglio = bersaglio.statistiche.velocita * (bersaglio.modificatori.velocita || 1);
             potenza = Math.floor(25 * (velBersaglio / Math.max(1, velUtente)));
         }
-        
+
         return Math.min(potenza || 1, Max);
     }
 
     static AumentaPotenzaMossaAlleato({ Moltiplicatore = 1.5, Utente, Proprietario }) {
         // Potenzia il danno della mossa che l'alleato effettuerà nel turno corrente.
-        let alleato = Proprietario && Proprietario.squadra ? Proprietario.squadra[1] : null; 
+        let alleato = Proprietario && Proprietario.squadra ? Proprietario.squadra[1] : null;
         if (!alleato) return true; // Nelle lotte in singolo non farà nulla
         alleato.statiVolatili = alleato.statiVolatili || {};
-        
+
         alleato.statiVolatili.altruismo = Moltiplicatore;
         return true;
     }
@@ -602,10 +619,10 @@ class Effetti {
         // Ritorna l'ultima mossa utilizzata in campo, ignorando alcune esclusioni.
         if (!Partita || !Partita.ultimaMossaUsata) return false;
         let mossa = Partita.ultimaMossaUsata;
-        
+
         const mosseNonCopiabili = ["Copione", "Assistente", "Sonnolalia", "Metronomo", "Naturaforza", "Protezione", "Individua", "Resistenza"];
         if (!mossa || mosseNonCopiabili.includes(mossa.Nome)) return false;
-        
+
         if (Logs) Logs.push(`${Utente.nome} sfrutta ${mossa.Nome} di riflesso!`);
         return true;
     }
@@ -615,7 +632,7 @@ class Effetti {
         let target = Bersaglio;
         if (!target || target.haGiaAgito) return false;
         target.statiVolatili = target.statiVolatili || {};
-        
+
         target.statiVolatili.agisceSubito = true;
         return true;
     }
@@ -624,7 +641,7 @@ class Effetti {
         // Cura il bersaglio scelto rimuovendone il problema di stato primario.
         let targets = Bersaglio === "TuttiAlleati" && Proprietario ? Proprietario.squadra : [(Bersaglio === "Utente" ? Utente : BersaglioObj)];
         let successo = false;
-        
+
         targets.forEach(t => {
             if (t && t.stato) {
                 t.stato = null;
@@ -636,7 +653,7 @@ class Effetti {
                 if (Logs) Logs.push(`${t.nome} è stato curato dal suo problema di stato!`);
             }
         });
-        
+
         return successo;
     }
 
@@ -646,7 +663,7 @@ class Effetti {
         if (!target || !target.ultimaMossaUsata) return false;
         target.statiVolatili = target.statiVolatili || {};
         if (target.statiVolatili.ripeti) return false;
-        
+
         target.statiVolatili.ripeti = {
             attivo: true,
             mossa: target.ultimaMossaUsata,
@@ -661,7 +678,7 @@ class Effetti {
         let utente = Utente;
         if (!utente) return false;
         utente.statiVolatili = utente.statiVolatili || {};
-        utente.statiVolatili.attiraAttacchi = true; 
+        utente.statiVolatili.attiraAttacchi = true;
         return true;
     }
 
@@ -676,16 +693,36 @@ class Effetti {
         let utente = Utente;
         if (!utente || !utente.modificatori) return 20;
         let aumenti = 0;
-        
+
         for (let stat in utente.modificatori) {
             if (utente.modificatori[stat] > 0) {
                 aumenti += utente.modificatori[stat];
             }
         }
-        
+
         return 20 + (20 * aumenti);
     }
+    static PotenzaBasataSuPeso({ Formula, Max = 120, Bersaglio, Utente }) {
+        // Poiché peso e livello non sono gestiti, usiamo gli HP massimi come indicatore astratto di "stazza/peso"
+        let hpUtente = Math.max(1, Utente.hpMax || 100);
+        let hpBersaglio = Math.max(1, Bersaglio.hpMax || 100);
 
+        if (Formula === "PesoUtenteVsBersaglio") {
+            let ratio = hpBersaglio / hpUtente;
+            if (ratio <= 0.2) return Math.min(120, Max);
+            if (ratio <= 0.25) return Math.min(100, Max);
+            if (ratio <= 0.33) return Math.min(80, Max);
+            if (ratio <= 0.5) return Math.min(60, Max);
+            return Math.min(40, Max);
+        } else {
+            if (hpBersaglio < 50) return Math.min(20, Max);
+            if (hpBersaglio < 80) return Math.min(40, Max);
+            if (hpBersaglio < 110) return Math.min(60, Max);
+            if (hpBersaglio < 150) return Math.min(80, Max);
+            if (hpBersaglio < 200) return Math.min(100, Max);
+            return Math.min(120, Max);
+        }
+    }
     static RiduciPP({ Quantita = 4, Bersaglio = "Bersaglio", Utente }) {
         // Toglie PP aggiuntivi all'ultima mossa utilizzata dal bersaglio.
         let target = (typeof Bersaglio === "string" && Bersaglio === "Utente") ? Utente : Bersaglio;
@@ -704,7 +741,7 @@ class Effetti {
         if (!utente) return false;
         utente.statiVolatili = utente.statiVolatili || {};
         if (utente.statiVolatili.esclusiva) return false;
-        
+
         utente.statiVolatili.esclusiva = true;
         return true;
     }
@@ -729,7 +766,7 @@ class Effetti {
         let utente = Utente;
         if (!utente) return false;
         utente.statiVolatili = utente.statiVolatili || {};
-        utente.statiVolatili.rancore = true; 
+        utente.statiVolatili.rancore = true;
         return true;
     }
 
@@ -759,9 +796,9 @@ class Effetti {
 
         let mossaCopiata = target.mosse.find(m => m.Nome === target.ultimaMossaUsata);
         if (!mossaCopiata) return false;
-        
+
         utente.mosse[indiceMossa] = { ...mossaCopiata, ppAttuali: mossaCopiata.PP, ppMassimi: mossaCopiata.PP };
-        
+
         if (!Permanente) {
             utente.statiVolatili.mossaCopiata = { indice: indiceMossa, originale: "Mimica" };
         }
@@ -817,7 +854,7 @@ class Effetti {
     static CambiaTipo({ Tipo, Bersaglio = "Bersaglio", Utente }) {
         // Sostituisce la combinazione di Tipi del bersaglio con quella indicata.
         let target = (typeof Bersaglio === "string" && Bersaglio === "Utente") ? Utente : Bersaglio;
-        
+
         if (!target || target.isTerastallizzato) return false;
 
         target.tipi = Array.isArray(Tipo) ? Tipo : [Tipo];
@@ -879,7 +916,7 @@ class Effetti {
 
         target.statiVolatili.mirino = {
             attivo: true,
-            daParteDi: utente.id 
+            daParteDi: utente.id
         };
         return true;
     }
@@ -890,7 +927,7 @@ class Effetti {
         if (!target) return false;
 
         let danno = Math.floor(target.hp * (Percentuale / 100));
-        if (danno === 0 && target.hp > 0) danno = 1; 
+        if (danno === 0 && target.hp > 0) danno = 1;
 
         target.hp = Math.max(0, target.hp - danno);
         return true;
@@ -900,12 +937,12 @@ class Effetti {
         // Innalza istantaneamente il grado di una statistica sino al massimo scalino possibile (+6).
         let target = (typeof Bersaglio === "string" && Bersaglio === "Utente") ? Utente : Bersaglio;
         if (!target) return false;
-        
+
         target.modificatori = target.modificatori || {};
         let statKey = Statistica.toLowerCase();
 
         if (!target.modificatori[statKey]) target.modificatori[statKey] = 0;
-        
+
         if (target.modificatori[statKey] === 6) return false;
 
         target.modificatori[statKey] = 6;
@@ -917,28 +954,26 @@ class Effetti {
         let utente = Utente;
         if (!utente) return false;
         utente.statiVolatili = utente.statiVolatili || {};
-        
+
         utente.statiVolatili.sostituzioneForzata = true;
         return true;
     }
 
-    static ScambiaPosizioneAlleato({ Utente }) {
-        // Scambia di posto in campo l'utente col Pokémon suo alleato.
-        let utente = Utente;
-        let alleato = typeof getPokemon !== "undefined" ? getPokemon("Alleato") : null;
-        
-        if (!alleato || !utente) return false;
-        utente.statiVolatili = utente.statiVolatili || {};
+    static ScambiaPosizioneAlleato({ Utente, Proprietario }) {
+        let alleato = Proprietario && Proprietario.squadra ? Proprietario.squadra[1] : null;
+
+        if (!alleato || !Utente) return false;
+        Utente.statiVolatili = Utente.statiVolatili || {};
         alleato.statiVolatili = alleato.statiVolatili || {};
-        
-        utente.statiVolatili.scambiatoConAlleato = true;
+
+        Utente.statiVolatili.scambiatoConAlleato = true;
         alleato.statiVolatili.scambiatoConAlleato = true;
         return true;
     }
 
     static CalcolaDannoSuDifesaFisica() {
         // Questo flag è ora nativamente letto in gestione_partita.js durante il pre-calcolo
-        return true; 
+        return true;
     }
 
     static DannoFuturo({ Turni = 2, Bersaglio, Utente, Mossa }) {
@@ -947,7 +982,7 @@ class Effetti {
         let utente = Utente;
         if (!target || !utente) return false;
         target.statiVolatili = target.statiVolatili || {};
-        
+
         if (target.statiVolatili.dannoFuturo) return false;
 
         target.statiVolatili.dannoFuturo = {
@@ -970,9 +1005,9 @@ class Effetti {
 
     static ColpoSicuro() {
         // Contrassegno letto nativamente da gestione_partita.js
-        return true; 
+        return true;
     }
-    
+
     static DannoFisso({ Danno = null, Formula = null, Utente }) {
         // Ritorna un valore di danno invariato basato sulla configurazione o sul livello.
         let utente = Utente;
@@ -993,7 +1028,7 @@ class Effetti {
         // Trasforma il proprio schieramento elementale eguagliandolo alle tipologie avversarie.
         let utente = Utente;
         let target = (typeof Bersaglio === "string" && Bersaglio === "Utente") ? Utente : Bersaglio;
-        
+
         if (!target || !utente || utente.isTerastallizzato || target.tipi.length === 0) return false;
 
         utente.tipi = [...target.tipi];
@@ -1010,7 +1045,7 @@ class Effetti {
         target.statiVolatili.magnetascesa = false;
         target.statiVolatili.telecinesi = false;
 
-        return true; 
+        return true;
     }
 
     static EffettoMaledizione({ Bersaglio = "Bersaglio", Utente }) {
@@ -1023,14 +1058,14 @@ class Effetti {
             if (!target) return false;
             target.statiVolatili = target.statiVolatili || {};
             if (target.statiVolatili.maledizione) return false;
-            
+
             let costoPS = Math.floor(utente.hpMax / 2);
             if (utente.hp <= costoPS && utente.hp > 1) {
-                utente.hp = 0; 
+                utente.hp = 0;
             } else {
                 utente.hp -= costoPS;
             }
-            
+
             target.statiVolatili.maledizione = true;
             return true;
         } else {
@@ -1044,28 +1079,26 @@ class Effetti {
 
     static Lascia1PS() {
         // Contrassegno gestito post-danno in gestione_partita.js nativamente
-        return true; 
+        return true;
     }
 
-    static ImpedisciSonno({ Turni = 3, Utente }) {
-        // Inibisce lo status Sonno svegliando i combattenti ed eliminando il riposo.
-        let utente = Utente;
-        if (typeof getCampo === "undefined" || typeof getTuttiIPokemonInCampo === "undefined") return true;
-        let campo = getCampo();
-        
-        campo.effetti["Baraonda"] = Turni;
-        
+    static ImpedisciSonno({ Turni = 3, Utente, Proprietario, Avversario }) {
+        if (typeof getTuttiIPokemonInCampo === "undefined") return true;
+
+        if (Proprietario) Proprietario.effetti["Baraonda"] = Turni;
+        if (Avversario) Avversario.effetti["Baraonda"] = Turni;
+
         let tutti = getTuttiIPokemonInCampo();
         tutti.forEach(p => {
             if (p.stato === "Sonno") {
                 p.stato = null;
-                if(p.contatoriStato) p.contatoriStato.sonno = 0;
+                if (p.contatoriStato) p.contatoriStato.sonno = 0;
             }
         });
-        
-        if (utente) {
-            utente.statiVolatili = utente.statiVolatili || {};
-            utente.statiVolatili.baraonda = { attivo: true, turniRimanenti: Turni };
+
+        if (Utente) {
+            Utente.statiVolatili = Utente.statiVolatili || {};
+            Utente.statiVolatili.baraonda = { attivo: true, turniRimanenti: Turni };
         }
         return true;
     }
@@ -1089,20 +1122,20 @@ class Effetti {
         // Valida che tutte le altre abilità del Pokémon in campo siano state testate in precedenza.
         let utente = Utente;
         if (!utente || utente.mosse.length <= 1) return false;
-        
-        let altreMosse = utente.mosse.filter(m => m.nome !== "Ultima Scelta");
+
+        let altreMosse = utente.mosse.filter(m => m.Nome !== "Ultimascelta");
         let tutteUsate = altreMosse.every(m => m.usataAlmenoUnaVolta === true);
-        
+
         if (!tutteUsate) return false;
         return true;
     }
 
-    static BloccaPriorità({ Bersaglio = "TuttiAlleati" }) {
-        // Alza difese insormontabili nel campo isolandolo dalle azioni che dispongono di alta priorità.
-        if (typeof getLatoCampo === "undefined") return true;
-        let lato = getLatoCampo(Bersaglio.includes("Alleat") ? "Utente" : "Nemico");
-        
-        lato.effetti["Anticipo"] = true;
+    static BloccaPriorità({ Bersaglio = "TuttiAlleati", Proprietario, Avversario }) {
+        let lato = (Bersaglio.includes("Utente") || Bersaglio.includes("Alleat")) ? Proprietario : Avversario;
+        if (lato) {
+            lato.effetti = lato.effetti || {};
+            lato.effetti["Anticipo"] = true;
+        }
         return true;
     }
 
@@ -1119,7 +1152,7 @@ class Effetti {
 
     static ColpoCriticoSicuro() {
         // Processato e tracciato a mano durante il calcolo danno.
-        return true; 
+        return true;
     }
 
     static RompiBarriere({ Lato = "Nemico", Proprietario, Avversario, Logs }) {
@@ -1170,13 +1203,13 @@ class Effetti {
         const statisticheBase = ["attacco", "difesa", "attaccospeciale", "difesaspeciale", "velocita"];
         utente.statistiche = utente.statistiche || {};
         utente.modificatori = utente.modificatori || {};
-        
+
         statisticheBase.forEach(stat => {
-            if(target.statistiche) utente.statistiche[stat] = target.statistiche[stat];
-            if(target.modificatori) utente.modificatori[stat] = target.modificatori[stat] || 0;
+            if (target.statistiche) utente.statistiche[stat] = target.statistiche[stat];
+            if (target.modificatori) utente.modificatori[stat] = target.modificatori[stat] || 0;
         });
-        
-        if(target.modificatori) {
+
+        if (target.modificatori) {
             utente.modificatori.precisione = target.modificatori.precisione || 0;
             utente.modificatori.elusione = target.modificatori.elusione || 0;
             utente.modificatori.tassoCritico = target.modificatori.tassoCritico || 0;
@@ -1216,7 +1249,7 @@ class Effetti {
         utente.contatoriStato = utente.contatoriStato || {};
         utente.statiVolatili = utente.statiVolatili || {};
 
-        let probabilitaSuccesso = utente.contatoriStato.usciteProtezione ? Math.pow(1/3, utente.contatoriStato.usciteProtezione) : 1;
+        let probabilitaSuccesso = utente.contatoriStato.usciteProtezione ? Math.pow(1 / 3, utente.contatoriStato.usciteProtezione) : 1;
 
         if (Math.random() > probabilitaSuccesso) {
             utente.contatoriStato.usciteProtezione = 0;

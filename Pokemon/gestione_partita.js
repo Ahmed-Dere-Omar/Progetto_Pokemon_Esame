@@ -51,6 +51,9 @@ class gestionePartita {
             let p2Hp = this.p2 && this.p2.squadra && this.p2.squadra[this.p2.attivoIdx] ? this.p2.squadra[this.p2.attivoIdx].hp : 0;
             origPush({ testo: testo, p1Hp: p1Hp, p2Hp: p2Hp });
         };
+
+        if (this.p1.squadra[this.p1.attivoIdx]) this.p1.squadra[this.p1.attivoIdx].statiVolatili = { primoTurnoInCampo: true };
+        if (this.p2.squadra[this.p2.attivoIdx]) this.p2.squadra[this.p2.attivoIdx].statiVolatili = { primoTurnoInCampo: true };
     }
 
     processaTurno(azioneP1, azioneP2) {
@@ -142,6 +145,7 @@ class gestionePartita {
             if (vecchioPk) vecchioPk.statiVolatili = {};
             proprietario.attivoIdx = azione.nuovoIdx;
             const nuovoPk = proprietario.squadra[proprietario.attivoIdx];
+            nuovoPk.statiVolatili = { primoTurnoInCampo: true }; // Flag per Bruciapelo
 
             // ORA registriamo i log testuali. Il "fotografo" catturerà la barra della vita 
             // del NUOVO Pokémon per entrambe le righe, eliminando il ritardo visivo e sistemando i nomi!
@@ -241,6 +245,7 @@ class gestionePartita {
         let mossaPK = pk.mosse.find(m => m.Nome === mossa.Nome);
         if (mossaPK && mossaPK.ppAttuali > 0) {
             mossaPK.ppAttuali--; // Sottrae il PP solo se il pokemon non è bloccato
+            mossaPK.usataAlmenoUnaVolta = true; // Tracciamento per Ultimascelta
         }
         // ==========================================
 
@@ -278,6 +283,20 @@ class gestionePartita {
         }
 
         this.ultimaMossaUsata = mossa; // Tracciamo la mossa per le meccaniche che la richiedono
+
+        // --- CONTROLLO FALLIMENTO PREVENTIVO (es. Sbigoattacco, Ultimascelta, Bruciapelo) ---
+        if (mossa.CodiceFunzione) {
+            let fallisce = false;
+            mossa.CodiceFunzione.forEach(eff => {
+                if (eff.NomeFunzione === "VerificaCondizione" && !EffettiModulo.VerificaCondizione({ ...eff.Parametri, Bersaglio: targetPk, Utente: pk, Partita: this })) fallisce = true;
+                if (eff.NomeFunzione === "FallisceSeMosseNonUsate" && !EffettiModulo.FallisceSeMosseNonUsate({ Utente: pk })) fallisce = true;
+            });
+            if (fallisce) {
+                this.logs.push(`${pk.nome} usa ${mossa.Nome}, ma fallisce!`);
+                pk.haGiaAgito = true;
+                return;
+            }
+        }
 
         // --- CONTROLLO PRECISIONE E FALLIMENTO ---
         if (mossa.Categoria !== 'Stato' || mossa.Precisione > 0) {
@@ -471,6 +490,35 @@ class gestionePartita {
             EffettiModulo.DannoFuturo({ Turni: turni, Bersaglio: targetPk, Utente: pk, Mossa: mossa });
         }
 
+        // --- GESTIONE SOSTITUZIONI FORZATE E RITIRATE (Boato, Teletrasporto, Staffetta) ---
+        if (targetPk.statiVolatili && targetPk.statiVolatili.forzaSostituzione) {
+            targetPk.statiVolatili.forzaSostituzione = false;
+            let available = azione.bersaglio.squadra.map((p, i) => ({ p, i })).filter(obj => obj.p.hp > 0 && obj.i !== azione.bersaglio.attivoIdx);
+            if (available.length > 0) {
+                let randomPk = available[Math.floor(Math.random() * available.length)];
+                azione.bersaglio.attivoIdx = randomPk.i;
+                this.logs.push(`${targetPk.nome} è stato spazzato via!`);
+                this.logs.push(`È stato trascinato in campo ${randomPk.p.nome}!`);
+                randomPk.p.statiVolatili = { primoTurnoInCampo: true };
+            } else {
+                this.logs.push(`Ma fallisce!`);
+            }
+        }
+        if (pk.statiVolatili && pk.statiVolatili.sostituzioneForzata) {
+            pk.statiVolatili.sostituzioneForzata = false;
+            let available = azione.proprietario.squadra.map((p, i) => ({ p, i })).filter(obj => obj.p.hp > 0 && obj.i !== azione.proprietario.attivoIdx);
+            if (available.length > 0) {
+                let randomPk = available[Math.floor(Math.random() * available.length)];
+                let msg = pk.statiVolatili.preparaStaffetta ? "passa il testimone a" : "torna indietro! Vai,";
+                azione.proprietario.attivoIdx = randomPk.i;
+                if (pk.statiVolatili.preparaStaffetta) azione.proprietario.squadra[randomPk.i].modificatori = pk.modificatori;
+                this.logs.push(`${pk.nome} ${msg} ${randomPk.p.nome}!`);
+                randomPk.p.statiVolatili = { primoTurnoInCampo: true };
+            } else {
+                this.logs.push(`Ma fallisce!`);
+            }
+        }
+
         pk.haGiaAgito = true; // Necessario per garantire che i tentennamenti contino i turni sfalsati
         pk.ultimaMossaUsata = mossa.Nome;
         this.ultimaMossaGlobale = mossa;
@@ -656,6 +704,10 @@ class gestionePartita {
             const pk = p.squadra[p.attivoIdx];
             if (!pk || pk.hp <= 0) return;
 
+            if (pk.statiVolatili && pk.statiVolatili.primoTurnoInCampo) {
+                pk.statiVolatili.primoTurnoInCampo = false;
+            }
+
             // 1. Problemi di Stato Primari
             if (pk.stato === 'Avvelenamento') {
                 const danno = Math.max(1, Math.floor(pk.hpMax / 8));
@@ -762,6 +814,17 @@ class gestionePartita {
                 if (pk.statiVolatili.provocazione.turniRimanenti <= 0) {
                     pk.statiVolatili.provocazione = null;
                     this.logs.push(`${pk.nome} non è più provocato!`);
+                }
+            }
+
+            // 10. Ultimocanto
+            if (pk.statiVolatili && pk.statiVolatili.ultimocanto) {
+                pk.statiVolatili.ultimocanto.turniRimanenti--;
+                if (pk.statiVolatili.ultimocanto.turniRimanenti <= 0) {
+                    pk.hp = 0;
+                    this.logs.push(`Il conteggio di Ultimocanto scende a 0! ${pk.nome} va KO!`);
+                } else {
+                    this.logs.push(`Il conteggio di Ultimocanto per ${pk.nome} è a ${pk.statiVolatili.ultimocanto.turniRimanenti}!`);
                 }
             }
         });
