@@ -54,9 +54,9 @@ class gestionePartita {
     }
 
     processaTurno(azioneP1, azioneP2) {
-        this.logs.length = 0; 
-        this.statiTurno = {}; 
-        
+        this.logs.length = 0;
+        this.statiTurno = {};
+
         // 0. Controlla subito le fughe PvP e forza il termine
         let haFuggitoQualcuno = false;
         if (azioneP1 && azioneP1.tipo === 'flee') { this.p1.haFuggito = true; this.logs.push(`L'allenatore si arrende e ritira ${this.p1.squadra[this.p1.attivoIdx].nome}!`); haFuggitoQualcuno = true; }
@@ -133,22 +133,22 @@ class gestionePartita {
 
     eseguiAzione(azione) {
         let { pk, bersaglio, mossa, proprietario } = azione;
-        
+
         // 0. GESTIONE SOSTITUZIONE (SWITCH)
         if (azione.tipo === 'switch') {
             const vecchioPk = proprietario.squadra[proprietario.attivoIdx];
-            
+
             // FIX: Cambiamo subito l'indice e azzeriamo gli stati in silenzio!
-            if(vecchioPk) vecchioPk.statiVolatili = {}; 
+            if (vecchioPk) vecchioPk.statiVolatili = {};
             proprietario.attivoIdx = azione.nuovoIdx;
             const nuovoPk = proprietario.squadra[proprietario.attivoIdx];
-            
+
             // ORA registriamo i log testuali. Il "fotografo" catturerà la barra della vita 
             // del NUOVO Pokémon per entrambe le righe, eliminando il ritardo visivo e sistemando i nomi!
             this.logs.push(`${proprietario.id === this.p1.id ? 'Hai' : "L'allenatore avversario"} ritirato ${vecchioPk.nome}!`);
             this.logs.push(`Vai, ${nuovoPk.nome}!`);
-            
-            nuovoPk.haGiaAgito = true; 
+
+            nuovoPk.haGiaAgito = true;
             return;
         }
 
@@ -217,7 +217,7 @@ class gestionePartita {
                     this.logs.push(`${pk.nome} non è più confuso!`);
                 }
             }
-            
+
             if (pk.statiVolatili.inibizione && pk.statiVolatili.inibizione.attivo && pk.statiVolatili.inibizione.mossa === mossa.Nome) {
                 this.logs.push(`${pk.nome} non può usare ${mossa.Nome} a causa di Inibitore!`);
                 pk.haGiaAgito = true;
@@ -229,7 +229,7 @@ class gestionePartita {
                 return;
             }
         }
-        
+
         if (targetPk.statiVolatili && targetPk.statiVolatili.esclusiva) {
             if (targetPk.mosse.some(m => m.Nome === mossa.Nome)) {
                 this.logs.push(`${pk.nome} non può usare ${mossa.Nome} a causa di Esclusiva!`);
@@ -283,7 +283,7 @@ class gestionePartita {
         if (mossa.Categoria !== 'Stato' || mossa.Precisione > 0) {
             let isColpoSicuro = mossa.CodiceFunzione && mossa.CodiceFunzione.some(e => e.NomeFunzione === "ColpoSicuro");
             if (targetPk.statiVolatili && targetPk.statiVolatili.mirino && targetPk.statiVolatili.mirino.daParteDi === pk.id) isColpoSicuro = true;
-            
+
             let precisione = mossa.Precisione || 100;
             if (mossa.CodiceFunzione) {
                 mossa.CodiceFunzione.forEach(e => {
@@ -296,55 +296,55 @@ class gestionePartita {
                 let evaMod = targetPk.modificatori.elusione || 0;
                 let stage = Math.max(-6, Math.min(6, accMod - evaMod));
                 let mult = stage >= 0 ? (3 + stage) / 3 : 3 / (3 - stage);
-                
+
                 if ((Math.random() * 100) > (precisione * mult)) {
                     this.logs.push(`${pk.nome} usa ${mossa.Nome} ma fallisce!`);
                     pk.haGiaAgito = true;
-                    if (pk.statiVolatili && pk.statiVolatili.potenzaConsecutiva) pk.statiVolatili.potenzaConsecutiva = null; 
+                    if (pk.statiVolatili && pk.statiVolatili.potenzaConsecutiva) pk.statiVolatili.potenzaConsecutiva = null;
                     return;
                 }
             }
         }
 
         let dannoInflittoReale = 0;
-        
-       // --- GESTIONE MOSSE CON CARICA (es. Solarraggio, Fossa) ---
-       let effettoCarica = mossa.CodiceFunzione ? mossa.CodiceFunzione.find(eff => eff.NomeFunzione === "CaricaAttacco") : null;
-       if (effettoCarica) {
-           pk.statiVolatili = pk.statiVolatili || {};
-           if (!pk.statiVolatili.inCarica) {
-               pk.statiVolatili.inCarica = true;
-                pk.statiVolatili.mossaForzata = mossa.Nome;
-               let messaggio = effettoCarica.Parametri.Messaggio || `${pk.nome} si sta preparando per l'attacco!`;
-               this.logs.push(messaggio);
-               if (effettoCarica.Parametri.StatoSeminvulnerabile) {
-                   pk.statiVolatili.statoSeminvulnerabile = effettoCarica.Parametri.StatoSeminvulnerabile;
-               }
 
-               // Esegue SOLO gli effetti previsti per il turno 1 (es. aumento Difesa di Capocciata)
-               mossa.CodiceFunzione.forEach(eff => {
-                   if (eff.Parametri && eff.Parametri.Turno === 1 && EffettiModulo[eff.NomeFunzione]) {
-                       let reqTarget = (eff.Parametri.Bersaglio === "Utente") ? pk : targetPk;
-                       
-                       EffettiModulo[eff.NomeFunzione]({
-                           ...eff.Parametri,
-                           Utente: pk,
-                           Bersaglio: reqTarget,
-                           Partita: this,
+        // --- GESTIONE MOSSE CON CARICA (es. Solarraggio, Fossa) ---
+        let effettoCarica = mossa.CodiceFunzione ? mossa.CodiceFunzione.find(eff => eff.NomeFunzione === "CaricaAttacco") : null;
+        if (effettoCarica) {
+            pk.statiVolatili = pk.statiVolatili || {};
+            if (!pk.statiVolatili.inCarica) {
+                pk.statiVolatili.inCarica = true;
+                pk.statiVolatili.mossaForzata = mossa.Nome;
+                let messaggio = effettoCarica.Parametri.Messaggio || `${pk.nome} si sta preparando per l'attacco!`;
+                this.logs.push(messaggio);
+                if (effettoCarica.Parametri.StatoSeminvulnerabile) {
+                    pk.statiVolatili.statoSeminvulnerabile = effettoCarica.Parametri.StatoSeminvulnerabile;
+                }
+
+                // Esegue SOLO gli effetti previsti per il turno 1 (es. aumento Difesa di Capocciata)
+                mossa.CodiceFunzione.forEach(eff => {
+                    if (eff.Parametri && eff.Parametri.Turno === 1 && EffettiModulo[eff.NomeFunzione]) {
+                        let reqTarget = (eff.Parametri.Bersaglio === "Utente") ? pk : targetPk;
+
+                        EffettiModulo[eff.NomeFunzione]({
+                            ...eff.Parametri,
+                            Utente: pk,
+                            Bersaglio: reqTarget,
+                            Partita: this,
                             Logs: this.logs,
                             MossaNome: mossa.Nome
-                       });
-                   }
-               });
+                        });
+                    }
+                });
 
-               pk.haGiaAgito = true;
-               return; // INTERROMPE IL TURNO QUI
-           } else {
-               // E' il secondo turno: rimuove la carica e sferra finalmente l'attacco!
-               pk.statiVolatili.inCarica = false;
-               pk.statiVolatili.statoSeminvulnerabile = null;
-           }
-       }
+                pk.haGiaAgito = true;
+                return; // INTERROMPE IL TURNO QUI
+            } else {
+                // E' il secondo turno: rimuove la carica e sferra finalmente l'attacco!
+                pk.statiVolatili.inCarica = false;
+                pk.statiVolatili.statoSeminvulnerabile = null;
+            }
+        }
         // ----------------------------------------------------------
 
         let isDannoFuturo = mossa.CodiceFunzione && mossa.CodiceFunzione.some(e => e.NomeFunzione === "DannoFuturo");
@@ -363,7 +363,7 @@ class gestionePartita {
                 let dmgResult = this.calcolaDanno(pk, targetPk, mossa, azione.bersaglio);
                 let danno = dmgResult.danno;
                 effectiveness = dmgResult.effectiveness;
-                
+
                 if (effectiveness === 0) {
                     if (i === 0) this.logs.push(`Non ha effetto su ${targetPk.nome}...`);
                     break;
@@ -375,7 +375,7 @@ class gestionePartita {
 
                 let isFalseSwipe = mossa.CodiceFunzione && mossa.CodiceFunzione.some(e => e.NomeFunzione === "Lascia1PS");
                 let limit = isFalseSwipe ? 1 : 0;
-                
+
                 if (targetPk.statiVolatili && targetPk.statiVolatili.resistenza && (targetPk.hp - danno) <= 0) {
                     limit = targetPk.statiVolatili.resistenza;
                     if (i === 0) this.logs.push(`${targetPk.nome} resiste al colpo!`);
@@ -386,7 +386,7 @@ class gestionePartita {
                 targetPk.hp = Math.max(limit, targetPk.hp - danno);
                 totalDanno += vecchiHp - targetPk.hp;
                 actualHits++;
-                
+
                 if (targetPk.hp <= 0 && targetPk.statiVolatili && targetPk.statiVolatili.rancore) {
                     let mPK = pk.mosse.find(m => m.Nome === mossa.Nome);
                     if (mPK) {
@@ -412,17 +412,17 @@ class gestionePartita {
 
         if (mossa.CodiceFunzione && mossa.CodiceFunzione.length > 0) {
             const nativeMods = ["ColpiMultipli", "Lascia1PS", "ColpoSicuro", "CalcolaDannoSuDifesaFisica", "ColpoCriticoSicuro", "PotenzaInversaPS", "DannoFisso", "PotenzaVariabile", "ModificaDanno", "AumentaPotenzaInCoro", "PotenzaBasataSuStatistiche", "PotenzaBasataSuPeso", "DannoVariabile", "DannoFuturo"];
-            
+
             mossa.CodiceFunzione.forEach(eff => {
                 if (eff.Parametri && eff.Parametri.Turno === 1) return; // Saltiamo gli effetti già eseguiti nella carica
                 if (nativeMods.includes(eff.NomeFunzione)) return; // Ignoriamo i flag perché adesso gestiti nativamente da calcolaDanno
-                
+
                 let bersaglioEffetto = targetPk;
                 let reqTarget = (eff.Parametri && eff.Parametri.Bersaglio) ? eff.Parametri.Bersaglio : mossa.Bersaglio;
 
                 // Se il nemico è KO applichiamo solo gli effetti che buffano l'utente
-                if (targetPk.hp <= 0 && eff.NomeFunzione !== "MandaKO" && eff.NomeFunzione !== "AzzeraPPSeKO" && 
-                   !(reqTarget === 'Utente' || reqTarget === 'LatoUtente' || reqTarget === 'TuttiAlleati' || reqTarget === 'Alleato')) {
+                if (targetPk.hp <= 0 && eff.NomeFunzione !== "MandaKO" && eff.NomeFunzione !== "AzzeraPPSeKO" &&
+                    !(reqTarget === 'Utente' || reqTarget === 'LatoUtente' || reqTarget === 'TuttiAlleati' || reqTarget === 'Alleato')) {
                     return;
                 }
 
@@ -448,14 +448,14 @@ class gestionePartita {
                 // Evitiamo di sovrascrivere l'oggetto Bersaglio con una stringa,
                 // a meno che non sia una delle pochissime funzioni che legge esplicitamente il testo!
                 let effettiConStringa = ["ResettaStatistiche", "RimuoviStato", "ProteggiDaArea", "BloccaPriorità"];
-                
+
                 if (effettiConStringa.includes(eff.NomeFunzione) && eff.Parametri && typeof eff.Parametri.Bersaglio === "string") {
                     parametriEffetto.Bersaglio = eff.Parametri.Bersaglio;
                 }
 
                 if (EffettiModulo[eff.NomeFunzione]) {
                     let risultato = EffettiModulo[eff.NomeFunzione](parametriEffetto);
-                    
+
                     let esitoLog = risultato ? '✅ APPLICATO' : '❌ FALLITO / NON APPLICABILE';
                     console.log(`[Sistema Effetti] | Mossa: ${mossa.Nome} | Effetto: ${eff.NomeFunzione} | Bersaglio: ${bersaglioEffetto.nome} | Esito: ${esitoLog}`);
                 } else {
@@ -463,12 +463,12 @@ class gestionePartita {
                 }
             });
         }
-        
+
         if (isDannoFuturo) {
             let effDannoFuturo = mossa.CodiceFunzione.find(e => e.NomeFunzione === "DannoFuturo");
             let turni = effDannoFuturo && effDannoFuturo.Parametri && effDannoFuturo.Parametri.Turni ? effDannoFuturo.Parametri.Turni : 2;
             this.logs.push(`${pk.nome} ha previsto un attacco!`);
-            EffettiModulo.DannoFuturo({ Turni: turni, Bersaglio: targetPk, Utente: pk, Mossa: mossa }); 
+            EffettiModulo.DannoFuturo({ Turni: turni, Bersaglio: targetPk, Utente: pk, Mossa: mossa });
         }
 
         pk.haGiaAgito = true; // Necessario per garantire che i tentennamenti contino i turni sfalsati
@@ -788,9 +788,8 @@ class gestionePartita {
         let p1Pk = this.p1.squadra[this.p1.attivoIdx];
         let p2Pk = this.p2.squadra[this.p2.attivoIdx];
 
-        // Inviamo la lista completa della squadra e l'indice di chi sta lottando!
-        let teamP1 = this.p1.squadra.map(p => ({ nome: p.nome, hp: p.hp, maxHp: p.hpMax }));
-        let teamP2 = this.p2.squadra.map(p => ({ nome: p.nome, hp: p.hp, maxHp: p.hpMax }));
+        let teamP1 = this.p1.squadra.map(p => ({ nome: p.nome, hp: p.hp, maxHp: p.hpMax, modificatori: p.modificatori || {} }));
+        let teamP2 = this.p2.squadra.map(p => ({ nome: p.nome, hp: p.hp, maxHp: p.hpMax, modificatori: p.modificatori || {} }));
 
         return {
             p1: {
@@ -850,9 +849,9 @@ class gestionePartita {
                     score = -1000; // Impossibile colpire, scarta la mossa!
                 } else {
                     score *= efficacia; // x2, x4, x0.5 etc.
-                    
+
                     // Bonus Kill (Se stima di poterlo mandare KO, priorità massima)
-                    if (efficacia >= 2 && playerHpPct < 0.4) score += 500; 
+                    if (efficacia >= 2 && playerHpPct < 0.4) score += 500;
                 }
 
                 // STAB (Bonus di tipo)
@@ -867,7 +866,7 @@ class gestionePartita {
                     let p = eff.Parametri || {};
 
                     switch (eff.NomeFunzione) {
-                        
+
                         // --- STATI PRIMARI (Sonno, Veleno, Paralisi...) ---
                         case "ApplicaStato":
                             if (playerPk.stato) {
@@ -907,7 +906,7 @@ class gestionePartita {
                         case "ModificaStatistica":
                             let bersaglioEffetto = (p.Bersaglio === "Utente") ? botPk : playerPk;
                             let statMod = bersaglioEffetto.modificatori ? (bersaglioEffetto.modificatori[p.Statistica.toLowerCase()] || 0) : 0;
-                            
+
                             if (p.Bersaglio === "Utente" && p.Gradi > 0) {
                                 // Mi sto potenziando
                                 if (statMod >= 4) score -= 200; // Già abbastanza boostato
