@@ -1,9 +1,18 @@
 const express = require('express');
 const app = express();
 const server = require('http').Server(app);
-const io = require('socket.io')(server);
+const cors = require('cors'); // Aggiunto per permettere la connessione da Netlify
 const fs = require('fs');
 
+app.use(cors());
+
+// Abilitiamo il CORS anche direttamente su Socket.io
+const io = require('socket.io')(server, {
+    cors: {
+        origin: "*", 
+        methods: ["GET", "POST"]
+    }
+});
 const gestionePartita = require('./gestione_partita.js');
 
 const moveDBArray = JSON.parse(fs.readFileSync(__dirname + '/DB/DB_mosse.json', 'utf8'));
@@ -31,9 +40,6 @@ const pkmnDBArray = JSON.parse(fs.readFileSync(__dirname + '/DB/DB_pokemon.json'
 const pkmnDB = {};
 pkmnDBArray.forEach(p => pkmnDB[p.nome] = p);
 
-app.use(express.static(__dirname));
-
-app.get('/', (req, res) => res.sendFile(__dirname + '/game.html'));
 
 // --- DATABASE DEL SERVER ---
 const players = {};

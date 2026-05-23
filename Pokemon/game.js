@@ -92,6 +92,7 @@ class BootScene extends Phaser.Scene {
         this.load.image('tilesD', 'assets/d.png');
         this.load.spritesheet('player', 'assets/avatar.png', { frameWidth: 64, frameHeight: 64 });
         this.load.image('allenatore', 'assets/npc.png');
+        this.load.image('nurse', 'assets/nurse.png');
     }
 
     create() {
@@ -797,7 +798,9 @@ class WorldScene extends Phaser.Scene {
                 setTimeout(() => {
                     const handleEnter = (e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
                             window.removeEventListener('keydown', handleEnter);
+                            if (this.enterKey) this.enterKey.reset();
                             mostraProssimo();
                         }
                     };
@@ -873,7 +876,9 @@ class WorldScene extends Phaser.Scene {
                 this.sceltaAttuale = this.sceltaAttuale === 0 ? 1 : 0;
                 aggiornaCursoreScelta();
             } else if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
                 window.removeEventListener('keydown', handleChoiceInput);
+                if (this.enterKey) this.enterKey.reset();
                 onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO');
             }
         };
@@ -1614,7 +1619,7 @@ class CPKScene extends Phaser.Scene {
 
     setupNPCs() {
         // Crea solo l'NPC di sinistra (assicurati che le coordinate x e y combacino con la tua mappa)
-        this.npc = this.physics.add.sprite(64, 30, 'allenatore').setScale(1).setImmovable(true);
+        this.npc = this.physics.add.sprite(64, 30, 'nurse').setScale(1).setImmovable(true);
         this.physics.add.collider(this.npc, this.wallLayer);
     }
 
@@ -1625,6 +1630,7 @@ class CPKScene extends Phaser.Scene {
 
         this.physics.add.collider(this.player, this.wallLayer);
         this.cameras.main.startFollow(this.player, true).setZoom(4).setBounds(0, 0, this.mapWidth, this.mapHeight);
+        this.cameras.main.startFollow(this.player, true).setZoom(4.5);
     }
 
     update() {
@@ -1803,6 +1809,7 @@ class CPKScene extends Phaser.Scene {
         const handleChoiceInput = (e) => {
             if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'ArrowDown' || e.key === 's') { this.sceltaAttuale = this.sceltaAttuale === 0 ? 1 : 0; aggiornaCursoreScelta(); }
             else if (e.key === 'Enter' || e.key === ' ') { window.removeEventListener('keydown', handleChoiceInput); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
+            else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); if (this.enterKey) this.enterKey.reset(); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
         };
         setTimeout(() => { window.addEventListener('keydown', handleChoiceInput); }, 100);
     }
@@ -1860,7 +1867,9 @@ class CPKScene extends Phaser.Scene {
                 setTimeout(() => {
                     const handleEnter = (e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
                             window.removeEventListener('keydown', handleEnter);
+                            if (this.enterKey) this.enterKey.reset();
                             mostraProssimo();
                         }
                     };
@@ -2022,7 +2031,7 @@ class PvPScene extends Phaser.Scene {
 
     setupNetwork() {
         this.otherPlayers = this.physics.add.group();
-        this.socket = io();
+        this.socket = io('https://neomon-server.onrender.com');
         this.socket.emit('joinGame', this.myPlayerName); // Rimosso + " (PvP)"
 
         this.socket.on('currentPlayers', (players) => {
@@ -2086,6 +2095,7 @@ class PvPScene extends Phaser.Scene {
         this.playerNameText.setDepth(10);
 
         this.cameras.main.startFollow(this.player, true).setZoom(4).setBounds(0, 0, this.mapWidth, this.mapHeight);
+        this.cameras.main.startFollow(this.player, true).setZoom(4.5);
     }
 
     addOtherPlayer(info) {
@@ -2250,6 +2260,7 @@ class PvPScene extends Phaser.Scene {
         const handleChoiceInput = (e) => {
             if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'ArrowDown' || e.key === 's') { this.sceltaAttuale = this.sceltaAttuale === 0 ? 1 : 0; aggiornaCursoreScelta(); }
             else if (e.key === 'Enter' || e.key === ' ') { window.removeEventListener('keydown', handleChoiceInput); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
+            else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); if (this.enterKey) this.enterKey.reset(); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
         };
         setTimeout(() => { window.addEventListener('keydown', handleChoiceInput); }, 100);
     }
@@ -2431,7 +2442,9 @@ class PvPScene extends Phaser.Scene {
                 setTimeout(() => {
                     const handleEnter = (e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
                             window.removeEventListener('keydown', handleEnter);
+                            if (this.enterKey) this.enterKey.reset();
                             mostraProssimo();
                         }
                     };
@@ -4140,7 +4153,9 @@ class PVEScene extends Phaser.Scene {
                 setTimeout(() => {
                     const handleEnter = (e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
                             window.removeEventListener('keydown', handleEnter);
+                            if (this.enterKey) this.enterKey.reset();
                             mostraProssimo();
                         }
                     };
@@ -4216,7 +4231,9 @@ class PVEScene extends Phaser.Scene {
                 this.sceltaAttuale = this.sceltaAttuale === 0 ? 1 : 0;
                 aggiornaCursoreScelta();
             } else if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
                 window.removeEventListener('keydown', handleChoiceInput);
+                if (this.enterKey) this.enterKey.reset();
                 onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO');
             }
         };
