@@ -369,7 +369,8 @@ class LoginScene extends Phaser.Scene {
 
         this.registry.set('userPokemon', myPokemon || []);
         let nomeFinal = profiloUtente.username.toUpperCase();
-
+        // Accende i controlli se si è da smartphone
+        if (window.innerWidth <= 1024) document.getElementById('mobile-controls').style.display = 'block';
         // 3. REINDIRIZZAMENTO
         if (isNewPlayer) {
             // Se è nuovo, gli mostriamo cosa ha ricevuto
@@ -415,6 +416,7 @@ class LoginScene extends Phaser.Scene {
     }
 
     indirizzaGiocatore(nome, user, pkmnList) {
+        if (window.innerWidth <= 1024) document.getElementById('mobile-controls').style.display = 'block';
         if (pkmnList.length === 0) {
             console.log("Nuovo giocatore: Reindirizzo alla scelta dello Starter");
             // Manda l'utente alla nuova schermata di selezione!
