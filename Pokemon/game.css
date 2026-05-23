@@ -735,6 +735,7 @@ canvas {
     top: -18px !important;
     box-shadow: 2px 2px 0 #000;
 }
+
 /* =========================================
    ETICHETTA "TUO POKEMON" IN BATTAGLIA
    ========================================= */
@@ -761,17 +762,24 @@ canvas {
    ========================================= */
 #mobile-controls {
     position: absolute;
-    top: 0; left: 0;
-    width: 100vw; height: 100vh;
-    pointer-events: none; /* Lascia passare i click al gioco sotto */
-    z-index: 9999999; /* Sopra a tutte le modali (PC, Pause, Dialoghi)! */
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    /* Lascia passare i click al gioco sotto */
+    z-index: 9999999;
+    /* Sopra a tutte le modali (PC, Pause, Dialoghi)! */
     font-family: 'Courier New', Courier, monospace;
     user-select: none;
     -webkit-user-select: none;
 }
 
-.dpad-btn, .action-btn-mobile, #btn-menu {
-    pointer-events: auto; /* Riattiva i tocchi solo sui tasti */
+.dpad-btn,
+.action-btn-mobile,
+#btn-menu {
+    pointer-events: auto;
+    /* Riattiva i tocchi solo sui tasti */
     background: rgba(38, 28, 51, 0.85);
     border: 3px solid var(--battle-accent);
     color: white;
@@ -793,14 +801,26 @@ canvas {
     flex-direction: column;
     align-items: center;
 }
-.dpad-row { display: flex; }
-.dpad-btn {
-    width: 60px; height: 60px;
-    font-size: 24px;
-    border-radius: 8px;
-    margin: 4px;
+
+.dpad-row {
+    display: flex;
 }
-.dpad-center { width: 60px; height: 60px; margin: 4px; }
+
+.dpad-btn {
+    width: 45px;
+    height: 45px;
+    /* Ridotto da 60 a 45 */
+    font-size: 18px;
+    /* Ridotto da 24 a 18 */
+    border-radius: 6px;
+    margin: 3px;
+}
+
+.dpad-center {
+    width: 45px;
+    height: 45px;
+    margin: 3px;
+}
 
 /* Tasti A e B (Stile Console) */
 #action-buttons {
@@ -811,24 +831,35 @@ canvas {
     gap: 20px;
     align-items: flex-end;
 }
-.action-btn-mobile {
-    width: 75px; height: 75px;
-    border-radius: 50%;
-    font-size: 32px;
-}
-#btn-enter { margin-bottom: 25px; border-color: #4caf50; } /* Sfalsato verso l'alto */
-#btn-esc { border-color: #f44336; }
 
-/* Tasto Menu Pausa */
+.action-btn-mobile {
+    width: 60px;
+    height: 60px;
+    /* Ridotto da 75 a 60 */
+    border-radius: 50%;
+    font-size: 24px;
+    /* Ridotto da 32 a 24 */
+}
+
+#btn-enter {
+    margin-bottom: 20px;
+}
+
+#btn-esc {
+    border-color: #f44336;
+}
+
+/* Tasto Menu (Rimpicciolito) */
 #btn-menu {
-    position: absolute;
-    top: 20px; right: 20px;
-    padding: 12px 24px;
-    border-radius: 8px;
-    font-size: 20px;
+    padding: 8px 16px;
+    /* Ridotto il padding */
+    font-size: 16px;
+    /* Ridotto da 20 a 16 */
 }
 
 /* Nascondiamo su PC e schermi grandi! */
 @media (min-width: 1024px) {
-    #mobile-controls { display: none !important; }
+    #mobile-controls {
+        display: none !important;
+    }
 }
