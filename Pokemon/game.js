@@ -3079,9 +3079,13 @@ class BattleScene extends Phaser.Scene {
             });
         }
 
-        // CODICE NUOVO CORRETTO
-        this.myTeamData[this.myActiveIdx].mosse = [...(p1Data.mosse || [])];
-        if (this.oppTeamData) this.oppTeamData[p2Data.attivoIdx].mosse = [...(p2Data.mosse || [])];
+        // NUOVO CODICE CORAZZATO
+        if (this.myTeamData && this.myTeamData[this.myActiveIdx]) {
+            this.myTeamData[this.myActiveIdx].mosse = [...(p1Data.mosse || [])];
+        }
+        if (this.oppTeamData && this.oppTeamData[p2Data.attivoIdx]) {
+            this.oppTeamData[p2Data.attivoIdx].mosse = [...(p2Data.mosse || [])];
+        }
 
         // FIX CRASH 1: Aggiorniamo tramite DOM updateUI() invece di cercare il vecchio setText di Phaser
         if (p1Data.nome !== this.pEntity.name) {
