@@ -3079,8 +3079,9 @@ class BattleScene extends Phaser.Scene {
             });
         }
 
-        this.myTeamData[this.myActiveIdx].mosse = [...p1Data.mosse];
-        if (this.oppTeamData) this.oppTeamData[p2Data.attivoIdx].mosse = [...p2Data.mosse];
+        // CODICE NUOVO CORRETTO
+        this.myTeamData[this.myActiveIdx].mosse = [...(p1Data.mosse || [])];
+        if (this.oppTeamData) this.oppTeamData[p2Data.attivoIdx].mosse = [...(p2Data.mosse || [])];
 
         // FIX CRASH 1: Aggiorniamo tramite DOM updateUI() invece di cercare il vecchio setText di Phaser
         if (p1Data.nome !== this.pEntity.name) {
@@ -3134,11 +3135,12 @@ class BattleScene extends Phaser.Scene {
                         try {
                             let profilo = this.registry.get('playerProfile');
                             if (profilo) {
-                                profilo.partite_giocate = (profilo.partite_giocate || 0) + 1;
-                                if (esito === 'win') profilo.vittorie = (profilo.vittorie || 0) + 1;
+                                // CODICE NUOVO CORRETTO
+                                profilo.partite_totali = (profilo.partite_totali || 0) + 1;
+                                if (esito === 'win') profilo.vittorie_totali = (profilo.vittorie_totali || 0) + 1;
                                 await supabaseClient.from('profilo').update({
-                                    partite_giocate: profilo.partite_giocate,
-                                    vittorie: profilo.vittorie
+                                    partite_totali: profilo.partite_totali,
+                                    vittorie_totali: profilo.vittorie_totali
                                 }).eq('id_profilo', profilo.id_profilo);
                                 this.registry.set('playerProfile', profilo);
                             }
