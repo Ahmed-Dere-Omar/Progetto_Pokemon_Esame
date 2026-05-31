@@ -84,13 +84,19 @@ class BootScene extends Phaser.Scene {
 
         this.load.tilemapTiledJSON('map', 'assets/mappa.tmj');
         this.load.tilemapTiledJSON('mapPVE', 'assets/mappaPVE.tmj');
+        this.load.tilemapTiledJSON('mapPVE2', 'assets/mappaPVE2.tmj');
         this.load.tilemapTiledJSON('mapPvP', 'assets/mappaPvP.tmj');
         this.load.tilemapTiledJSON('mapCPK', 'assets/mappaCPK.tmj');
         this.load.image('tilesA', 'assets/a.png');
         this.load.image('tilesE', 'assets/e.png');
         this.load.image('tilesC', 'assets/c.png');
         this.load.image('tilesD', 'assets/d.png');
-        this.load.spritesheet('player', 'assets/avatar.png', { frameWidth: 64, frameHeight: 64 });
+        this.load.spritesheet('avatar', 'assets/avatar.png', { frameWidth: 64, frameHeight: 64 });
+        this.load.spritesheet('avatar2', 'assets/avatar2.png', { frameWidth: 64, frameHeight: 64 });
+        this.load.spritesheet('avatar3', 'assets/avatar3.png', { frameWidth: 64, frameHeight: 64 });
+        this.load.spritesheet('avatar4', 'assets/avatar4.png', { frameWidth: 64, frameHeight: 64 });
+        this.load.spritesheet('avatar5', 'assets/avatar5.png', { frameWidth: 64, frameHeight: 64 });
+        this.load.spritesheet('avatar6', 'assets/avatar6.png', { frameWidth: 64, frameHeight: 64 });
         this.load.image('allenatore', 'assets/npc.png');
         this.load.image('nurse', 'assets/nurse.png');
     }
@@ -485,15 +491,19 @@ class WorldScene extends Phaser.Scene {
         this.vengoDa = data.vengoDa; // Registra da quale porta stai uscendo
     }
     create() {
+        let profilo = this.registry.get('playerProfile');
+        let avatarNum = profilo ? (profilo.avatar_sprite || 1) : 1;
+        this.textureKey = avatarNum == 1 ? 'avatar' : `avatar${avatarNum}`;
+
         this.player = null;
         this.playerNameText = null;
         this.npc = null;
         this.isMovingGrid = false;
 
         this.setupMap();
-        this.setupAnimations();
+        this.setupAnimations(); // <-- CORRETTO
         this.setupNPCs();
-        this.setupPlayer(); // Multiplayer rimosso: carica solo il giocatore locale
+        this.setupPlayer();
 
         this.cursors = this.input.keyboard.createCursorKeys();
         this.enterKey = this.input.keyboard.addKey('ENTER');
@@ -565,11 +575,10 @@ class WorldScene extends Phaser.Scene {
 
 
     setupAnimations() {
-        if (!this.anims.exists('down')) {
-            ['down', 'left', 'right', 'up'].forEach((key, i) => {
-                this.anims.create({ key, frames: this.anims.generateFrameNumbers('player', { start: i * 4, end: i * 4 + 3 }), frameRate: 10, repeat: -1 });
-            });
-        }
+        ['down', 'left', 'right', 'up'].forEach(key => { if (this.anims.exists(key)) this.anims.remove(key); });
+        ['down', 'left', 'right', 'up'].forEach((key, i) => {
+            this.anims.create({ key, frames: this.anims.generateFrameNumbers(this.textureKey, { start: i * 4, end: i * 4 + 3 }), frameRate: 10, repeat: -1 });
+        });
     }
 
     setupPlayer() {
@@ -586,7 +595,7 @@ class WorldScene extends Phaser.Scene {
             }
         }
 
-        this.player = this.physics.add.sprite(startX, startY, 'player').setCollideWorldBounds(true);
+        this.player = this.physics.add.sprite(startX, startY, this.textureKey).setCollideWorldBounds(true);
         this.player.setScale(0.5);
         this.player.body.setSize(32, 32).setOffset(16, 32);
         this.player.setDepth(10);
@@ -709,12 +718,16 @@ class WorldScene extends Phaser.Scene {
             // 1. Controlla il salvataggio sul DB
             let profilo = this.registry.get('playerProfile');
             let hasSave = false;
+            let savedLevel = 1;
 
             const { data, error } = await supabaseClient.from('profilo').select('id_mappa').eq('id_profilo', profilo.id_profilo).single();
             if (error) {
                 console.warn("Nessun salvataggio trovato o colonna mancante sul DB:", error.message);
-            } else if (data && data.id_mappa && data.id_mappa !== 'mappa_base') {
+            } else if (data && data.id_mappa && data.id_mappa.startsWith('mappa_pve')) {
                 hasSave = true;
+                // Estrapola il numero del livello (es. "mappa_pve_2" -> 2)
+                let parts = data.id_mappa.split('_');
+                if (parts.length === 3) savedLevel = parseInt(parts[2]) || 1;
             }
 
             // 2. Crea la UI del dialogo
@@ -722,14 +735,14 @@ class WorldScene extends Phaser.Scene {
 
             // 3. Mostra i testi in sequenza
             let dialoghi = hasSave
-                ? ["Hai un salvataggio in corso nella modalità PvE.", "Vuoi riprendere la tua avventura?"]
+                ? [`Hai un salvataggio in corso al Livello ${savedLevel}.`, "Vuoi riprendere la tua avventura?"]
                 : ["Benvenuto nella modalità PvE!", "Vuoi iniziare una nuova avventura?"];
 
             this.mostraTestiDialogo(dialoghi, () => {
                 this.mostraSceltaSiNo((scelta) => {
                     this.chiudiDialogo();
                     if (scelta === 'SI') {
-                        this.avviaPVE(hasSave);
+                        this.avviaPVE(hasSave, savedLevel);
                     } else {
                         this.time.delayedCall(100, () => {
                             this.isDialogActive = false;
@@ -1027,8 +1040,11 @@ class WorldScene extends Phaser.Scene {
         }, 1000);
     }
 
-    async avviaPVE(hasSave) {
+    async avviaPVE(hasSave, savedLevel = 1) {
         this.isTransitioning = true;
+
+        let levelToLoad = hasSave ? savedLevel : 1;
+        let mappaDaSalvare = `mappa_pve_${levelToLoad}`;
 
         let overlay = document.createElement('div');
         overlay.style.position = 'absolute';
@@ -1042,16 +1058,16 @@ class WorldScene extends Phaser.Scene {
         overlay.style.alignItems = 'center';
         overlay.style.zIndex = '9999';
 
-        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 3rem; color: #fff;">CARICAMENTO PVE...</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 3rem; color: #fff;">CARICAMENTO LIVELLO ${levelToLoad}...</h1>`;
         document.getElementById('game-container').appendChild(overlay);
 
         try {
             let profilo = this.registry.get('playerProfile');
-            const { error } = await supabaseClient.from('profilo').update({ id_mappa: 'mappa_pve' }).eq('id_profilo', profilo.id_profilo);
+            const { error } = await supabaseClient.from('profilo').update({ id_mappa: mappaDaSalvare }).eq('id_profilo', profilo.id_profilo);
             if (error) {
                 console.error("Errore aggiornamento DB (Mappa PVE):", error);
             } else {
-                profilo.id_mappa = 'mappa_pve';
+                profilo.id_mappa = mappaDaSalvare;
             }
         } catch (err) {
             console.error("Errore nel salvataggio dell'ingresso in PVE:", err);
@@ -1063,7 +1079,8 @@ class WorldScene extends Phaser.Scene {
             this.isDialogActive = false;
 
             this.scene.stop('WorldScene');
-            this.scene.start('PVEScene', { name: this.myPlayerName, user: this.registry.get('playerProfile') });
+            // Passiamo il levelToLoad alla PVEScene
+            this.scene.start('PVEScene', { name: this.myPlayerName, user: this.registry.get('playerProfile'), level: levelToLoad });
         }, 1000);
     }
 
@@ -1083,12 +1100,12 @@ class WorldScene extends Phaser.Scene {
 
             const renderMainPause = () => {
                 overlay.innerHTML = `
-                    <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 500px; max-width: 90%;">
-                        <h2 class="text-shadows" style="font-size: 4rem; margin-bottom: 30px; text-align: center;">MENU PAUSA</h2>
-                        <button id="profile-btn" style="width: 300px; padding: 15px; margin-top: 10px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">PROFILO</button>
-                        <button id="logout-btn" style="width: 300px; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">ESCI DAL GIOCO</button>
-                        <p style="color: #fff; margin-top: 40px; font-size: 1.2rem; font-family: 'Courier New'; font-weight: bold; text-align: center;">Premi ESC per tornare al gioco</p>
-                    </div>`;
+                <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 500px; max-width: 90%;">
+                    <h2 class="text-shadows" style="font-size: 4rem; margin-bottom: 30px; text-align: center;">MENU PAUSA</h2>
+                    <button id="profile-btn" style="width: 300px; padding: 15px; margin-top: 10px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">PROFILO</button>
+                    <button id="logout-btn" style="width: 300px; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">ESCI DAL GIOCO</button>
+                    <p style="color: #fff; margin-top: 40px; font-size: 1.2rem; font-family: 'Courier New'; font-weight: bold; text-align: center;">Premi ESC per tornare al gioco</p>
+                </div>`;
             };
 
             renderMainPause();
@@ -1101,20 +1118,62 @@ class WorldScene extends Phaser.Scene {
                     window.location.reload();
                 } else if (e.target.id === 'profile-btn') {
                     let profilo = this.registry.get('playerProfile');
+                    let winRate = profilo.partite_totali > 0 ? ((profilo.vittorie_totali / profilo.partite_totali) * 100).toFixed(1) : 0;
                     let box = document.getElementById('pause-box');
+
+                    let avatarNum = profilo.avatar_sprite || 1;
+                    let currentAvatarPath = avatarNum == 1 ? 'assets/avatar.png' : `assets/avatar${avatarNum}.png`;
+
                     if (box) {
                         box.innerHTML = `
-                            <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">PROFILO ALLENATORE</h2>
-                            <div style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; border: 2px solid #ff7477; width: 85%; text-align: left; color: #fff; font-family: 'Courier New', monospace; font-size: 1.2rem;">
-                                <p style="margin: 10px 0;"><strong>NOME:</strong> ${profilo.username || 'Sconosciuto'}</p>
-                                <p style="margin: 10px 0;"><strong>VITTORIE:</strong> ${profilo.vittorie || 0}</p>
-                                <p style="margin: 10px 0;"><strong>PARTITE GIOCATE:</strong> ${profilo.partite_giocate || 0}</p>
-                            </div>
-                            <button id="back-pause-btn" style="width: 300px; padding: 15px; margin-top: 30px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">INDIETRO</button>
-                        `;
+                <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">PROFILO</h2>
+                <div style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; border: 2px solid #ff7477; width: 85%; color: #fff; font-family: 'Courier New', monospace; font-size: 1.2rem; text-align: center;">
+                    <p><strong>NOME:</strong> ${profilo.username || 'Sconosciuto'}</p>
+                    <p><strong>VITTORIE:</strong> ${profilo.vittorie_totali || 0}</p>
+                    <p><strong>PARTITE:</strong> ${profilo.partite_totali || 0}</p>
+                    <p><strong>VITTORIE %:</strong> ${winRate}%</p>
+                    <div style="margin-top: 15px; display: flex; justify-content: center; align-items: center; gap: 15px;">
+                        <button id="prev-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&lt;</button>
+                        
+                        <div style="width: 32px; height: 32px; overflow: hidden; position: relative; transform: scale(2); margin: 0 15px; image-rendering: pixelated;">
+                            <img id="profile-avatar" src="${currentAvatarPath}" style="position: absolute; top: 0; left: 0; width: 400%; height: 400%; max-width: none;">
+                        </div>
+
+                        <button id="next-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&gt;</button>
+                    </div>
+                </div>
+                <button id="back-pause-btn" style="width: 300px; padding: 15px; margin-top: 30px; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer;">INDIETRO</button>
+            `;
                     }
+                } else if (e.target.id === 'prev-avatar' || e.target.id === 'next-avatar') {
+                    let profilo = this.registry.get('playerProfile');
+
+                    const avatars = ['assets/avatar.png', 'assets/avatar2.png', 'assets/avatar3.png', 'assets/avatar4.png', 'assets/avatar5.png', 'assets/avatar6.png'];
+                    let imgEl = document.getElementById('profile-avatar');
+
+                    let idx = avatars.indexOf(imgEl.getAttribute('src'));
+                    if (idx === -1) idx = 0;
+
+                    idx = e.target.id === 'prev-avatar' ? (idx - 1 + avatars.length) % avatars.length : (idx + 1) % avatars.length;
+
+                    let newAvatarPath = avatars[idx];
+                    imgEl.src = newAvatarPath;
+
+                    let numberToSave = idx + 1;
+                    profilo.avatar_sprite = numberToSave;
+
+                    await supabaseClient.from('profilo').update({ avatar_sprite: numberToSave }).eq('id_profilo', profilo.id_profilo);
+
+                    let textureKey = newAvatarPath.split('/').pop().replace('.png', '');
+                    if (this.player) {
+                        this.player.setTexture(textureKey);
+                    }
+
                 } else if (e.target.id === 'back-pause-btn') {
-                    renderMainPause();
+                    this.isPaused = false;
+                    let existingMenu = document.getElementById('pause-menu-overlay');
+                    if (existingMenu) existingMenu.remove();
+                    this.scene.restart();
                 }
             });
         }
@@ -1554,6 +1613,10 @@ class CPKScene extends Phaser.Scene {
     }
 
     create() {
+        let profilo = this.registry.get('playerProfile');
+        let avatarNum = profilo ? (profilo.avatar_sprite || 1) : 1;
+        this.textureKey = avatarNum == 1 ? 'avatar' : `avatar${avatarNum}`;
+
         this.player = null;
         this.isMovingGrid = false;
 
@@ -1566,17 +1629,16 @@ class CPKScene extends Phaser.Scene {
             let startZone = this.zoneInterattive.find(z => z.nomeInterazione === 'Porta Inizio');
             if (startZone) {
                 startX = startZone.x + (startZone.width || 16) / 2;
-                startY = startZone.y - 16; // Appare leggermente sopra la porta
+                startY = startZone.y - 16;
             }
         }
 
         this.setupPlayer(startX, startY);
 
-        if (!this.anims.exists('down')) {
-            ['down', 'left', 'right', 'up'].forEach((key, i) => {
-                this.anims.create({ key, frames: this.anims.generateFrameNumbers('player', { start: i * 4, end: i * 4 + 3 }), frameRate: 10, repeat: -1 });
-            });
-        }
+        ['down', 'left', 'right', 'up'].forEach(key => { if (this.anims.exists(key)) this.anims.remove(key); });
+        ['down', 'left', 'right', 'up'].forEach((key, i) => {
+            this.anims.create({ key, frames: this.anims.generateFrameNumbers(this.textureKey, { start: i * 4, end: i * 4 + 3 }), frameRate: 10, repeat: -1 });
+        });
 
         this.cursors = this.input.keyboard.createCursorKeys();
         this.enterKey = this.input.keyboard.addKey('ENTER');
@@ -1626,7 +1688,7 @@ class CPKScene extends Phaser.Scene {
     }
 
     setupPlayer(startX, startY) {
-        this.player = this.physics.add.sprite(startX, startY, 'player').setCollideWorldBounds(true);
+        this.player = this.physics.add.sprite(startX, startY, this.textureKey).setCollideWorldBounds(true);
         this.player.setScale(0.5);
         this.player.body.setSize(32, 32).setOffset(16, 32);
 
@@ -1944,18 +2006,35 @@ class CPKScene extends Phaser.Scene {
                     this.tornaAllaLobby();
                 } else if (e.target.id === 'profile-btn') {
                     let profilo = this.registry.get('playerProfile');
+                    let winRate = profilo.partite_totali > 0 ? ((profilo.vittorie_totali / profilo.partite_totali) * 100).toFixed(1) : 0;
                     let box = document.getElementById('pause-box');
                     if (box) {
                         box.innerHTML = `
-                            <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">PROFILO ALLENATORE</h2>
-                            <div style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; border: 2px solid #ff7477; width: 85%; text-align: left; color: #fff; font-family: 'Courier New', monospace; font-size: 1.2rem;">
-                                <p style="margin: 10px 0;"><strong>NOME:</strong> ${profilo.username || 'Sconosciuto'}</p>
-                                <p style="margin: 10px 0;"><strong>VITTORIE:</strong> ${profilo.vittorie || 0}</p>
-                                <p style="margin: 10px 0;"><strong>PARTITE GIOCATE:</strong> ${profilo.partite_giocate || 0}</p>
+                            <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">PROFILO</h2>
+                            <div style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; border: 2px solid #ff7477; width: 85%; color: #fff; font-family: 'Courier New', monospace; font-size: 1.2rem; text-align: center;">
+                                <p><strong>NOME:</strong> ${profilo.username || 'Sconosciuto'}</p>
+                                <p><strong>VITTORIE:</strong> ${profilo.vittorie_totali || 0}</p>
+                                <p><strong>PARTITE:</strong> ${profilo.partite_totali || 0}</p>
+                                <p><strong>VITTORIE %:</strong> ${winRate}%</p>
+                                <div style="margin-top: 15px; display: flex; justify-content: center; align-items: center; gap: 15px;">
+                                    <button id="prev-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&lt;</button>
+                                    <img id="profile-avatar" src="${profilo.avatar || 'assets/avatar.png'}" style="width: 64px; height: 64px; image-rendering: pixelated;">
+                                    <button id="next-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&gt;</button>
+                                </div>
                             </div>
-                            <button id="back-pause-btn" style="width: 300px; padding: 15px; margin-top: 30px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">INDIETRO</button>
+                            <button id="back-pause-btn" style="width: 300px; padding: 15px; margin-top: 30px; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer;">INDIETRO</button>
                         `;
                     }
+                } else if (e.target.id === 'prev-avatar' || e.target.id === 'next-avatar') {
+                    let profilo = this.registry.get('playerProfile');
+                    const avatars = ['assets/avatar.png', 'assets/npc.png', 'assets/nurse.png']; // Inserisci qui i tuoi PNG
+                    let imgEl = document.getElementById('profile-avatar');
+                    let idx = avatars.indexOf(imgEl.getAttribute('src'));
+                    if (idx === -1) idx = 0;
+                    idx = e.target.id === 'prev-avatar' ? (idx - 1 + avatars.length) % avatars.length : (idx + 1) % avatars.length;
+                    imgEl.src = avatars[idx];
+                    profilo.avatar = avatars[idx];
+                    supabaseClient.from('profilo').update({ avatar: avatars[idx] }).eq('id_profilo', profilo.id_profilo);
                 } else if (e.target.id === 'back-pause-btn') {
                     renderMainPause();
                 }
@@ -1975,6 +2054,10 @@ class PvPScene extends Phaser.Scene {
     }
 
     create() {
+        let profilo = this.registry.get('playerProfile');
+        let avatarNum = profilo ? (profilo.avatar_sprite || 1) : 1;
+        this.textureKey = avatarNum == 1 ? 'avatar' : `avatar${avatarNum}`;
+
         this.player = null;
         this.playerNameText = null;
         this.isMovingGrid = false;
@@ -2066,11 +2149,10 @@ class PvPScene extends Phaser.Scene {
     }
 
     setupAnimations() {
-        if (!this.anims.exists('down')) {
-            ['down', 'left', 'right', 'up'].forEach((key, i) => {
-                this.anims.create({ key, frames: this.anims.generateFrameNumbers('player', { start: i * 4, end: i * 4 + 3 }), frameRate: 10, repeat: -1 });
-            });
-        }
+        ['down', 'left', 'right', 'up'].forEach(key => { if (this.anims.exists(key)) this.anims.remove(key); });
+        ['down', 'left', 'right', 'up'].forEach((key, i) => {
+            this.anims.create({ key, frames: this.anims.generateFrameNumbers(this.textureKey, { start: i * 4, end: i * 4 + 3 }), frameRate: 10, repeat: -1 });
+        });
     }
 
     addPlayer(info) {
@@ -2085,7 +2167,7 @@ class PvPScene extends Phaser.Scene {
             }
         }
 
-        this.player = this.physics.add.sprite(startX, startY, 'player').setCollideWorldBounds(true);
+        this.player = this.physics.add.sprite(startX, startY, this.textureKey).setCollideWorldBounds(true);
         this.player.setScale(0.5);
         this.player.body.setSize(32, 32).setOffset(16, 32);
         this.player.setDepth(10);
@@ -2101,7 +2183,7 @@ class PvPScene extends Phaser.Scene {
     }
 
     addOtherPlayer(info) {
-        let op = this.add.sprite(info.x, info.y, 'player');
+        let op = this.add.sprite(info.x, info.y, 'avatar');
         op.playerId = info.playerId;
         op.setScale(0.5); // Ridimensionamento sistemato
         op.setDepth(10);
@@ -2369,18 +2451,35 @@ class PvPScene extends Phaser.Scene {
                     this.tornaAllaLobby();
                 } else if (e.target.id === 'profile-btn') {
                     let profilo = this.registry.get('playerProfile');
+                    let winRate = profilo.partite_totali > 0 ? ((profilo.vittorie_totali / profilo.partite_totali) * 100).toFixed(1) : 0;
                     let box = document.getElementById('pause-box');
                     if (box) {
                         box.innerHTML = `
-                            <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">PROFILO ALLENATORE</h2>
-                            <div style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; border: 2px solid #ff7477; width: 85%; text-align: left; color: #fff; font-family: 'Courier New', monospace; font-size: 1.2rem;">
-                                <p style="margin: 10px 0;"><strong>NOME:</strong> ${profilo.username || 'Sconosciuto'}</p>
-                                <p style="margin: 10px 0;"><strong>VITTORIE:</strong> ${profilo.vittorie || 0}</p>
-                                <p style="margin: 10px 0;"><strong>PARTITE GIOCATE:</strong> ${profilo.partite_giocate || 0}</p>
+                            <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">PROFILO</h2>
+                            <div style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; border: 2px solid #ff7477; width: 85%; color: #fff; font-family: 'Courier New', monospace; font-size: 1.2rem; text-align: center;">
+                                <p><strong>NOME:</strong> ${profilo.username || 'Sconosciuto'}</p>
+                                <p><strong>VITTORIE:</strong> ${profilo.vittorie_totali || 0}</p>
+                                <p><strong>PARTITE:</strong> ${profilo.partite_totali || 0}</p>
+                                <p><strong>VITTORIE %:</strong> ${winRate}%</p>
+                                <div style="margin-top: 15px; display: flex; justify-content: center; align-items: center; gap: 15px;">
+                                    <button id="prev-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&lt;</button>
+                                    <img id="profile-avatar" src="${profilo.avatar || 'assets/avatar.png'}" style="width: 64px; height: 64px; image-rendering: pixelated;">
+                                    <button id="next-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&gt;</button>
+                                </div>
                             </div>
-                            <button id="back-pause-btn" style="width: 300px; padding: 15px; margin-top: 30px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">INDIETRO</button>
+                            <button id="back-pause-btn" style="width: 300px; padding: 15px; margin-top: 30px; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer;">INDIETRO</button>
                         `;
                     }
+                } else if (e.target.id === 'prev-avatar' || e.target.id === 'next-avatar') {
+                    let profilo = this.registry.get('playerProfile');
+                    const avatars = ['assets/avatar.png', 'assets/npc.png', 'assets/nurse.png']; // Inserisci qui i tuoi PNG
+                    let imgEl = document.getElementById('profile-avatar');
+                    let idx = avatars.indexOf(imgEl.getAttribute('src'));
+                    if (idx === -1) idx = 0;
+                    idx = e.target.id === 'prev-avatar' ? (idx - 1 + avatars.length) % avatars.length : (idx + 1) % avatars.length;
+                    imgEl.src = avatars[idx];
+                    profilo.avatar = avatars[idx];
+                    supabaseClient.from('profilo').update({ avatar: avatars[idx] }).eq('id_profilo', profilo.id_profilo);
                 } else if (e.target.id === 'back-pause-btn') {
                     renderMainPause();
                 }
@@ -2529,6 +2628,9 @@ class BattleScene extends Phaser.Scene {
     }
 
     create() {
+        let profilo = this.registry.get('playerProfile');
+        let avatarNum = profilo ? (profilo.avatar_sprite || 1) : 1;
+        this.textureKey = avatarNum == 1 ? 'avatar' : `avatar${avatarNum}`;
         this.pkmnDB = this.registry.get('pokemonDB');
         this.moveDB = this.registry.get('moveDB');
 
@@ -3660,19 +3762,24 @@ class BattleScene extends Phaser.Scene {
 // ==============================================================================
 class PVEScene extends Phaser.Scene {
     constructor() { super({ key: 'PVEScene' }); }
+
     init(data) {
         this.myPlayerName = data.name;
         this.user = data.user;
+        this.currentLevel = data.level || 1;
+        this.maxLevel = 2; // Numero totale di mappe PVE
     }
 
     create() {
+        let profilo = this.registry.get('playerProfile');
+        let avatarNum = profilo ? (profilo.avatar_sprite || 1) : 1;
+        this.textureKey = avatarNum == 1 ? 'avatar' : `avatar${avatarNum}`;
+
         this.player = null;
         this.npcInSfida = null;
         this.npcs = null;
         this.isMovingGrid = false;
 
-        // Qui andrà implementata la logica per creare la mappa PVE usando mappaPVE.tmj
-        // const map = this.make.tilemap({ key: 'mapPVE' });
         this.setupMap();
         this.setupNPCs();
 
@@ -3681,18 +3788,16 @@ class PVEScene extends Phaser.Scene {
         if (this.zoneInterattive) {
             let startZone = this.zoneInterattive.find(z => z.nomeInterazione === 'Porta Inizio');
             if (startZone) {
-                startX = startZone.x + 8; // Centriamo sull'asse
-                startY = startZone.y + 8;
-                startY = startZone.y - 32; // Spostiamo lo spawn più in alto per non attivare l'uscita
+                startX = startZone.x + 8;
+                startY = startZone.y - 32;
             }
         }
         this.setupPlayer(startX, startY);
 
-        if (!this.anims.exists('down')) {
-            ['down', 'left', 'right', 'up'].forEach((key, i) => {
-                this.anims.create({ key, frames: this.anims.generateFrameNumbers('player', { start: i * 4, end: i * 4 + 3 }), frameRate: 10, repeat: -1 });
-            });
-        }
+        ['down', 'left', 'right', 'up'].forEach(key => { if (this.anims.exists(key)) this.anims.remove(key); });
+        ['down', 'left', 'right', 'up'].forEach((key, i) => {
+            this.anims.create({ key, frames: this.anims.generateFrameNumbers(this.textureKey, { start: i * 4, end: i * 4 + 3 }), frameRate: 10, repeat: -1 });
+        });
 
         this.cursors = this.input.keyboard.createCursorKeys();
         this.enterKey = this.input.keyboard.addKey('ENTER');
@@ -3702,7 +3807,6 @@ class PVEScene extends Phaser.Scene {
         this.isDialogActive = false;
         this.canEncounter = true;
         this.isTransitioning = false;
-        this.isMovingGrid = false;
 
         this.events.on('resume', () => {
             this.cursors.left.reset(); this.cursors.right.reset();
@@ -3733,17 +3837,16 @@ class PVEScene extends Phaser.Scene {
                 this.npcInSfida = null;
             }
         });
-
     }
 
     setupMap() {
-        const map = this.make.tilemap({ key: 'mapPVE' });
+        let mapKey = this.currentLevel === 1 ? 'mapPVE' : `mapPVE${this.currentLevel}`;
+        const map = this.make.tilemap({ key: mapKey });
 
-        // Configurazione delle proporzioni esatte estratte dal Json della mappa PVE
         const tilesetA = map.addTilesetImage('a', 'tilesA', 16, 16, 1, 1);
         const tilesetE = map.addTilesetImage('e', 'tilesE', 16, 16, 0, 0);
         const tilesetC = map.addTilesetImage('c', 'tilesC', 16, 16, 1, 1);
-        const tilesetD = map.addTilesetImage('d', 'tilesD', 16, 16, 1, 1);
+        const tilesetD = map.addTilesetImage('d', 'tilesD', 16, 16, 0, 0);
 
         const allTilesets = [tilesetA, tilesetC, tilesetD, tilesetE];
 
@@ -3771,11 +3874,12 @@ class PVEScene extends Phaser.Scene {
     setupNPCs() {
         this.npcs = this.physics.add.group();
 
-        let npcPositions = [
-            { x: 120, y: 350 },
-            { x: 180, y: 200 },
-            { x: 120, y: 100 }
-        ];
+        let npcPositions = [];
+        if (this.currentLevel === 1) {
+            npcPositions = [{ x: 120, y: 350 }, { x: 180, y: 200 }, { x: 120, y: 100 }];
+        } else if (this.currentLevel === 2) {
+            npcPositions = [{ x: 150, y: 300 }, { x: 100, y: 200 }, { x: 180, y: 100 }]; // Modifica qui le coordinate della mappa 2
+        }
 
         npcPositions.forEach((pos, index) => {
             let npc = this.physics.add.sprite(pos.x, pos.y, 'allenatore').setScale(1).setImmovable(true);
@@ -3787,7 +3891,7 @@ class PVEScene extends Phaser.Scene {
     }
 
     setupPlayer(startX, startY) {
-        this.player = this.physics.add.sprite(startX, startY, 'player').setCollideWorldBounds(true);
+        this.player = this.physics.add.sprite(startX, startY, this.textureKey).setCollideWorldBounds(true);
         this.player.setScale(0.5);
         this.player.body.setSize(32, 32).setOffset(16, 32);
 
@@ -3803,10 +3907,8 @@ class PVEScene extends Phaser.Scene {
         if (this.isTransitioning || !this.player || this.isPaused || this.isMovingGrid || this.isDialogActive) return;
 
         const TILE_SIZE = 16;
-
         let currentAnim = null;
-        let dx = 0;
-        let dy = 0;
+        let dx = 0; let dy = 0;
 
         if (this.cursors.left.isDown) { dx = -TILE_SIZE; currentAnim = 'left'; }
         else if (this.cursors.right.isDown) { dx = TILE_SIZE; currentAnim = 'right'; }
@@ -3822,64 +3924,67 @@ class PVEScene extends Phaser.Scene {
             let isOutOfBounds = targetX < 0 || targetX >= this.mapWidth || targetY < 0 || targetY >= this.mapHeight;
             let ostacolo = this.wallLayer.getTileAtWorldXY(targetX, targetY, true);
             let isWall = (ostacolo && ostacolo.index !== -1);
-
             let isNpc = false;
+
             if (this.npcs) {
                 this.npcs.getChildren().forEach(n => {
-                    if (Phaser.Math.Distance.Between(targetX, targetY, n.x, n.y) < 16) {
-                        isNpc = true;
-                    }
+                    if (Phaser.Math.Distance.Between(targetX, targetY, n.x, n.y) < 16) isNpc = true;
                 });
             }
 
             if (!isWall && !isNpc && !isOutOfBounds) {
                 this.isMovingGrid = true;
-
                 this.tweens.add({
-                    targets: this.player,
-                    x: targetX,
-                    y: targetY,
-                    duration: 250,
+                    targets: this.player, x: targetX, y: targetY, duration: 250,
                     onComplete: () => {
                         this.isMovingGrid = false;
                         this.player.anims.stop();
 
-                        // Controllo Erba Alta
                         let grassTile = this.grassLayer.getTileAtWorldXY(targetX, targetY, true);
                         if (this.canEncounter && grassTile && grassTile.index !== -1) {
-                            if (Phaser.Math.Between(1, 100) <= 10) { // 10% di probabilità
-                                this.startPVEEncounter();
-                            }
+                            if (Phaser.Math.Between(1, 100) <= 10) this.startPVEEncounter();
                             this.canEncounter = false;
                             this.time.delayedCall(250, () => this.canEncounter = true);
                         }
 
-                        // Controllo porte di uscita
                         if (this.zoneInterattive && !this.isDialogActive && !this.isTransitioning) {
                             let interazioneCalpestata = this.zoneInterattive.find(z => Phaser.Math.Distance.Between(this.player.x, this.player.y, z.x + (z.width || 0) / 2, z.y + (z.height || 0) / 2) < 20);
                             if (interazioneCalpestata) {
                                 if (interazioneCalpestata.nomeInterazione === 'Porta Fine') {
                                     let tuttiSconfitti = true;
                                     if (this.npcs) {
-                                        this.npcs.getChildren().forEach(n => {
-                                            if (!n.isDefeated) tuttiSconfitti = false;
-                                        });
+                                        this.npcs.getChildren().forEach(n => { if (!n.isDefeated) tuttiSconfitti = false; });
                                     }
                                     if (tuttiSconfitti) {
-                                        this.tornaAllaLobby(false); // Finito: torna in base resettando la posizione.
+                                        if (this.currentLevel < this.maxLevel) {
+                                            this.isDialogActive = true;
+                                            this.createDialogUI();
+                                            this.mostraTestiDialogo(["Hai sconfitto tutti!", "Passare al livello successivo? ▼"], () => {
+                                                this.mostraSceltaSiNo((scelta) => {
+                                                    this.chiudiDialogo();
+                                                    if (scelta === 'SI') {
+                                                        this.passaAlProssimoLivello();
+                                                    } else {
+                                                        this.isMovingGrid = true;
+                                                        this.tweens.add({ targets: this.player, x: this.player.x - dx, y: this.player.y - dy, duration: 250, onComplete: () => { this.isMovingGrid = false; this.isDialogActive = false; } });
+                                                    }
+                                                });
+                                            });
+                                        } else {
+                                            this.isDialogActive = true;
+                                            this.createDialogUI();
+                                            this.mostraTestiDialogo(["COMPLIMENTI!", "Hai superato tutte le sfide PvE!", "Torni alla Lobby da vero Campione. ▼"], () => {
+                                                this.chiudiDialogo();
+                                                this.tornaAllaLobby(true);
+                                            });
+                                        }
                                     } else {
                                         this.isDialogActive = true;
                                         this.createDialogUI();
-                                        this.mostraTestiDialogo(["Devi sconfiggere tutti gli allenatori", "prima di poter uscire da qui!"], () => {
+                                        this.mostraTestiDialogo(["Devi sconfiggere tutti gli allenatori", "prima di poter uscire da qui! ▼"], () => {
                                             this.chiudiDialogo();
                                             this.isMovingGrid = true;
-                                            this.tweens.add({
-                                                targets: this.player,
-                                                x: this.player.x - dx,
-                                                y: this.player.y - dy,
-                                                duration: 250,
-                                                onComplete: () => { this.isMovingGrid = false; this.isDialogActive = false; }
-                                            });
+                                            this.tweens.add({ targets: this.player, x: this.player.x - dx, y: this.player.y - dy, duration: 250, onComplete: () => { this.isMovingGrid = false; this.isDialogActive = false; } });
                                         });
                                     }
                                 } else if (interazioneCalpestata.nomeInterazione === 'Porta Inizio') {
@@ -3917,6 +4022,26 @@ class PVEScene extends Phaser.Scene {
         }
     }
 
+    passaAlProssimoLivello() {
+        this.isTransitioning = true;
+        let overlay = document.createElement('div');
+        overlay.style.position = 'absolute';
+        overlay.style.top = '0'; overlay.style.left = '0';
+        overlay.style.width = '100%'; overlay.style.height = '100%';
+        overlay.style.backgroundColor = '#000';
+        overlay.style.display = 'flex'; overlay.style.justifyContent = 'center'; overlay.style.alignItems = 'center';
+        overlay.style.zIndex = '9999';
+
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 3rem; color: #fff;">CARICAMENTO LIVELLO ${this.currentLevel + 1}...</h1>`;
+        document.getElementById('game-container').appendChild(overlay);
+
+        setTimeout(() => {
+            if (overlay) overlay.remove();
+            this.isTransitioning = false;
+            this.scene.restart({ name: this.myPlayerName, user: this.user, level: this.currentLevel + 1 });
+        }, 1500);
+    }
+
     startPVEEncounter(isNPC = false) {
         this.isTransitioning = true;
         this.player.body.setVelocity(0);
@@ -3924,15 +4049,10 @@ class PVEScene extends Phaser.Scene {
 
         let overlay = document.createElement('div');
         overlay.style.position = 'absolute';
-        overlay.style.top = '0';
-        overlay.style.left = '0';
-        overlay.style.width = '100%';
-        overlay.style.height = '100%';
-        overlay.style.display = 'flex';
-        overlay.style.justifyContent = 'center';
-        overlay.style.alignItems = 'center';
-        overlay.style.pointerEvents = 'none';
-        overlay.style.zIndex = '9999';
+        overlay.style.top = '0'; overlay.style.left = '0';
+        overlay.style.width = '100%'; overlay.style.height = '100%';
+        overlay.style.display = 'flex'; overlay.style.justifyContent = 'center'; overlay.style.alignItems = 'center';
+        overlay.style.pointerEvents = 'none'; overlay.style.zIndex = '9999';
 
         overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 4rem;">${isNPC ? 'SFIDA ALLENATORE!' : 'POKÉMON SELVATICO!'}</h1>`;
         document.getElementById('game-container').appendChild(overlay);
@@ -3949,7 +4069,6 @@ class PVEScene extends Phaser.Scene {
                 this.scene.resume('PVEScene');
                 return;
             }
-
             this.scene.launch('BattleScene', { isWild: true, isNPC: isNPC, parentScene: 'PVEScene' });
         }, 2000);
     }
@@ -3957,11 +4076,10 @@ class PVEScene extends Phaser.Scene {
     gestisciDialogoNPC(npc) {
         if (this.isDialogActive) return;
         this.isDialogActive = true;
-
         this.createDialogUI();
 
         if (npc.isDefeated) {
-            this.mostraTestiDialogo(["Mh, mi hai già battuto...", "Sei davvero in gamba!"], () => {
+            this.mostraTestiDialogo(["Mh, mi hai già battuto...", "Sei davvero in gamba! ▼"], () => {
                 this.chiudiDialogo();
                 this.time.delayedCall(100, () => { this.isDialogActive = false; });
             });
@@ -3973,7 +4091,7 @@ class PVEScene extends Phaser.Scene {
                         this.npcInSfida = npc;
                         this.startPVEEncounter(true);
                     } else {
-                        this.mostraTestiDialogo(["Tsk, fifone!"], () => {
+                        this.mostraTestiDialogo(["Tsk, fifone! ▼"], () => {
                             this.chiudiDialogo();
                             this.time.delayedCall(100, () => { this.isDialogActive = false; });
                         });
@@ -3988,7 +4106,6 @@ class PVEScene extends Phaser.Scene {
         this.isDialogActive = true;
         this.player.body.setVelocity(0);
         this.player.anims.stop();
-
         this.createDialogUI();
 
         this.mostraTestiDialogo(["Sei vicino all'uscita.", "Vuoi salvare i progressi e tornare alla Lobby? ▼"], () => {
@@ -3997,7 +4114,9 @@ class PVEScene extends Phaser.Scene {
                 if (scelta === 'SI') {
                     this.tornaAllaLobby(true);
                 } else {
-                    this.scene.start('WorldScene', { name: this.myPlayerName, user: this.user, vengoDa: 'Porta PVE' });
+                    this.time.delayedCall(100, () => {
+                        this.isDialogActive = false;
+                    });
                 }
             });
         });
@@ -4005,32 +4124,19 @@ class PVEScene extends Phaser.Scene {
 
     async tornaAllaLobby(salvaRun = false) {
         this.isTransitioning = true;
-
         let overlay = document.createElement('div');
-        overlay.style.position = 'absolute';
-        overlay.style.top = '0';
-        overlay.style.left = '0';
-        overlay.style.width = '100%';
-        overlay.style.height = '100%';
-        overlay.style.backgroundColor = '#000';
-        overlay.style.display = 'flex';
-        overlay.style.justifyContent = 'center';
-        overlay.style.alignItems = 'center';
-        overlay.style.zIndex = '9999';
-
+        overlay.style.position = 'absolute'; overlay.style.top = '0'; overlay.style.left = '0';
+        overlay.style.width = '100%'; overlay.style.height = '100%'; overlay.style.backgroundColor = '#000';
+        overlay.style.display = 'flex'; overlay.style.justifyContent = 'center'; overlay.style.alignItems = 'center'; overlay.style.zIndex = '9999';
         overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 3rem; color: #fff;">TORNO ALLA LOBBY...</h1>`;
         document.getElementById('game-container').appendChild(overlay);
 
         try {
             let profilo = this.registry.get('playerProfile');
-            let mappaDaSalvare = salvaRun ? 'mappa_pve' : 'mappa_base';
+            let mappaDaSalvare = salvaRun ? `mappa_pve_${this.currentLevel}` : 'mappa_base';
 
             const { error } = await supabaseClient.from('profilo').update({ id_mappa: mappaDaSalvare }).eq('id_profilo', profilo.id_profilo);
-            if (error) {
-                console.error("Errore aggiornamento DB (Mappa):", error);
-            } else {
-                profilo.id_mappa = mappaDaSalvare;
-            }
+            if (!error) profilo.id_mappa = mappaDaSalvare;
 
             let myDbTeam = this.registry.get('userPokemon');
             let allUpdates = myDbTeam.map(p => ({
@@ -4038,13 +4144,12 @@ class PVEScene extends Phaser.Scene {
             }));
             await supabaseClient.from('pokemon').upsert(allUpdates);
         } catch (err) {
-            console.error("Errore nel salvataggio in uscita:", err);
+            console.error("Errore salvataggio:", err);
         }
 
         setTimeout(() => {
             if (overlay) overlay.remove();
             this.isTransitioning = false;
-
             this.scene.stop('PVEScene');
             this.scene.start('WorldScene', { name: this.myPlayerName, user: this.user, vengoDa: 'Porta PVE' });
         }, 1000);
@@ -4086,18 +4191,41 @@ class PVEScene extends Phaser.Scene {
                     this.tornaAllaLobby(true);
                 } else if (e.target.id === 'profile-btn') {
                     let profilo = this.registry.get('playerProfile');
+                    let winRate = profilo.partite_totali > 0 ? ((profilo.vittorie_totali / profilo.partite_totali) * 100).toFixed(1) : 0;
                     let box = document.getElementById('pause-box');
                     if (box) {
                         box.innerHTML = `
-                            <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">PROFILO ALLENATORE</h2>
-                            <div style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; border: 2px solid #ff7477; width: 85%; text-align: left; color: #fff; font-family: 'Courier New', monospace; font-size: 1.2rem;">
-                                <p style="margin: 10px 0;"><strong>NOME:</strong> ${profilo.username || 'Sconosciuto'}</p>
-                                <p style="margin: 10px 0;"><strong>VITTORIE:</strong> ${profilo.vittorie || 0}</p>
-                                <p style="margin: 10px 0;"><strong>PARTITE GIOCATE:</strong> ${profilo.partite_giocate || 0}</p>
+                            <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">PROFILO</h2>
+                            <div style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; border: 2px solid #ff7477; width: 85%; color: #fff; font-family: 'Courier New', monospace; font-size: 1.2rem; text-align: center;">
+                                <p><strong>NOME:</strong> ${profilo.username || 'Sconosciuto'}</p>
+                                <p><strong>VITTORIE:</strong> ${profilo.vittorie_totali || 0}</p>
+                                <p><strong>PARTITE:</strong> ${profilo.partite_totali || 0}</p>
+                                <p><strong>WIN %:</strong> ${winRate}%</p>
+                                <div style="margin-top: 15px; display: flex; justify-content: center; align-items: center; gap: 15px;">
+                                    <button id="prev-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&lt;</button>
+                                    <img id="profile-avatar" src="${profilo.avatar || 'assets/avatar.png'}" style="width: 64px; height: 64px; image-rendering: pixelated;">
+                                    <button id="next-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&gt;</button>
+                                </div>
                             </div>
-                            <button id="back-pause-btn" style="width: 300px; padding: 15px; margin-top: 30px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">INDIETRO</button>
+                            <button id="back-pause-btn" style="width: 300px; padding: 15px; margin-top: 30px; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer;">INDIETRO</button>
                         `;
                     }
+                } else if (e.target.id === 'prev-avatar' || e.target.id === 'next-avatar') {
+                    let profilo = this.registry.get('playerProfile');
+                    const avatars = ['assets/avatar.png', 'assets/avatar2.png', 'assets/avatar3.png', 'assets/avatar4.png', 'assets/avatar5.png', 'assets/avatar6.png'];
+                    let imgEl = document.getElementById('profile-avatar');
+                    let idx = avatars.indexOf(imgEl.getAttribute('src'));
+                    if (idx === -1) idx = 0;
+                    idx = e.target.id === 'prev-avatar' ? (idx - 1 + avatars.length) % avatars.length : (idx + 1) % avatars.length;
+
+                    let newAvatarPath = avatars[idx];
+                    imgEl.src = newAvatarPath;
+                    let numberToSave = idx + 1;
+                    profilo.avatar_sprite = numberToSave;
+
+                    supabaseClient.from('profilo').update({ avatar_sprite: numberToSave }).eq('id_profilo', profilo.id_profilo);
+                    let textureKey = newAvatarPath.split('/').pop().replace('.png', '');
+                    if (this.player) this.player.setTexture(textureKey);
                 } else if (e.target.id === 'back-pause-btn') {
                     renderMainPause();
                 }
@@ -4110,33 +4238,13 @@ class PVEScene extends Phaser.Scene {
         if (!container) {
             container = document.createElement('div');
             container.id = 'dialog-ui-container';
-            container.style.position = 'fixed';
-            container.style.bottom = '20px';
-            container.style.left = '50%';
-            container.style.transform = 'translateX(-50%)';
-            container.style.width = '800px';
-            container.style.height = '140px';
-            container.style.backgroundColor = '#2b2b2b';
-            container.style.border = '6px solid #d05050';
-            container.style.boxSizing = 'border-box';
-            container.style.padding = '20px 30px';
-            container.style.zIndex = '999999';
-            container.style.display = 'flex';
-            container.style.flexDirection = 'column';
-            container.style.justifyContent = 'flex-start';
-            container.style.boxShadow = '0px 10px 20px rgba(0,0,0,0.8)';
-
+            container.style.position = 'fixed'; container.style.bottom = '20px'; container.style.left = '50%'; container.style.transform = 'translateX(-50%)';
+            container.style.width = '800px'; container.style.height = '140px'; container.style.backgroundColor = '#2b2b2b'; container.style.border = '6px solid #d05050';
+            container.style.boxSizing = 'border-box'; container.style.padding = '20px 30px'; container.style.zIndex = '999999';
+            container.style.display = 'flex'; container.style.flexDirection = 'column'; container.style.justifyContent = 'flex-start'; container.style.boxShadow = '0px 10px 20px rgba(0,0,0,0.8)';
             let textEl = document.createElement('div');
-            textEl.id = 'dialog-ui-text';
-            textEl.style.color = '#ffffff';
-            textEl.style.fontFamily = '"Courier New", Courier, monospace';
-            textEl.style.fontSize = '26px';
-            textEl.style.fontWeight = 'bold';
-            textEl.style.textShadow = '2px 2px 0 #000';
-            textEl.style.lineHeight = '1.3';
-
-            container.appendChild(textEl);
-            document.body.appendChild(container);
+            textEl.id = 'dialog-ui-text'; textEl.style.color = '#ffffff'; textEl.style.fontFamily = '"Courier New", Courier, monospace'; textEl.style.fontSize = '26px'; textEl.style.fontWeight = 'bold'; textEl.style.textShadow = '2px 2px 0 #000'; textEl.style.lineHeight = '1.3';
+            container.appendChild(textEl); document.body.appendChild(container);
         }
         container.style.display = 'flex';
         document.getElementById('dialog-ui-text').innerText = '';
@@ -4152,26 +4260,19 @@ class PVEScene extends Phaser.Scene {
     mostraTestiDialogo(testi, onComplete) {
         let index = 0;
         let textEl = document.getElementById('dialog-ui-text');
-
         const mostraProssimo = () => {
             if (index < testi.length) {
                 textEl.innerHTML = testi[index].replace(' ▼', '') + '<span style="color:#ffcc00;"> ▼</span>';
                 index++;
-
                 setTimeout(() => {
                     const handleEnter = (e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            window.removeEventListener('keydown', handleEnter);
-                            if (this.enterKey) this.enterKey.reset();
-                            mostraProssimo();
+                            e.preventDefault(); window.removeEventListener('keydown', handleEnter); if (this.enterKey) this.enterKey.reset(); mostraProssimo();
                         }
                     };
                     window.addEventListener('keydown', handleEnter);
                 }, 100);
-            } else {
-                if (onComplete) onComplete();
-            }
+            } else { if (onComplete) onComplete(); }
         };
         mostraProssimo();
     }
@@ -4180,89 +4281,34 @@ class PVEScene extends Phaser.Scene {
         let choiceContainer = document.getElementById('dialog-choice-container');
         if (!choiceContainer) {
             choiceContainer = document.createElement('div');
-            choiceContainer.id = 'dialog-choice-container';
-            choiceContainer.style.position = 'fixed';
-            choiceContainer.style.bottom = '175px';
-            choiceContainer.style.left = '50%';
-            choiceContainer.style.transform = 'translateX(250px)';
-            choiceContainer.style.width = '150px';
-            choiceContainer.style.backgroundColor = '#2b2b2b';
-            choiceContainer.style.border = '4px solid #d05050';
-            choiceContainer.style.boxSizing = 'border-box';
-            choiceContainer.style.padding = '15px';
-            choiceContainer.style.zIndex = '999999';
-            choiceContainer.style.display = 'flex';
-            choiceContainer.style.flexDirection = 'column';
-            choiceContainer.style.gap = '15px';
-            choiceContainer.style.boxShadow = '0px 10px 20px rgba(0,0,0,0.8)';
-
-            let optSi = document.createElement('div');
-            optSi.id = 'dialog-opt-si';
-            optSi.style.color = '#ffffff';
-            optSi.style.fontFamily = '"Courier New", Courier, monospace';
-            optSi.style.fontSize = '26px';
-            optSi.style.fontWeight = 'bold';
-            optSi.style.textShadow = '2px 2px 0 #000';
-
-            let optNo = document.createElement('div');
-            optNo.id = 'dialog-opt-no';
-            optNo.style.color = '#ffffff';
-            optNo.style.fontFamily = '"Courier New", Courier, monospace';
-            optNo.style.fontSize = '26px';
-            optNo.style.fontWeight = 'bold';
-            optNo.style.textShadow = '2px 2px 0 #000';
-
-            choiceContainer.appendChild(optSi);
-            choiceContainer.appendChild(optNo);
-            document.body.appendChild(choiceContainer);
+            choiceContainer.id = 'dialog-choice-container'; choiceContainer.style.position = 'fixed'; choiceContainer.style.bottom = '175px'; choiceContainer.style.left = '50%';
+            choiceContainer.style.transform = 'translateX(250px)'; choiceContainer.style.width = '150px'; choiceContainer.style.backgroundColor = '#2b2b2b';
+            choiceContainer.style.border = '4px solid #d05050'; choiceContainer.style.boxSizing = 'border-box'; choiceContainer.style.padding = '15px';
+            choiceContainer.style.zIndex = '999999'; choiceContainer.style.display = 'flex'; choiceContainer.style.flexDirection = 'column'; choiceContainer.style.gap = '15px'; choiceContainer.style.boxShadow = '0px 10px 20px rgba(0,0,0,0.8)';
+            let optSi = document.createElement('div'); optSi.id = 'dialog-opt-si'; optSi.style.color = '#ffffff'; optSi.style.fontFamily = '"Courier New", Courier, monospace'; optSi.style.fontSize = '26px'; optSi.style.fontWeight = 'bold'; optSi.style.textShadow = '2px 2px 0 #000';
+            let optNo = document.createElement('div'); optNo.id = 'dialog-opt-no'; optNo.style.color = '#ffffff'; optNo.style.fontFamily = '"Courier New", Courier, monospace'; optNo.style.fontSize = '26px'; optNo.style.fontWeight = 'bold'; optNo.style.textShadow = '2px 2px 0 #000';
+            choiceContainer.appendChild(optSi); choiceContainer.appendChild(optNo); document.body.appendChild(choiceContainer);
         }
-
         choiceContainer.style.display = 'flex';
-        this.sceltaAttuale = 0; // 0 = SÌ, 1 = NO
-
+        this.sceltaAttuale = 0;
         const aggiornaCursoreScelta = () => {
-            let optSi = document.getElementById('dialog-opt-si');
-            let optNo = document.getElementById('dialog-opt-no');
-            if (this.sceltaAttuale === 0) {
-                optSi.innerHTML = `<span style="display:inline-block; width: 25px; color: #ffcc00;">▶</span><span style="color: #ffcc00;">SÌ</span>`;
-                optNo.innerHTML = `<span style="display:inline-block; width: 25px;"></span><span style="color: #ffffff;">NO</span>`;
-            } else {
-                optSi.innerHTML = `<span style="display:inline-block; width: 25px;"></span><span style="color: #ffffff;">SÌ</span>`;
-                optNo.innerHTML = `<span style="display:inline-block; width: 25px; color: #ffcc00;">▶</span><span style="color: #ffcc00;">NO</span>`;
-            }
+            let optSi = document.getElementById('dialog-opt-si'); let optNo = document.getElementById('dialog-opt-no');
+            if (this.sceltaAttuale === 0) { optSi.innerHTML = `<span style="display:inline-block; width: 25px; color: #ffcc00;">▶</span><span style="color: #ffcc00;">SÌ</span>`; optNo.innerHTML = `<span style="display:inline-block; width: 25px;"></span><span style="color: #ffffff;">NO</span>`; }
+            else { optSi.innerHTML = `<span style="display:inline-block; width: 25px;"></span><span style="color: #ffffff;">SÌ</span>`; optNo.innerHTML = `<span style="display:inline-block; width: 25px; color: #ffcc00;">▶</span><span style="color: #ffcc00;">NO</span>`; }
         };
-
         aggiornaCursoreScelta();
-
         const handleChoiceInput = (e) => {
-            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'ArrowDown' || e.key === 's') {
-                this.sceltaAttuale = this.sceltaAttuale === 0 ? 1 : 0;
-                aggiornaCursoreScelta();
-            } else if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                window.removeEventListener('keydown', handleChoiceInput);
-                if (this.enterKey) this.enterKey.reset();
-                onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO');
-            }
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'ArrowDown' || e.key === 's') { this.sceltaAttuale = this.sceltaAttuale === 0 ? 1 : 0; aggiornaCursoreScelta(); }
+            else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); if (this.enterKey) this.enterKey.reset(); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
         };
-
-        setTimeout(() => {
-            window.addEventListener('keydown', handleChoiceInput);
-        }, 100);
+        setTimeout(() => { window.addEventListener('keydown', handleChoiceInput); }, 100);
     }
 
     leggiCartello() {
         if (this.isDialogActive) return;
         this.isDialogActive = true;
-
         this.createDialogUI();
-
-        this.mostraTestiDialogo([
-            "BENVENUTO NELLA MODALITÀ PVE!",
-            "Qui puoi esplorare l'erba alta per trovare Pokémon selvatici...",
-            "Oppure sfidare gli allenatori presenti per allenare la tua squadra.",
-            "Trova l'uscita alla fine del percorso per completare l'area!"
-        ], () => {
+        this.mostraTestiDialogo(["BENVENUTO NELLA MODALITÀ PVE!", `Sei nel livello ${this.currentLevel}.`, "Esplora l'erba alta o sfida gli allenatori.", "Trova l'uscita alla fine del percorso! ▼"], () => {
             this.chiudiDialogo();
             this.time.delayedCall(100, () => { this.isDialogActive = false; });
         });
