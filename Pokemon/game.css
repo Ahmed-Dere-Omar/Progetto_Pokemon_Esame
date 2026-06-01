@@ -22,14 +22,18 @@ body {
     margin: 0;
     padding: 0;
     background-color: #3E1E68;
-    height: 100vh;
+    height: 100dvh;
+    min-height: -webkit-fill-available;
     overflow: hidden;
 }
 
 /* Contenitore base per Phaser */
 #game-container {
     width: 100vw;
-    height: 100vh;
+    height: 100dvh;
+    max-width: 100vw;
+    max-height: 100dvh;
+    min-height: -webkit-fill-available;
     position: relative;
     overflow: hidden;
 }
@@ -293,6 +297,8 @@ canvas {
     transition: transform 0.1s, box-shadow 0.1s;
     box-shadow: 4px 4px 0 var(--battle-shadow);
     position: relative;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .pkmn-info {
@@ -588,9 +594,10 @@ canvas {
 
 .pkmn-modal-content {
     position: relative;
-    /* GLOBALE: Grandezza fissa e gigante per PC e Battaglia! */
-    width: 1250px !important;
-    height: 760px !important;
+    /* GLOBALE: Adattabile per desktop e mobile */
+    width: 95vw !important;
+    max-width: 1250px !important;
+    height: 90dvh !important;
     max-height: 760px !important;
 
     background: var(--battle-bg);
@@ -601,6 +608,8 @@ canvas {
     flex-direction: column;
     color: var(--color-primary);
     box-sizing: border-box;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .pkmn-modal-content::before,
@@ -765,38 +774,22 @@ canvas {
     top: 0;
     left: 0;
     width: 100vw;
-    height: 100vh;
+    height: 100dvh;
     pointer-events: none;
-    /* Lascia passare i click al gioco sotto */
     z-index: 9999999;
-    /* Sopra a tutte le modali (PC, Pause, Dialoghi)! */
     font-family: 'Courier New', Courier, monospace;
     user-select: none;
     -webkit-user-select: none;
-}
-
-.dpad-btn,
-.action-btn-mobile,
-#btn-menu {
-    pointer-events: auto;
-    /* Riattiva i tocchi solo sui tasti */
-    background: rgba(38, 28, 51, 0.85);
-    border: 3px solid var(--battle-accent);
-    color: white;
     display: flex;
-    justify-content: center;
-    align-items: center;
-    font-weight: bold;
-    box-shadow: 2px 2px 0 var(--battle-shadow-heavy);
-    touch-action: none;
-    transition: transform 0.05s;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding: 20px 30px 40px 30px;
+    box-sizing: border-box;
 }
 
 /* D-PAD (Frecce Direzionali) */
 #dpad {
-    position: absolute;
-    bottom: 40px;
-    left: 20px;
+    position: static;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -807,42 +800,73 @@ canvas {
 }
 
 .dpad-btn {
-    width: 45px;
-    height: 45px;
-    /* Ridotto da 60 a 45 */
-    font-size: 18px;
-    /* Ridotto da 24 a 18 */
-    border-radius: 6px;
-    margin: 3px;
+    pointer-events: auto;
+    width: 55px;
+    height: 55px;
+    font-size: 22px;
+    border-radius: 8px;
+    margin: 4px;
+    background: rgba(38, 28, 51, 0.85);
+    border: 3px solid var(--battle-accent);
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    box-shadow: 2px 4px 0 var(--battle-shadow-heavy);
+    touch-action: none;
+    transition: transform 0.05s, background 0.1s;
+}
+
+.dpad-btn:active {
+    background: var(--battle-accent);
+    color: var(--battle-black);
+    transform: translateY(2px);
+    box-shadow: 0px 2px 0 var(--battle-shadow-heavy);
 }
 
 .dpad-center {
-    width: 45px;
-    height: 45px;
-    margin: 3px;
+    width: 55px;
+    height: 55px;
+    margin: 4px;
 }
 
 /* Tasti A e B (Stile Console) */
 #action-buttons {
-    position: absolute;
-    bottom: 40px;
-    right: 20px;
-    display: flex;
-    gap: 20px;
-    align-items: flex-end;
+    position: static;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    align-items: end;
 }
 
 .action-btn-mobile {
-    width: 60px;
-    height: 60px;
-    /* Ridotto da 75 a 60 */
+    pointer-events: auto;
+    width: 70px;
+    height: 70px;
     border-radius: 50%;
-    font-size: 24px;
-    /* Ridotto da 32 a 24 */
+    font-size: 26px;
+    background: rgba(38, 28, 51, 0.85);
+    border: 3px solid var(--battle-accent);
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    box-shadow: 2px 4px 0 var(--battle-shadow-heavy);
+    touch-action: none;
+    transition: transform 0.05s, background 0.1s;
+}
+
+.action-btn-mobile:active {
+    background: var(--battle-accent);
+    color: var(--battle-black);
+    transform: translateY(2px);
+    box-shadow: 0px 2px 0 var(--battle-shadow-heavy);
 }
 
 #btn-enter {
-    margin-bottom: 20px;
+    margin-bottom: 30px;
 }
 
 #btn-esc {
@@ -851,14 +875,43 @@ canvas {
 
 /* Tasto Menu (Rimpicciolito) */
 #btn-menu {
-    padding: 8px 16px;
-    /* Ridotto il padding */
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    pointer-events: auto;
+    background: rgba(38, 28, 51, 0.85);
+    border: 3px solid var(--battle-accent);
+    color: white;
+    padding: 10px 20px;
     font-size: 16px;
-    /* Ridotto da 20 a 16 */
+    border-radius: 8px;
+    font-weight: bold;
+    box-shadow: 2px 4px 0 var(--battle-shadow-heavy);
+    touch-action: none;
+}
+
+#btn-menu:active {
+    background: var(--battle-accent);
+    color: var(--battle-black);
+    transform: translateY(2px);
+    box-shadow: 0px 2px 0 var(--battle-shadow-heavy);
+}
+
+@media (max-width: 1024px) {
+    #pc-main-view, .summary-layout {
+        flex-direction: column !important;
+        overflow-y: auto !important;
+    }
+    .summary-left, .summary-right {
+        border-right: none !important;
+        border-bottom: 4px dashed var(--color-quaternary);
+        flex: none !important;
+        height: auto !important;
+    }
 }
 
 /* Nascondiamo su PC e schermi grandi! */
-@media (min-width: 1024px) {
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
     #mobile-controls {
         display: none !important;
     }

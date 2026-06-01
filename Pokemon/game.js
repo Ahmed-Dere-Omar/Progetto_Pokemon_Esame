@@ -8,6 +8,12 @@ const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 // Memorizziamo SE QUESTA SPECIFICA SCHEDA è quella aperta dalla mail.
 // ==============================================================================
 window.isRecoveryLink = window.location.href.includes('type=recovery');
+
+// FUNZIONE HELPER: Rilevamento touch
+const isTouchDevice = () => {
+    return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (navigator.msMaxTouchPoints > 0);
+};
+
 // ==============================================================================
 // BANNER GLOBALE (Per avvisi in tutte le scene)
 // ==============================================================================
@@ -376,7 +382,10 @@ class LoginScene extends Phaser.Scene {
         this.registry.set('userPokemon', myPokemon || []);
         let nomeFinal = profiloUtente.username.toUpperCase();
         // Accende i controlli se si è da smartphone
-        if (window.innerWidth <= 1024) document.getElementById('mobile-controls').style.display = 'block';
+        if (isTouchDevice() || window.innerWidth <= 1024) {
+            let controls = document.getElementById('mobile-controls');
+            if (controls) controls.style.display = 'flex';
+        }
         // 3. REINDIRIZZAMENTO
         if (isNewPlayer) {
             // Se è nuovo, gli mostriamo cosa ha ricevuto
@@ -422,7 +431,10 @@ class LoginScene extends Phaser.Scene {
     }
 
     indirizzaGiocatore(nome, user, pkmnList) {
-        if (window.innerWidth <= 1024) document.getElementById('mobile-controls').style.display = 'block';
+        if (isTouchDevice() || window.innerWidth <= 1024) {
+            let controls = document.getElementById('mobile-controls');
+            if (controls) controls.style.display = 'flex';
+        }
         if (pkmnList.length === 0) {
             console.log("Nuovo giocatore: Reindirizzo alla scelta dello Starter");
             // Manda l'utente alla nuova schermata di selezione!
@@ -610,7 +622,7 @@ class WorldScene extends Phaser.Scene {
     }
 
     update() {
-        if (Phaser.Input.Keyboard.JustDown(this.escKey) && !this.isTransitioning && !this.pcOpen) {
+        if (Phaser.Input.Keyboard.JustDown(this.escKey) && !this.isTransitioning && !this.pcOpen && !this.isDialogActive) {
             this.togglePauseMenu();
         }
 
@@ -766,8 +778,10 @@ class WorldScene extends Phaser.Scene {
             container.style.bottom = '20px';
             container.style.left = '50%';
             container.style.transform = 'translateX(-50%)';
-            container.style.width = '800px';
-            container.style.height = '140px';
+            container.style.width = '95vw';
+            container.style.maxWidth = '800px';
+            container.style.height = 'auto';
+            container.style.minHeight = '140px';
             container.style.backgroundColor = '#2b2b2b';
             container.style.border = '6px solid #d05050';
             container.style.boxSizing = 'border-box';
@@ -812,10 +826,11 @@ class WorldScene extends Phaser.Scene {
 
                 setTimeout(() => {
                     const handleEnter = (e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
+                        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
                             e.preventDefault();
                             window.removeEventListener('keydown', handleEnter);
                             if (this.enterKey) this.enterKey.reset();
+                            if (this.escKey) this.escKey.reset();
                             mostraProssimo();
                         }
                     };
@@ -834,10 +849,12 @@ class WorldScene extends Phaser.Scene {
             choiceContainer = document.createElement('div');
             choiceContainer.id = 'dialog-choice-container';
             choiceContainer.style.position = 'fixed';
-            choiceContainer.style.bottom = '175px';
-            choiceContainer.style.left = '50%';
-            choiceContainer.style.transform = 'translateX(250px)';
-            choiceContainer.style.width = '150px';
+            choiceContainer.style.bottom = '180px'; /* Alzato sopra il dialogo */
+            choiceContainer.style.left = '65%';     /* Centrato orizzontalmente */
+            choiceContainer.style.transform = 'translateX(-50%)';
+            choiceContainer.style.right = 'auto';   /* Rimosso l'ancoraggio a destra */
+            choiceContainer.style.width = 'auto';
+            choiceContainer.style.minWidth = '120px';
             choiceContainer.style.backgroundColor = '#2b2b2b';
             choiceContainer.style.border = '4px solid #d05050';
             choiceContainer.style.boxSizing = 'border-box';
@@ -887,19 +904,16 @@ class WorldScene extends Phaser.Scene {
         aggiornaCursoreScelta();
 
         const handleChoiceInput = (e) => {
-            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'ArrowDown' || e.key === 's') {
-                this.sceltaAttuale = this.sceltaAttuale === 0 ? 1 : 0;
-                aggiornaCursoreScelta();
-            } else if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                window.removeEventListener('keydown', handleChoiceInput);
-                if (this.enterKey) this.enterKey.reset();
-                onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO');
-            }
+            let key = e.key || (e.detail && e.detail.key);
+            if (!key) return;
+            if (key === 'ArrowUp' || key === 'w' || key === 'ArrowDown' || key === 's') { this.sceltaAttuale = this.sceltaAttuale === 0 ? 1 : 0; aggiornaCursoreScelta(); }
+            else if (key === 'Enter' || key === ' ') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.enterKey) this.enterKey.reset(); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
+            else if (key === 'Escape' || key === 'Backspace') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.escKey) this.escKey.reset(); onChoice('NO'); }
         };
 
         setTimeout(() => {
             window.addEventListener('keydown', handleChoiceInput);
+            window.addEventListener('dpad-input', handleChoiceInput);
         }, 100);
     }
 
@@ -977,7 +991,8 @@ class WorldScene extends Phaser.Scene {
         overlay.style.alignItems = 'center';
         overlay.style.zIndex = '9999';
 
-        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 3rem; color: #fff;">CARICAMENTO ARENA PVP...</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 7vw; text-align: center; max-width: 90%; color: #fff;">CARICAMENTO ARENA PVP...</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: clamp(2rem, 5vw, 3.5rem); text-align: center; width: 90%; color: #fff;">CARICAMENTO ARENA PVP...</h1>`;
         document.getElementById('game-container').appendChild(overlay);
 
         setTimeout(() => {
@@ -1027,7 +1042,8 @@ class WorldScene extends Phaser.Scene {
         overlay.style.alignItems = 'center';
         overlay.style.zIndex = '9999';
 
-        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 3rem; color: #fff;">CARICAMENTO CENTRO POKÉMON...</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 7vw; text-align: center; max-width: 90%; color: #fff;">CARICAMENTO CENTRO POKÉMON...</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: clamp(2rem, 5vw, 3.5rem); text-align: center; width: 90%; color: #fff;">CARICAMENTO CENTRO POKÉMON...</h1>`;
         document.getElementById('game-container').appendChild(overlay);
 
         setTimeout(() => {
@@ -1058,7 +1074,8 @@ class WorldScene extends Phaser.Scene {
         overlay.style.alignItems = 'center';
         overlay.style.zIndex = '9999';
 
-        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 3rem; color: #fff;">CARICAMENTO LIVELLO ${levelToLoad}...</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 7vw; text-align: center; max-width: 90%; color: #fff;">CARICAMENTO LIVELLO ${levelToLoad}...</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: clamp(2rem, 5vw, 3.5rem); text-align: center; width: 90%; color: #fff;">CARICAMENTO LIVELLO ${levelToLoad}...</h1>`;
         document.getElementById('game-container').appendChild(overlay);
 
         try {
@@ -1100,10 +1117,10 @@ class WorldScene extends Phaser.Scene {
 
             const renderMainPause = () => {
                 overlay.innerHTML = `
-                <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 500px; max-width: 90%;">
-                    <h2 class="text-shadows" style="font-size: 4rem; margin-bottom: 30px; text-align: center;">MENU PAUSA</h2>
-                    <button id="profile-btn" style="width: 300px; padding: 15px; margin-top: 10px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">PROFILO</button>
-                    <button id="logout-btn" style="width: 300px; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">ESCI DAL GIOCO</button>
+                <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 90%; max-width: 400px;">
+                    <h2 class="text-shadows" style="font-size: clamp(2rem, 6vw, 3.5rem); margin-bottom: 30px; text-align: center;">MENU PAUSA</h2>
+                    <button id="profile-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 10px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">PROFILO</button>
+                    <button id="logout-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">ESCI DAL GIOCO</button>
                     <p style="color: #fff; margin-top: 40px; font-size: 1.2rem; font-family: 'Courier New'; font-weight: bold; text-align: center;">Premi ESC per tornare al gioco</p>
                 </div>`;
             };
@@ -1142,7 +1159,7 @@ class WorldScene extends Phaser.Scene {
                         <button id="next-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&gt;</button>
                     </div>
                 </div>
-                <button id="back-pause-btn" style="width: 300px; padding: 15px; margin-top: 30px; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer;">INDIETRO</button>
+                <button id="back-pause-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 30px; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer;">INDIETRO</button>
             `;
                     }
                 } else if (e.target.id === 'prev-avatar' || e.target.id === 'next-avatar') {
@@ -1202,18 +1219,18 @@ class WorldScene extends Phaser.Scene {
         overlay.className = 'pkmn-modal-overlay';
         overlay.id = 'pc-overlay-main';
         overlay.innerHTML = `
-            <div class="pkmn-modal-content" style="width: 1250px !important; height: 760px !important; max-height: 760px !important;">
+            <div class="pkmn-modal-content" id="pc-modal-content">
                 <div class="pkmn-modal-header" style="margin-bottom: 15px;">SISTEMA MEMORIA POKÉMON</div>
                 
-                <div id="pc-main-view" style="display: flex; gap: 20px; flex: 1; overflow: hidden;">
-                    <div style="flex: 1; display: flex; flex-direction: column; background: var(--battle-panel); border: 4px solid var(--color-secondary); border-radius: 8px; padding: 15px;">
+                <div id="pc-main-view" style="display: flex; gap: 20px; flex: 1;">
+                    <div style="flex: 1; display: flex; flex-direction: column; background: var(--battle-panel); border: 4px solid var(--color-secondary); border-radius: 8px; padding: 15px; box-sizing: border-box;">
                         <h2 style="color: var(--battle-accent); text-align: center; margin-top: 0; flex-shrink: 0;">SQUADRA</h2>
-                        <div id="pc-squadra" style="display: flex; flex-direction: column; gap: 15px; flex: 1; align-content: start; padding: 10px; overflow: hidden !important;"></div>
+                        <div id="pc-squadra" style="display: flex; flex-direction: column; gap: 10px; width: 100%; box-sizing: border-box; flex: 1; align-content: start; padding: 10px;"></div>
                     </div>
 
-                    <div style="flex: 2.2; background: var(--battle-panel); border: 4px solid var(--battle-border); border-radius: 8px; padding: 15px; display: flex; flex-direction: column; overflow: hidden !important;">
+                    <div style="flex: 2.2; background: var(--battle-panel); border: 4px solid var(--battle-border); border-radius: 8px; padding: 15px; display: flex; flex-direction: column; box-sizing: border-box;">
                         <h2 style="color: var(--battle-accent); text-align: center; margin-top: 0; flex-shrink: 0;">BOX DATI</h2>
-                        <div id="pc-box" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; flex: 1; align-content: start; padding: 10px; overflow: hidden !important;"></div>
+                        <div id="pc-box" class="pc-grid-box" style="display: grid; gap: 10px; box-sizing: border-box; flex: 1; align-content: start; padding: 10px;"></div>
                     </div>
 
                     <div style="flex: 1; background: var(--battle-bg); border: 4px dashed var(--color-quaternary); border-radius: 8px; padding: 15px; display: flex; flex-direction: column; align-items: center; text-align: center;">
@@ -1278,12 +1295,24 @@ class WorldScene extends Phaser.Scene {
         style.innerHTML = `
             .pc-grid-slot { background: #222; border: 3px solid #555; border-radius: 8px; height: 65px; display: flex; justify-content: center; align-items: center; position: relative; box-shadow: inset 2px 2px 5px rgba(0,0,0,0.5); }
             
-            /* FIX 2: Larghezza 92% e margin auto. Questo dà al quadratino lo spazio vitale ai lati per "gonfiarsi" senza toccare il bordo del box squadra! */
-            .pc-sq-slot { width: 92% !important; margin: 0 auto; background: #3d2b4f; border: 3px dashed #555; border-radius: 8px; height: 100px; display: flex; align-items: center; padding: 0 15px; gap: 15px; box-shadow: 2px 2px 0 var(--battle-shadow); } 
+            .pc-sq-slot { width: 100%; max-width: 92%; margin: 0 auto; background: #3d2b4f; border: 3px dashed #555; border-radius: 8px; height: 100px; display: flex; align-items: center; padding: 0 15px; gap: 15px; box-sizing: border-box; box-shadow: 2px 2px 0 var(--battle-shadow); } 
             
             .pc-grid-slot.selected, .pc-sq-slot.selected { border-color: var(--battle-accent) !important; background-color: #4a3b5c !important; transform: scale(1.05); box-shadow: 0 0 10px var(--battle-accent); z-index: 10; }
             .pc-action-btn { background: var(--battle-panel); border: 2px solid var(--battle-border); color: #fff; padding: 10px; font-weight: bold; cursor: pointer; }
             .pc-action-btn.selected { border-color: var(--battle-accent); color: var(--battle-accent); background: #3d2b4f; transform: translateX(-5px); box-shadow: 4px 4px 0 var(--battle-accent); }
+            
+            /* Griglia Box dinamica (Desktop) */
+            .pc-grid-box { grid-template-columns: repeat(6, 1fr); }
+
+            /* MEDIA QUERIES PER MOBILE */
+            @media (max-width: 1024px) {
+                #pc-modal-content { height: 90dvh !important; max-height: 90dvh !important; overflow-y: scroll !important; overflow-x: hidden !important; }
+                #pc-main-view { flex-direction: column !important; overflow-y: visible !important; }
+                .pc-grid-box { grid-template-columns: repeat(auto-fit, minmax(50px, 1fr)) !important; }
+                #pc-squadra, #pc-box { overflow: visible !important; }
+                .pc-sq-slot { width: 100% !important; max-width: 100% !important; }
+                .summary-right { overflow-y: visible !important; }
+            }
         `;
         document.head.appendChild(style);
 
@@ -1578,7 +1607,8 @@ class WorldScene extends Phaser.Scene {
         overlay.style.pointerEvents = 'none';
         overlay.style.zIndex = '9999';
 
-        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 4rem;">${testo}</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 7vw; text-align: center; max-width: 90%;">${testo}</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: clamp(2rem, 5vw, 3.5rem); text-align: center; width: 90%;">${testo}</h1>`;
         document.getElementById('game-container').appendChild(overlay);
 
         setTimeout(() => {
@@ -1698,7 +1728,7 @@ class CPKScene extends Phaser.Scene {
     }
 
     update() {
-        if (Phaser.Input.Keyboard.JustDown(this.escKey) && !this.isTransitioning && !this.pcOpen) {
+        if (Phaser.Input.Keyboard.JustDown(this.escKey) && !this.isTransitioning && !this.pcOpen && !this.isDialogActive) {
             this.togglePauseMenu();
         }
 
@@ -1820,10 +1850,11 @@ class CPKScene extends Phaser.Scene {
             choiceContainer = document.createElement('div');
             choiceContainer.id = 'dialog-choice-container';
             choiceContainer.style.position = 'fixed';
-            choiceContainer.style.bottom = '175px';
-            choiceContainer.style.left = '50%';
-            choiceContainer.style.transform = 'translateX(250px)';
-            choiceContainer.style.width = '150px';
+            choiceContainer.style.bottom = '160px';
+            choiceContainer.style.right = '5%';
+            choiceContainer.style.transform = 'none';
+            choiceContainer.style.width = 'auto';
+            choiceContainer.style.minWidth = '120px';
             choiceContainer.style.backgroundColor = '#2b2b2b';
             choiceContainer.style.border = '4px solid #d05050';
             choiceContainer.style.boxSizing = 'border-box';
@@ -1871,11 +1902,13 @@ class CPKScene extends Phaser.Scene {
         };
         aggiornaCursoreScelta();
         const handleChoiceInput = (e) => {
-            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'ArrowDown' || e.key === 's') { this.sceltaAttuale = this.sceltaAttuale === 0 ? 1 : 0; aggiornaCursoreScelta(); }
-            else if (e.key === 'Enter' || e.key === ' ') { window.removeEventListener('keydown', handleChoiceInput); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
-            else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); if (this.enterKey) this.enterKey.reset(); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
+            let key = e.key || (e.detail && e.detail.key);
+            if (!key) return;
+            if (key === 'ArrowUp' || key === 'w' || key === 'ArrowDown' || key === 's') { this.sceltaAttuale = this.sceltaAttuale === 0 ? 1 : 0; aggiornaCursoreScelta(); }
+            else if (key === 'Enter' || key === ' ') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.enterKey) this.enterKey.reset(); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
+            else if (key === 'Escape' || key === 'Backspace') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.escKey) this.escKey.reset(); onChoice('NO'); }
         };
-        setTimeout(() => { window.addEventListener('keydown', handleChoiceInput); }, 100);
+        setTimeout(() => { window.addEventListener('keydown', handleChoiceInput); window.addEventListener('dpad-input', handleChoiceInput); }, 100);
     }
 
     createDialogUI() {
@@ -1887,8 +1920,10 @@ class CPKScene extends Phaser.Scene {
             container.style.bottom = '20px';
             container.style.left = '50%';
             container.style.transform = 'translateX(-50%)';
-            container.style.width = '800px';
-            container.style.height = '140px';
+            container.style.width = '95vw';
+            container.style.maxWidth = '800px';
+            container.style.height = 'auto';
+            container.style.minHeight = '140px';
             container.style.backgroundColor = '#2b2b2b';
             container.style.border = '6px solid #d05050';
             container.style.boxSizing = 'border-box';
@@ -1930,10 +1965,11 @@ class CPKScene extends Phaser.Scene {
                 index++;
                 setTimeout(() => {
                     const handleEnter = (e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
+                        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
                             e.preventDefault();
                             window.removeEventListener('keydown', handleEnter);
                             if (this.enterKey) this.enterKey.reset();
+                            if (this.escKey) this.escKey.reset();
                             mostraProssimo();
                         }
                     };
@@ -1958,7 +1994,8 @@ class CPKScene extends Phaser.Scene {
         overlay.style.alignItems = 'center';
         overlay.style.zIndex = '9999';
 
-        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 3rem; color: #fff;">TORNO ALLA LOBBY...</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 7vw; text-align: center; max-width: 90%; color: #fff;">TORNO ALLA LOBBY...</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: clamp(2rem, 5vw, 3.5rem); text-align: center; width: 90%; color: #fff;">TORNO ALLA LOBBY...</h1>`;
         document.getElementById('game-container').appendChild(overlay);
 
         setTimeout(() => {
@@ -1986,10 +2023,10 @@ class CPKScene extends Phaser.Scene {
 
             const renderMainPause = () => {
                 overlay.innerHTML = `
-                    <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 500px; max-width: 90%;">
-                        <h2 class="text-shadows" style="font-size: 4rem; margin-bottom: 30px; text-align: center;">CENTRO POKÉMON</h2>
-                        <button id="profile-btn" style="width: 300px; padding: 15px; margin-top: 10px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">PROFILO</button>
-                        <button id="lobby-btn" style="width: 300px; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">TORNA ALLA LOBBY</button>
+                    <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 90%; max-width: 400px;">
+                       <h2 class="text-shadows" style="font-size: clamp(2rem, 6vw, 3.5rem); margin-bottom: 30px; text-align: center;">CENTRO POKÉMON</h2>
+                        <button id="profile-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 10px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">PROFILO</button>
+                        <button id="lobby-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">TORNA ALLA LOBBY</button>
                         <p style="color: #fff; margin-top: 40px; font-size: 1.2rem; font-family: 'Courier New'; font-weight: bold; text-align: center;">Premi ESC per tornare al gioco</p>
                     </div>`;
             };
@@ -2022,7 +2059,7 @@ class CPKScene extends Phaser.Scene {
                                     <button id="next-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&gt;</button>
                                 </div>
                             </div>
-                            <button id="back-pause-btn" style="width: 300px; padding: 15px; margin-top: 30px; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer;">INDIETRO</button>
+                            <button id="back-pause-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 30px; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer;">INDIETRO</button>
                         `;
                     }
                 } else if (e.target.id === 'prev-avatar' || e.target.id === 'next-avatar') {
@@ -2205,7 +2242,7 @@ class PvPScene extends Phaser.Scene {
     }
 
     update() {
-        if (Phaser.Input.Keyboard.JustDown(this.escKey) && !this.isTransitioning && !this.pcOpen) {
+        if (Phaser.Input.Keyboard.JustDown(this.escKey) && !this.isTransitioning && !this.pcOpen && !this.isDialogActive) {
             this.togglePauseMenu();
         }
 
@@ -2316,10 +2353,11 @@ class PvPScene extends Phaser.Scene {
             choiceContainer = document.createElement('div');
             choiceContainer.id = 'dialog-choice-container';
             choiceContainer.style.position = 'fixed';
-            choiceContainer.style.bottom = '175px';
-            choiceContainer.style.left = '50%';
-            choiceContainer.style.transform = 'translateX(250px)';
-            choiceContainer.style.width = '150px';
+            choiceContainer.style.bottom = '160px';
+            choiceContainer.style.right = '5%';
+            choiceContainer.style.transform = 'none';
+            choiceContainer.style.width = 'auto';
+            choiceContainer.style.minWidth = '120px';
             choiceContainer.style.backgroundColor = '#2b2b2b';
             choiceContainer.style.border = '4px solid #d05050';
             choiceContainer.style.boxSizing = 'border-box';
@@ -2342,11 +2380,13 @@ class PvPScene extends Phaser.Scene {
         };
         aggiornaCursoreScelta();
         const handleChoiceInput = (e) => {
-            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'ArrowDown' || e.key === 's') { this.sceltaAttuale = this.sceltaAttuale === 0 ? 1 : 0; aggiornaCursoreScelta(); }
-            else if (e.key === 'Enter' || e.key === ' ') { window.removeEventListener('keydown', handleChoiceInput); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
-            else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); if (this.enterKey) this.enterKey.reset(); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
+            let key = e.key || (e.detail && e.detail.key);
+            if (!key) return;
+            if (key === 'ArrowUp' || key === 'w' || key === 'ArrowDown' || key === 's') { this.sceltaAttuale = this.sceltaAttuale === 0 ? 1 : 0; aggiornaCursoreScelta(); }
+            else if (key === 'Enter' || key === ' ') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.enterKey) this.enterKey.reset(); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
+            else if (key === 'Escape' || key === 'Backspace') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.escKey) this.escKey.reset(); onChoice('NO'); }
         };
-        setTimeout(() => { window.addEventListener('keydown', handleChoiceInput); }, 100);
+        setTimeout(() => { window.addEventListener('keydown', handleChoiceInput); window.addEventListener('dpad-input', handleChoiceInput); }, 100);
     }
 
     startEncounter(battleData, testo = "BATTAGLIA!") {
@@ -2366,7 +2406,8 @@ class PvPScene extends Phaser.Scene {
         overlay.style.pointerEvents = 'none';
         overlay.style.zIndex = '9999';
 
-        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 4rem;">${testo}</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 7vw; text-align: center; max-width: 90%;">${testo}</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: clamp(2rem, 5vw, 3.5rem); text-align: center; width: 90%;">${testo}</h1>`;
         document.getElementById('game-container').appendChild(overlay);
 
         setTimeout(() => {
@@ -2402,7 +2443,8 @@ class PvPScene extends Phaser.Scene {
         overlay.style.alignItems = 'center';
         overlay.style.zIndex = '9999';
 
-        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 3rem; color: #fff;">TORNO ALLA LOBBY...</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 7vw; text-align: center; max-width: 90%; color: #fff;">TORNO ALLA LOBBY...</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: clamp(2rem, 5vw, 3.5rem); text-align: center; width: 90%; color: #fff;">TORNO ALLA LOBBY...</h1>`;
         document.getElementById('game-container').appendChild(overlay);
 
         setTimeout(() => {
@@ -2431,10 +2473,10 @@ class PvPScene extends Phaser.Scene {
 
             const renderMainPause = () => {
                 overlay.innerHTML = `
-                    <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 500px; max-width: 90%;">
-                        <h2 class="text-shadows" style="font-size: 4rem; margin-bottom: 30px; text-align: center;">ARENA PVP</h2>
-                        <button id="profile-btn" style="width: 300px; padding: 15px; margin-top: 10px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">PROFILO</button>
-                        <button id="lobby-btn" style="width: 300px; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">TORNA ALLA LOBBY</button>
+                    <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 90%; max-width: 400px;">
+                       <h2 class="text-shadows" style="font-size: clamp(2rem, 6vw, 3.5rem); margin-bottom: 30px; text-align: center;">ARENA PVP</h2>
+                        <button id="profile-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 10px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">PROFILO</button>
+                        <button id="lobby-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">TORNA ALLA LOBBY</button>
                         <p style="color: #fff; margin-top: 40px; font-size: 1.2rem; font-family: 'Courier New'; font-weight: bold; text-align: center;">Premi ESC per tornare al gioco</p>
                     </div>`;
             };
@@ -2467,7 +2509,7 @@ class PvPScene extends Phaser.Scene {
                                     <button id="next-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&gt;</button>
                                 </div>
                             </div>
-                            <button id="back-pause-btn" style="width: 300px; padding: 15px; margin-top: 30px; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer;">INDIETRO</button>
+                            <button id="back-pause-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 30px; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer;">INDIETRO</button>
                         `;
                     }
                 } else if (e.target.id === 'prev-avatar' || e.target.id === 'next-avatar') {
@@ -2496,8 +2538,10 @@ class PvPScene extends Phaser.Scene {
             container.style.bottom = '20px';
             container.style.left = '50%';
             container.style.transform = 'translateX(-50%)';
-            container.style.width = '800px';
-            container.style.height = '140px';
+            container.style.width = '95vw';
+            container.style.maxWidth = '800px';
+            container.style.height = 'auto';
+            container.style.minHeight = '140px';
             container.style.backgroundColor = '#2b2b2b';
             container.style.border = '6px solid #d05050';
             container.style.boxSizing = 'border-box';
@@ -2542,10 +2586,11 @@ class PvPScene extends Phaser.Scene {
 
                 setTimeout(() => {
                     const handleEnter = (e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
+                        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
                             e.preventDefault();
                             window.removeEventListener('keydown', handleEnter);
                             if (this.enterKey) this.enterKey.reset();
+                            if (this.escKey) this.escKey.reset();
                             mostraProssimo();
                         }
                     };
@@ -2812,6 +2857,7 @@ class BattleScene extends Phaser.Scene {
         this.moveKeys = this.input.keyboard.createCursorKeys();
         this.confirmKey = this.input.keyboard.addKey('ENTER');
         this.cancelKey = this.input.keyboard.addKey('BACKSPACE');
+        this.escapeKey = this.input.keyboard.addKey('ESC');
 
         for (let i = 0; i < 4; i++) {
             let bx = 40 + (i % 2) * 260;
@@ -2907,7 +2953,7 @@ class BattleScene extends Phaser.Scene {
             this.handleButtonClick(this.selectedMoveIndex);
         }
 
-        if (Phaser.Input.Keyboard.JustDown(this.cancelKey)) {
+        if (Phaser.Input.Keyboard.JustDown(this.cancelKey) || (this.escapeKey && Phaser.Input.Keyboard.JustDown(this.escapeKey))) {
             if (this.menuState === 'MOVES') {
                 this.menuState = 'MAIN';
                 this.selectedMoveIndex = 0;
@@ -3415,7 +3461,7 @@ class BattleScene extends Phaser.Scene {
         const html = `
             <div class="pkmn-modal-content">
                     <div id="modal-list-view" style="display: flex; flex-direction: column; width: 100%; flex: 1; overflow: hidden;">
-                        <div class="pkmn-modal-header" style="margin-bottom: 25px;">SQUADRA POKÉMON</div> <div class="pokemon-list" id="pkmn-list-container" style="overflow-y: auto; overflow-x: hidden; flex: 1;"></div>
+                        <div class="pkmn-modal-header" style="margin-bottom: 25px;">SQUADRA POKÉMON</div> <div class="pokemon-list" id="pkmn-list-container" style="display: flex; flex-direction: column; gap: 10px; width: 100%; box-sizing: border-box; overflow-y: auto; overflow-x: hidden; flex: 1;"></div>
                     </div>
 
                     <div id="modal-summary-view" class="summary-view" style="display: none; flex-direction: column; width: 100%; flex: 1; overflow: hidden;">
@@ -3900,7 +3946,7 @@ class PVEScene extends Phaser.Scene {
     }
 
     update() {
-        if (Phaser.Input.Keyboard.JustDown(this.escKey) && !this.isTransitioning) {
+        if (Phaser.Input.Keyboard.JustDown(this.escKey) && !this.isTransitioning && !this.isDialogActive) {
             this.togglePauseMenu();
         }
 
@@ -4032,7 +4078,8 @@ class PVEScene extends Phaser.Scene {
         overlay.style.display = 'flex'; overlay.style.justifyContent = 'center'; overlay.style.alignItems = 'center';
         overlay.style.zIndex = '9999';
 
-        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 3rem; color: #fff;">CARICAMENTO LIVELLO ${this.currentLevel + 1}...</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 7vw; text-align: center; max-width: 90%; color: #fff;">CARICAMENTO LIVELLO ${this.currentLevel + 1}...</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: clamp(2rem, 5vw, 3.5rem); text-align: center; width: 90%; color: #fff;">CARICAMENTO LIVELLO ${this.currentLevel + 1}...</h1>`;
         document.getElementById('game-container').appendChild(overlay);
 
         setTimeout(() => {
@@ -4054,7 +4101,8 @@ class PVEScene extends Phaser.Scene {
         overlay.style.display = 'flex'; overlay.style.justifyContent = 'center'; overlay.style.alignItems = 'center';
         overlay.style.pointerEvents = 'none'; overlay.style.zIndex = '9999';
 
-        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 4rem;">${isNPC ? 'SFIDA ALLENATORE!' : 'POKÉMON SELVATICO!'}</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 7vw; text-align: center; max-width: 90%;">${isNPC ? 'SFIDA ALLENATORE!' : 'POKÉMON SELVATICO!'}</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: clamp(2rem, 5vw, 3.5rem); text-align: center; width: 90%;">${isNPC ? 'SFIDA ALLENATORE!' : 'POKÉMON SELVATICO!'}</h1>`;
         document.getElementById('game-container').appendChild(overlay);
 
         setTimeout(() => {
@@ -4128,7 +4176,8 @@ class PVEScene extends Phaser.Scene {
         overlay.style.position = 'absolute'; overlay.style.top = '0'; overlay.style.left = '0';
         overlay.style.width = '100%'; overlay.style.height = '100%'; overlay.style.backgroundColor = '#000';
         overlay.style.display = 'flex'; overlay.style.justifyContent = 'center'; overlay.style.alignItems = 'center'; overlay.style.zIndex = '9999';
-        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 3rem; color: #fff;">TORNO ALLA LOBBY...</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 7vw; text-align: center; max-width: 90%; color: #fff;">TORNO ALLA LOBBY...</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: clamp(2rem, 5vw, 3.5rem); text-align: center; width: 90%; color: #fff;">TORNO ALLA LOBBY...</h1>`;
         document.getElementById('game-container').appendChild(overlay);
 
         try {
@@ -4171,10 +4220,10 @@ class PVEScene extends Phaser.Scene {
 
             const renderMainPause = () => {
                 overlay.innerHTML = `
-                    <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 500px; max-width: 90%;">
-                        <h2 class="text-shadows" style="font-size: 4rem; margin-bottom: 30px; text-align: center;">MENU PAUSA PVE</h2>
-                        <button id="profile-btn" style="width: 300px; padding: 15px; margin-top: 10px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">PROFILO</button>
-                        <button id="lobby-btn" style="width: 300px; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">TORNA ALLA LOBBY</button>
+                    <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 90%; max-width: 400px;">
+                       <h2 class="text-shadows" style="font-size: clamp(2rem, 6vw, 3.5rem); margin-bottom: 30px; text-align: center;">MENU PAUSA PVE</h2>
+                        <button id="profile-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 10px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">PROFILO</button>
+                        <button id="lobby-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">TORNA ALLA LOBBY</button>
                         <p style="color: #fff; margin-top: 40px; font-size: 1.2rem; font-family: 'Courier New'; font-weight: bold; text-align: center;">Premi ESC per tornare al gioco</p>
                     </div>`;
             };
@@ -4207,7 +4256,7 @@ class PVEScene extends Phaser.Scene {
                                     <button id="next-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&gt;</button>
                                 </div>
                             </div>
-                            <button id="back-pause-btn" style="width: 300px; padding: 15px; margin-top: 30px; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer;">INDIETRO</button>
+                            <button id="back-pause-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 30px; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer;">INDIETRO</button>
                         `;
                     }
                 } else if (e.target.id === 'prev-avatar' || e.target.id === 'next-avatar') {
@@ -4239,7 +4288,8 @@ class PVEScene extends Phaser.Scene {
             container = document.createElement('div');
             container.id = 'dialog-ui-container';
             container.style.position = 'fixed'; container.style.bottom = '20px'; container.style.left = '50%'; container.style.transform = 'translateX(-50%)';
-            container.style.width = '800px'; container.style.height = '140px'; container.style.backgroundColor = '#2b2b2b'; container.style.border = '6px solid #d05050';
+            container.style.width = '95vw'; container.style.maxWidth = '800px'; container.style.height = 'auto'; container.style.minHeight = '140px';
+            container.style.backgroundColor = '#2b2b2b'; container.style.border = '6px solid #d05050';
             container.style.boxSizing = 'border-box'; container.style.padding = '20px 30px'; container.style.zIndex = '999999';
             container.style.display = 'flex'; container.style.flexDirection = 'column'; container.style.justifyContent = 'flex-start'; container.style.boxShadow = '0px 10px 20px rgba(0,0,0,0.8)';
             let textEl = document.createElement('div');
@@ -4266,8 +4316,9 @@ class PVEScene extends Phaser.Scene {
                 index++;
                 setTimeout(() => {
                     const handleEnter = (e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
+                        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
                             e.preventDefault(); window.removeEventListener('keydown', handleEnter); if (this.enterKey) this.enterKey.reset(); mostraProssimo();
+                            if (this.escKey) this.escKey.reset();
                         }
                     };
                     window.addEventListener('keydown', handleEnter);
@@ -4281,8 +4332,8 @@ class PVEScene extends Phaser.Scene {
         let choiceContainer = document.getElementById('dialog-choice-container');
         if (!choiceContainer) {
             choiceContainer = document.createElement('div');
-            choiceContainer.id = 'dialog-choice-container'; choiceContainer.style.position = 'fixed'; choiceContainer.style.bottom = '175px'; choiceContainer.style.left = '50%';
-            choiceContainer.style.transform = 'translateX(250px)'; choiceContainer.style.width = '150px'; choiceContainer.style.backgroundColor = '#2b2b2b';
+            choiceContainer.id = 'dialog-choice-container'; choiceContainer.style.position = 'fixed'; choiceContainer.style.bottom = '160px'; choiceContainer.style.right = '5%';
+            choiceContainer.style.transform = 'none'; choiceContainer.style.width = 'auto'; choiceContainer.style.minWidth = '120px'; choiceContainer.style.backgroundColor = '#2b2b2b';
             choiceContainer.style.border = '4px solid #d05050'; choiceContainer.style.boxSizing = 'border-box'; choiceContainer.style.padding = '15px';
             choiceContainer.style.zIndex = '999999'; choiceContainer.style.display = 'flex'; choiceContainer.style.flexDirection = 'column'; choiceContainer.style.gap = '15px'; choiceContainer.style.boxShadow = '0px 10px 20px rgba(0,0,0,0.8)';
             let optSi = document.createElement('div'); optSi.id = 'dialog-opt-si'; optSi.style.color = '#ffffff'; optSi.style.fontFamily = '"Courier New", Courier, monospace'; optSi.style.fontSize = '26px'; optSi.style.fontWeight = 'bold'; optSi.style.textShadow = '2px 2px 0 #000';
@@ -4298,10 +4349,13 @@ class PVEScene extends Phaser.Scene {
         };
         aggiornaCursoreScelta();
         const handleChoiceInput = (e) => {
-            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'ArrowDown' || e.key === 's') { this.sceltaAttuale = this.sceltaAttuale === 0 ? 1 : 0; aggiornaCursoreScelta(); }
-            else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); if (this.enterKey) this.enterKey.reset(); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
+            let key = e.key || (e.detail && e.detail.key);
+            if (!key) return;
+            if (key === 'ArrowUp' || key === 'w' || key === 'ArrowDown' || key === 's') { this.sceltaAttuale = this.sceltaAttuale === 0 ? 1 : 0; aggiornaCursoreScelta(); }
+            else if (key === 'Enter' || key === ' ') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.enterKey) this.enterKey.reset(); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
+            else if (key === 'Escape' || key === 'Backspace') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.escKey) this.escKey.reset(); onChoice('NO'); }
         };
-        setTimeout(() => { window.addEventListener('keydown', handleChoiceInput); }, 100);
+        setTimeout(() => { window.addEventListener('keydown', handleChoiceInput); window.addEventListener('dpad-input', handleChoiceInput); }, 100);
     }
 
     leggiCartello() {
@@ -4329,3 +4383,38 @@ const config = {
     scene: [BootScene, LoginScene, StarterScene, WorldScene, PVEScene, CPKScene, PvPScene, BattleScene]
 };
 new Phaser.Game(config);
+
+// ==============================================================================
+// GESTIONE CONTROLLI MOBILE
+// ==============================================================================
+document.addEventListener('DOMContentLoaded', () => {
+    const simulateKey = (keyName) => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: keyName, code: keyName, bubbles: true, cancelable: true }));
+        window.dispatchEvent(new CustomEvent('dpad-input', { detail: { key: keyName } })); // Scatena l'evento per le modali
+        setTimeout(() => {
+            window.dispatchEvent(new KeyboardEvent('keyup', { key: keyName, code: keyName, bubbles: true, cancelable: true }));
+        }, 50); // Mantiene il tasto premuto per 50ms per farlo intercettare a Phaser
+    };
+
+    const bindMobileButton = (id, keyName) => {
+        const btn = document.getElementById(id);
+        if (btn) {
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                simulateKey(keyName);
+            }, { passive: false });
+            btn.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                simulateKey(keyName);
+            });
+        }
+    };
+
+    bindMobileButton('btn-up', 'ArrowUp');
+    bindMobileButton('btn-down', 'ArrowDown');
+    bindMobileButton('btn-left', 'ArrowLeft');
+    bindMobileButton('btn-right', 'ArrowRight');
+    bindMobileButton('btn-enter', 'Enter');  // Tasto A
+    bindMobileButton('btn-esc', 'Escape');   // Tasto B (Annulla / Esci)
+    bindMobileButton('btn-menu', 'Escape');  // Tasto Menu (Usa Esc per la pausa)
+});
