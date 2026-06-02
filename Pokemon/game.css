@@ -783,7 +783,7 @@ canvas {
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
-    padding: 20px 30px 40px 30px;
+    padding: 20px 10px 40px 10px;
     box-sizing: border-box;
 }
 
@@ -801,9 +801,9 @@ canvas {
 
 .dpad-btn {
     pointer-events: auto;
-    width: 55px;
-    height: 55px;
-    font-size: 22px;
+    width: 40px;
+    height: 40px;
+    font-size: 15px;
     border-radius: 8px;
     margin: 4px;
     background: rgba(38, 28, 51, 0.85);
@@ -826,8 +826,8 @@ canvas {
 }
 
 .dpad-center {
-    width: 55px;
-    height: 55px;
+    width: 40px;
+    height: 40px;
     margin: 4px;
 }
 
@@ -836,16 +836,16 @@ canvas {
     position: static;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 15px;
+    gap: 10px;
     align-items: end;
 }
 
 .action-btn-mobile {
     pointer-events: auto;
-    width: 70px;
-    height: 70px;
+    width: 50px;
+    height: 50px;
     border-radius: 50%;
-    font-size: 26px;
+    font-size: 20px;
     background: rgba(38, 28, 51, 0.85);
     border: 3px solid var(--battle-accent);
     color: white;
@@ -898,11 +898,15 @@ canvas {
 }
 
 @media (max-width: 1024px) {
-    #pc-main-view, .summary-layout {
+
+    #pc-main-view,
+    .summary-layout {
         flex-direction: column !important;
         overflow-y: auto !important;
     }
-    .summary-left, .summary-right {
+
+    .summary-left,
+    .summary-right {
         border-right: none !important;
         border-bottom: 4px dashed var(--color-quaternary);
         flex: none !important;
