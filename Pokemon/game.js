@@ -775,8 +775,8 @@ class WorldScene extends Phaser.Scene {
         if (!container) {
             container = document.createElement('div');
             container.id = 'dialog-ui-container';
-            container.style.position = 'fixed';
-            container.style.bottom = '20px';
+            container.style.position = 'absolute';   /* Cambia da 'fixed' ad 'absolute' */
+            container.style.bottom = '22vh';         /* Cambia da '20px' a '22vh' (così fluttua sopra i tasti) */
             container.style.left = '50%';
             container.style.transform = 'translateX(-50%)';
             container.style.width = '95vw';
@@ -803,7 +803,9 @@ class WorldScene extends Phaser.Scene {
             textEl.style.lineHeight = '1.3';
 
             container.appendChild(textEl);
-            document.body.appendChild(container);
+
+            // Cambia 'document.body' con 'document.getElementById('game-container')'
+            document.getElementById('game-container').appendChild(container);
         }
         container.style.display = 'flex';
         document.getElementById('dialog-ui-text').innerText = '';
@@ -2014,13 +2016,13 @@ class CPKScene extends Phaser.Scene {
         setTimeout(() => { window.addEventListener('keydown', handleChoiceInput); window.addEventListener('dpad-input', handleChoiceInput); }, 100);
     }
 
-    createDialogUI() {
+     createDialogUI() {
         let container = document.getElementById('dialog-ui-container');
         if (!container) {
             container = document.createElement('div');
             container.id = 'dialog-ui-container';
-            container.style.position = 'fixed';
-            container.style.bottom = '20px';
+            container.style.position = 'absolute';   /* Cambia da 'fixed' ad 'absolute' */
+            container.style.bottom = '22vh';         /* Cambia da '20px' a '22vh' (così fluttua sopra i tasti) */
             container.style.left = '50%';
             container.style.transform = 'translateX(-50%)';
             container.style.width = '95vw';
@@ -2046,7 +2048,9 @@ class CPKScene extends Phaser.Scene {
             textEl.style.textShadow = '2px 2px 0 #000';
             textEl.style.lineHeight = '1.3';
             container.appendChild(textEl);
-            document.body.appendChild(container);
+
+            // Cambia 'document.body' con 'document.getElementById('game-container')'
+            document.getElementById('game-container').appendChild(container);
         }
         container.style.display = 'flex';
         document.getElementById('dialog-ui-text').innerText = '';
@@ -2884,13 +2888,13 @@ class PvPScene extends Phaser.Scene {
             });
         }
     }
-    createDialogUI() {
+   createDialogUI() {
         let container = document.getElementById('dialog-ui-container');
         if (!container) {
             container = document.createElement('div');
             container.id = 'dialog-ui-container';
-            container.style.position = 'fixed';
-            container.style.bottom = '20px';
+            container.style.position = 'absolute';   /* Cambia da 'fixed' ad 'absolute' */
+            container.style.bottom = '22vh';         /* Cambia da '20px' a '22vh' (così fluttua sopra i tasti) */
             container.style.left = '50%';
             container.style.transform = 'translateX(-50%)';
             container.style.width = '95vw';
@@ -2917,7 +2921,9 @@ class PvPScene extends Phaser.Scene {
             textEl.style.lineHeight = '1.3';
 
             container.appendChild(textEl);
-            document.body.appendChild(container);
+
+            // Cambia 'document.body' con 'document.getElementById('game-container')'
+            document.getElementById('game-container').appendChild(container);
         }
         container.style.display = 'flex';
         document.getElementById('dialog-ui-text').innerText = '';
@@ -4756,14 +4762,19 @@ class PVEScene extends Phaser.Scene {
         if (!container) {
             container = document.createElement('div');
             container.id = 'dialog-ui-container';
-            container.style.position = 'fixed'; container.style.bottom = '20px'; container.style.left = '50%'; container.style.transform = 'translateX(-50%)';
+            container.style.position = 'absolute';   /* Cambia da 'fixed' ad 'absolute' */
+            container.style.bottom = '22vh';         /* Cambia da '20px' a '22vh' (così fluttua sopra i tasti) */
+            container.style.left = '50%'; container.style.transform = 'translateX(-50%)';
             container.style.width = '95vw'; container.style.maxWidth = '800px'; container.style.height = 'auto'; container.style.minHeight = '140px';
             container.style.backgroundColor = '#2b2b2b'; container.style.border = '6px solid #d05050';
             container.style.boxSizing = 'border-box'; container.style.padding = '20px 30px'; container.style.zIndex = '999999';
             container.style.display = 'flex'; container.style.flexDirection = 'column'; container.style.justifyContent = 'flex-start'; container.style.boxShadow = '0px 10px 20px rgba(0,0,0,0.8)';
             let textEl = document.createElement('div');
             textEl.id = 'dialog-ui-text'; textEl.style.color = '#ffffff'; textEl.style.fontFamily = '"Courier New", Courier, monospace'; textEl.style.fontSize = '26px'; textEl.style.fontWeight = 'bold'; textEl.style.textShadow = '2px 2px 0 #000'; textEl.style.lineHeight = '1.3';
-            container.appendChild(textEl); document.body.appendChild(container);
+            container.appendChild(textEl);
+
+            // Cambia 'document.body' con 'document.getElementById('game-container')'
+            document.getElementById('game-container').appendChild(container);
         }
         container.style.display = 'flex';
         document.getElementById('dialog-ui-text').innerText = '';
