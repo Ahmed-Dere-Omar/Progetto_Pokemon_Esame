@@ -2349,7 +2349,15 @@ class CPKScene extends Phaser.Scene {
                     let numberToSave = idx + 1;
                     profilo.avatar_sprite = numberToSave;
 
-                    supabaseClient.from('profilo').update({ avatar_sprite: numberToSave }).eq('id_profilo', profilo.id_profilo);
+                    // 2. MAGIA: L'await che costringe Supabase a "spedire la lettera" al database!
+                    const { error } = await supabaseClient.from('profilo')
+                        .update({ avatar_sprite: numberToSave })
+                        .eq('id_profilo', profilo.id_profilo);
+
+                    if (error) {
+                        console.error("Errore Supabase Avatar:", error);
+                        window.showBanner("Errore nel salvataggio dell'avatar!");
+                    }
 
                     let textureKey = newAvatarPath.split('/').pop().replace('.png', '');
                     if (this.player) {
@@ -2925,7 +2933,15 @@ class PvPScene extends Phaser.Scene {
                     let numberToSave = idx + 1;
                     profilo.avatar_sprite = numberToSave;
 
-                    supabaseClient.from('profilo').update({ avatar_sprite: numberToSave }).eq('id_profilo', profilo.id_profilo);
+                    // 2. MAGIA: L'await che costringe Supabase a "spedire la lettera" al database!
+                    const { error } = await supabaseClient.from('profilo')
+                        .update({ avatar_sprite: numberToSave })
+                        .eq('id_profilo', profilo.id_profilo);
+
+                    if (error) {
+                        console.error("Errore Supabase Avatar:", error);
+                        window.showBanner("Errore nel salvataggio dell'avatar!");
+                    }
 
                     let textureKey = newAvatarPath.split('/').pop().replace('.png', '');
                     if (this.player) {
@@ -4798,7 +4814,15 @@ class PVEScene extends Phaser.Scene {
                     let numberToSave = idx + 1;
                     profilo.avatar_sprite = numberToSave;
 
-                    supabaseClient.from('profilo').update({ avatar_sprite: numberToSave }).eq('id_profilo', profilo.id_profilo);
+                    // 2. MAGIA: L'await che costringe Supabase a "spedire la lettera" al database!
+                    const { error } = await supabaseClient.from('profilo')
+                        .update({ avatar_sprite: numberToSave })
+                        .eq('id_profilo', profilo.id_profilo);
+
+                    if (error) {
+                        console.error("Errore Supabase Avatar:", error);
+                        window.showBanner("Errore nel salvataggio dell'avatar!");
+                    }
 
                     let textureKey = newAvatarPath.split('/').pop().replace('.png', '');
                     if (this.player) {
