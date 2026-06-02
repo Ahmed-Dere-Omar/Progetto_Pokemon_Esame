@@ -259,7 +259,7 @@ class LoginScene extends Phaser.Scene {
                 return;
             }
 
-           if (e.target.id === 'main-btn') {
+            if (e.target.id === 'main-btn') {
                 this.isWaitingForReset = false;
                 let pwdEl = dom.getChildByID('password-input');
                 let usrEl = dom.getChildByID('username-input');
@@ -275,7 +275,7 @@ class LoginScene extends Phaser.Scene {
                     const { data, error } = await supabaseClient.auth.signUp({
                         email: emailInput, password: password, options: { data: { username: username } }
                     });
-                    
+
                     if (error) {
                         msgLabel.innerText = "Errore: " + error.message;
                     } else {
@@ -355,7 +355,7 @@ class LoginScene extends Phaser.Scene {
         });
     }
 
-async avviaGioco(user, dom) {
+    async avviaGioco(user, dom) {
         if (this.isStarting) return;
         this.isStarting = true;
         multiTabChannel.postMessage('new_login');
@@ -371,11 +371,11 @@ async avviaGioco(user, dom) {
             if (profile) { profiloUtente = profile; break; }
             await new Promise(resolve => setTimeout(resolve, 500));
         }
-        
+
         // Se, nonostante l'attesa, non esiste un profilo (Casi rarissimi di errore DB)
         if (!profiloUtente) {
-             window.showBanner("Errore nel caricamento del profilo. Riprova.");
-             return;
+            window.showBanner("Errore nel caricamento del profilo. Riprova.");
+            return;
         }
         this.registry.set('playerProfile', profiloUtente);
 
@@ -405,7 +405,7 @@ async avviaGioco(user, dom) {
 
         this.registry.set('userPokemon', myPokemon || []);
 
-      // 3. REINDIRIZZAMENTO INTELLIGENTE
+        // 3. REINDIRIZZAMENTO INTELLIGENTE
         let haNickname = profiloUtente.username && profiloUtente.username.trim() !== "";
         let isGoogle = user.app_metadata && user.app_metadata.provider === 'google';
 
@@ -417,7 +417,7 @@ async avviaGioco(user, dom) {
         } else {
             // L'utente è in regola. Passa.
             let nomeFinal = profiloUtente.username.toUpperCase();
-            
+
             if (isTouchDevice() || window.innerWidth <= 1024) {
                 let controls = document.getElementById('mobile-controls');
                 if (controls) controls.style.display = 'flex';
@@ -437,7 +437,7 @@ async avviaGioco(user, dom) {
     // La Finestra del Nickname
     async mostraSceltaNickname(user, profilo, pkmnList, dom, isNewPlayer) {
         if (dom) dom.destroy();
-        
+
         // Se Google ha inserito il tuo vero nome e cognome nel DB, te lo fa vedere nel box così puoi cancellarlo e mettere un Nickname!
         let currentName = (profilo.username && profilo.username.trim() !== "") ? profilo.username : "";
 
@@ -463,14 +463,14 @@ async avviaGioco(user, dom) {
                 nameDom.getChildByID('name-msg').innerText = "Verifica nome in corso...";
 
                 const { error } = await supabaseClient.from('profilo').update({ username: newName }).eq('id_profilo', profilo.id_profilo);
-                
+
                 if (error) {
                     nameDom.getChildByID('name-msg').innerText = "Nome già in uso, scegline un altro!";
                 } else {
                     profilo.username = newName;
                     this.registry.set('playerProfile', profilo);
                     nameDom.destroy();
-                    
+
                     if (isTouchDevice() || window.innerWidth <= 1024) {
                         let controls = document.getElementById('mobile-controls');
                         if (controls) controls.style.display = 'flex';
@@ -1323,9 +1323,19 @@ class WorldScene extends Phaser.Scene {
                     let newAvatarPath = avatars[idx];
                     imgEl.src = newAvatarPath;
                     let numberToSave = idx + 1;
+
+                    // 1. Aggiorna il profilo locale nel gioco
                     profilo.avatar_sprite = numberToSave;
 
-                    supabaseClient.from('profilo').update({ avatar_sprite: numberToSave }).eq('id_profilo', profilo.id_profilo);
+                    // 2. MAGIA: L'await che costringe Supabase a "spedire la lettera" al database!
+                    const { error } = await supabaseClient.from('profilo')
+                        .update({ avatar_sprite: numberToSave })
+                        .eq('id_profilo', profilo.id_profilo);
+
+                    if (error) {
+                        console.error("Errore Supabase Avatar:", error);
+                        window.showBanner("Errore nel salvataggio dell'avatar!");
+                    }
 
                     let textureKey = newAvatarPath.split('/').pop().replace('.png', '');
                     if (this.player) {
@@ -1870,7 +1880,7 @@ class CPKScene extends Phaser.Scene {
         this.player.body.setSize(32, 32).setOffset(16, 32);
 
         this.physics.add.collider(this.player, this.wallLayer);
-        
+
         // Zoom aumentato a 6.5 specifico per riempire il canvas nelle stanze interne
         this.cameras.main.startFollow(this.player, true).setZoom(6.5).setBounds(0, 0, this.mapWidth, this.mapHeight);
     }
@@ -4860,13 +4870,13 @@ class PVEScene extends Phaser.Scene {
         mostraProssimo();
     }
 
-   mostraSceltaSiNo(onChoice) {
+    mostraSceltaSiNo(onChoice) {
         let choiceContainer = document.getElementById('dialog-choice-container');
         if (!choiceContainer) {
             choiceContainer = document.createElement('div');
-            choiceContainer.id = 'dialog-choice-container'; 
+            choiceContainer.id = 'dialog-choice-container';
             choiceContainer.style.position = 'absolute'; /* FONDAMENTALE: absolute, non fixed */
-            
+
             // --- CONTROLLO SCHERMO (Il trucco magico con calc) ---
             let isMobile = window.innerWidth <= 1024;
             choiceContainer.style.bottom = isMobile ? 'calc(22vh + 150px)' : '170px';
@@ -4878,42 +4888,42 @@ class PVEScene extends Phaser.Scene {
             choiceContainer.style.width = 'auto'; choiceContainer.style.minWidth = '120px'; choiceContainer.style.backgroundColor = '#2b2b2b';
             choiceContainer.style.border = '4px solid #d05050'; choiceContainer.style.boxSizing = 'border-box'; choiceContainer.style.padding = '15px';
             choiceContainer.style.zIndex = '999999'; choiceContainer.style.display = 'flex'; choiceContainer.style.flexDirection = 'column'; choiceContainer.style.gap = '15px'; choiceContainer.style.boxShadow = '0px 10px 20px rgba(0,0,0,0.8)';
-            
+
             let optSi = document.createElement('div'); optSi.id = 'dialog-opt-si'; optSi.style.color = '#ffffff'; optSi.style.fontFamily = '"Courier New", Courier, monospace'; optSi.style.fontSize = '26px'; optSi.style.fontWeight = 'bold'; optSi.style.textShadow = '2px 2px 0 #000';
             let optNo = document.createElement('div'); optNo.id = 'dialog-opt-no'; optNo.style.color = '#ffffff'; optNo.style.fontFamily = '"Courier New", Courier, monospace'; optNo.style.fontSize = '26px'; optNo.style.fontWeight = 'bold'; optNo.style.textShadow = '2px 2px 0 #000';
-            
-            choiceContainer.appendChild(optSi); choiceContainer.appendChild(optNo); 
-            
+
+            choiceContainer.appendChild(optSi); choiceContainer.appendChild(optNo);
+
             // FONDAMENTALE: Appeso al game-container e non al body
             document.getElementById('game-container').appendChild(choiceContainer);
         }
         choiceContainer.style.display = 'flex';
         this.sceltaAttuale = 0;
-        
+
         const aggiornaCursoreScelta = () => {
             let optSi = document.getElementById('dialog-opt-si'); let optNo = document.getElementById('dialog-opt-no');
             if (this.sceltaAttuale === 0) { optSi.innerHTML = `<span style="display:inline-block; width: 25px; color: #ffcc00;">▶</span><span style="color: #ffcc00;">SÌ</span>`; optNo.innerHTML = `<span style="display:inline-block; width: 25px;"></span><span style="color: #ffffff;">NO</span>`; }
             else { optSi.innerHTML = `<span style="display:inline-block; width: 25px;"></span><span style="color: #ffffff;">SÌ</span>`; optNo.innerHTML = `<span style="display:inline-block; width: 25px; color: #ffcc00;">▶</span><span style="color: #ffcc00;">NO</span>`; }
         };
         aggiornaCursoreScelta();
-        
+
         const handleChoiceInput = (e) => {
             let key = e.key || (e.detail && e.detail.key);
             if (!key) return;
             if (key === 'ArrowUp' || key === 'w' || key === 'ArrowDown' || key === 's') { this.sceltaAttuale = this.sceltaAttuale === 0 ? 1 : 0; aggiornaCursoreScelta(); }
-            else if (key === 'Enter' || key === ' ') { 
-                if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); 
+            else if (key === 'Enter' || key === ' ') {
+                if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput);
                 // Compatibilità universale per i tasti
-                if (this.keys && this.keys.CONFIRM) this.keys.CONFIRM.reset(); 
+                if (this.keys && this.keys.CONFIRM) this.keys.CONFIRM.reset();
                 if (this.enterKey) this.enterKey.reset();
-                onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); 
+                onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO');
             }
-            else if (key === 'Escape' || key === 'Backspace') { 
-                if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); 
+            else if (key === 'Escape' || key === 'Backspace') {
+                if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput);
                 // Compatibilità universale per i tasti
-                if (this.keys && this.keys.CANCEL) this.keys.CANCEL.reset(); 
+                if (this.keys && this.keys.CANCEL) this.keys.CANCEL.reset();
                 if (this.escKey) this.escKey.reset();
-                onChoice('NO'); 
+                onChoice('NO');
             }
         };
         setTimeout(() => { window.addEventListener('keydown', handleChoiceInput); window.addEventListener('dpad-input', handleChoiceInput); }, 100);
