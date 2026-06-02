@@ -405,12 +405,14 @@ async avviaGioco(user, dom) {
 
         this.registry.set('userPokemon', myPokemon || []);
 
-        // 3. REINDIRIZZAMENTO INTELLIGENTE
-        // La vera guardia del corpo: controlla rigidamente se il campo username è sporco o inesistente
+      // 3. REINDIRIZZAMENTO INTELLIGENTE
         let haNickname = profiloUtente.username && profiloUtente.username.trim() !== "";
+        let isGoogle = user.app_metadata && user.app_metadata.provider === 'google';
 
-        if (!haNickname) {
-            // BECCATO! È un account Google appena nato (o con un nome vuoto per qualche glitch)
+        // LA VERA GUARDIA: Mostra la scelta del nome se:
+        // 1. Non c'è alcun nome nel DB
+        // 2. OPPURE è il tuo primo accesso in assoluto (isNewPlayer) E sei entrato con Google
+        if (!haNickname || (isNewPlayer && isGoogle)) {
             this.mostraSceltaNickname(user, profiloUtente, myPokemon, dom, isNewPlayer);
         } else {
             // L'utente è in regola. Passa.
@@ -436,16 +438,18 @@ async avviaGioco(user, dom) {
     async mostraSceltaNickname(user, profilo, pkmnList, dom, isNewPlayer) {
         if (dom) dom.destroy();
         
+        // Se Google ha inserito il tuo vero nome e cognome nel DB, te lo fa vedere nel box così puoi cancellarlo e mettere un Nickname!
+        let currentName = (profilo.username && profilo.username.trim() !== "") ? profilo.username : "";
+
         let nameHtml = `
             <div id="login-container">
                 <h1 class="text-shadows" style="font-size: 3rem; margin-bottom: 0;">BENVENUTO!</h1>
                 <h2 style="font-size: 1.5rem; color: #fff; font-family: 'Courier New'; text-align: center;">Scegli il tuo Nickname da Allenatore:</h2>
-                <input type="text" id="new-username" placeholder="NICKNAME..." style="width: 300px; padding: 15px; font-size: 1.2rem; font-family: 'Courier New', monospace; font-weight: bold; text-align: center; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; outline: none; margin-top: 20px;">
+                <input type="text" id="new-username" value="${currentName}" placeholder="NICKNAME..." style="width: 300px; padding: 15px; font-size: 1.2rem; font-family: 'Courier New', monospace; font-weight: bold; text-align: center; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; outline: none; margin-top: 20px;">
                 <button id="save-name-btn" style="width: 338px; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">CONFERMA</button>
                 <p id="name-msg" style="color: #ffcc00; font-family: 'Courier New', monospace; font-weight: bold; margin-top: 10px;"></p>
             </div>`;
 
-        // Genera il DOM di Phaser e aspetta un millisecondo in più per far processare tutto bene al browser
         let nameDom = this.add.dom(500, 400).createFromHTML(nameHtml);
 
         nameDom.addListener('click').on('click', async (e) => {
