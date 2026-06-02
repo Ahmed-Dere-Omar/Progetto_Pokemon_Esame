@@ -259,7 +259,7 @@ class LoginScene extends Phaser.Scene {
                 return;
             }
 
-            if (e.target.id === 'main-btn') {
+           if (e.target.id === 'main-btn') {
                 this.isWaitingForReset = false;
                 let pwdEl = dom.getChildByID('password-input');
                 let usrEl = dom.getChildByID('username-input');
@@ -272,18 +272,35 @@ class LoginScene extends Phaser.Scene {
                 msgLabel.innerText = "Attendere...";
 
                 if (!this.isLoginMode) {
-                    const { error } = await supabaseClient.auth.signUp({
+                    const { data, error } = await supabaseClient.auth.signUp({
                         email: emailInput, password: password, options: { data: { username: username } }
                     });
-                    if (error) msgLabel.innerText = "Errore: " + error.message;
-                    else {
-                        msgLabel.innerText = "Registrazione OK! Ora accedi.";
-                        dom.getChildByID('toggle-mode').click();
+                    
+                    if (error) {
+                        msgLabel.innerText = "Errore: " + error.message;
+                    } else {
+                        if (data.session) {
+                            msgLabel.innerText = "Registrazione OK! Accesso in corso...";
+                            this.mostraTestoCaricamento();
+                            this.avviaGioco(data.session.user, dom);
+                        } else {
+                            // Se la conferma è attiva, passa alla schermata di login e avvisa l'utente
+                            msgLabel.innerText = "Account creato! Clicca il link nella tua email.";
+                            dom.getChildByID('toggle-mode').click();
+                        }
                     }
                 } else {
                     const { error } = await supabaseClient.auth.signInWithPassword({ email: emailInput, password: password });
-                    if (error) msgLabel.innerText = "Errore: Credenziali errate.";
-                    // Se OK, la "spia" di onAuthStateChange rileverà SIGNED_IN e ti butterà in gioco.
+                    if (error) {
+                        // --- IL NUOVO CONTROLLO ---
+                        // Se Supabase blocca l'accesso perché manca la conferma email:
+                        if (error.message.includes('Email not confirmed')) {
+                            msgLabel.innerText = "Devi confermare l'email! Controlla la posta.";
+                        } else {
+                            // Per password sbagliate o email inesistenti:
+                            msgLabel.innerText = "Errore: Credenziali errate.";
+                        }
+                    }
                 }
             }
         });
@@ -382,34 +399,45 @@ class LoginScene extends Phaser.Scene {
         }
 
         this.registry.set('userPokemon', myPokemon || []);
-        let nomeFinal = profiloUtente.username.toUpperCase();
-        // Accende i controlli se si è da smartphone
-        if (isTouchDevice() || window.innerWidth <= 1024) {
-            let controls = document.getElementById('mobile-controls');
-            if (controls) controls.style.display = 'flex';
-        }
-        // 3. REINDIRIZZAMENTO
-        if (isNewPlayer) {
-            // Se è nuovo, gli mostriamo cosa ha ricevuto
-            if (dom) dom.destroy();
-            this.scene.start('StarterScene', { name: nomeFinal, user: user, starters: myPokemon });
+
+        // 3. REINDIRIZZAMENTO INTELLIGENTE
+        // Controlliamo se l'utente ha già un nickname valido nel DB
+        let haNickname = profiloUtente.username && profiloUtente.username.trim() !== "";
+
+        if (!haNickname) {
+            // Se NON ha un nickname (primo accesso assoluto con Google), mostra la scelta
+            this.mostraSceltaNickname(user, profiloUtente, myPokemon, dom, isNewPlayer);
         } else {
-            // Se è vecchio, dritto in mappa (SEMPRE NELLA LOBBY)
+            // Se HA GIÀ un nickname (registrazione normale o vecchio utente), va dritto al gioco
+            let nomeFinal = profiloUtente.username.toUpperCase();
+            
+            if (isTouchDevice() || window.innerWidth <= 1024) {
+                let controls = document.getElementById('mobile-controls');
+                if (controls) controls.style.display = 'flex';
+            }
+
             setTimeout(() => {
                 if (dom) dom.destroy();
-                this.scene.start('WorldScene', { name: nomeFinal, user: user });
+                if (isNewPlayer) {
+                    // Se è un nuovo utente da registrazione normale, va ai 3 Starter
+                    this.scene.start('StarterScene', { name: nomeFinal, user: user, starters: myPokemon });
+                } else {
+                    // Se è un vecchio giocatore, dritto nella Lobby
+                    this.scene.start('WorldScene', { name: nomeFinal, user: user });
+                }
             }, 200);
         }
     }
 
-    // Funzione per gestire il cambio Nickname se necessario
-    async mostraSceltaNickname(user, profilo, pkmnList, dom) {
+    // Questa finestra apparirà SOLO a chi entra con Google per la prima volta
+    async mostraSceltaNickname(user, profilo, pkmnList, dom, isNewPlayer) {
         if (dom) dom.destroy();
+        
         let nameHtml = `
             <div id="login-container">
                 <h1 class="text-shadows" style="font-size: 3rem; margin-bottom: 0;">BENVENUTO!</h1>
                 <h2 style="font-size: 1.5rem; color: #fff; font-family: 'Courier New'; text-align: center;">Scegli il tuo Nickname da Allenatore:</h2>
-                <input type="text" id="new-username" placeholder="${profilo.username}" style="width: 300px; padding: 15px; font-size: 1.2rem; font-family: 'Courier New', monospace; font-weight: bold; text-align: center; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; outline: none; margin-top: 20px;">
+                <input type="text" id="new-username" placeholder="NICKNAME..." style="width: 300px; padding: 15px; font-size: 1.2rem; font-family: 'Courier New', monospace; font-weight: bold; text-align: center; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; outline: none; margin-top: 20px;">
                 <button id="save-name-btn" style="width: 338px; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">CONFERMA</button>
                 <p id="name-msg" style="color: #ffcc00; font-family: 'Courier New', monospace; font-weight: bold; margin-top: 10px;"></p>
             </div>`;
@@ -419,32 +447,35 @@ class LoginScene extends Phaser.Scene {
         nameDom.addListener('click').on('click', async (e) => {
             if (e.target.id === 'save-name-btn') {
                 let newName = nameDom.getChildByID('new-username').value.trim();
-                if (!newName) return;
+                if (!newName) {
+                    nameDom.getChildByID('name-msg').innerText = "Devi inserire un nome!";
+                    return;
+                }
+
+                nameDom.getChildByID('name-msg').innerText = "Verifica nome in corso...";
 
                 const { error } = await supabaseClient.from('profilo').update({ username: newName }).eq('id_profilo', profilo.id_profilo);
+                
                 if (error) {
-                    nameDom.getChildByID('name-msg').innerText = "Nome già in uso!";
+                    nameDom.getChildByID('name-msg').innerText = "Nome già in uso, scegline un altro!";
                 } else {
+                    profilo.username = newName;
+                    this.registry.set('playerProfile', profilo);
                     nameDom.destroy();
-                    this.indirizzaGiocatore(newName.toUpperCase(), user, pkmnList);
+                    
+                    if (isTouchDevice() || window.innerWidth <= 1024) {
+                        let controls = document.getElementById('mobile-controls');
+                        if (controls) controls.style.display = 'flex';
+                    }
+
+                    if (isNewPlayer) {
+                        this.scene.start('StarterScene', { name: newName.toUpperCase(), user: user, starters: pkmnList });
+                    } else {
+                        this.scene.start('WorldScene', { name: newName.toUpperCase(), user: user });
+                    }
                 }
             }
         });
-    }
-
-    indirizzaGiocatore(nome, user, pkmnList) {
-        if (isTouchDevice() || window.innerWidth <= 1024) {
-            let controls = document.getElementById('mobile-controls');
-            if (controls) controls.style.display = 'flex';
-        }
-        if (pkmnList.length === 0) {
-            console.log("Nuovo giocatore: Reindirizzo alla scelta dello Starter");
-            // Manda l'utente alla nuova schermata di selezione!
-            this.scene.start('StarterScene', { name: nome, user: user });
-        } else {
-            console.log(`Bentornato ${nome}! Squadra caricata.`);
-            this.scene.start('WorldScene', { name: nome, user: user });
-        }
     }
 }
 // ==============================================================================
@@ -776,7 +807,10 @@ class WorldScene extends Phaser.Scene {
             container = document.createElement('div');
             container.id = 'dialog-ui-container';
             container.style.position = 'absolute';   /* Cambia da 'fixed' ad 'absolute' */
-            container.style.bottom = '22vh';         /* Cambia da '20px' a '22vh' (così fluttua sopra i tasti) */
+            // --- NUOVO CONTROLLO RESPONSIVE ---
+            let isMobile = window.innerWidth <= 1024;
+            container.style.bottom = isMobile ? '22vh' : '20px';
+            // ----------------------------------
             container.style.left = '50%';
             container.style.transform = 'translateX(-50%)';
             container.style.width = '95vw';
@@ -2016,13 +2050,16 @@ class CPKScene extends Phaser.Scene {
         setTimeout(() => { window.addEventListener('keydown', handleChoiceInput); window.addEventListener('dpad-input', handleChoiceInput); }, 100);
     }
 
-     createDialogUI() {
+    createDialogUI() {
         let container = document.getElementById('dialog-ui-container');
         if (!container) {
             container = document.createElement('div');
             container.id = 'dialog-ui-container';
             container.style.position = 'absolute';   /* Cambia da 'fixed' ad 'absolute' */
-            container.style.bottom = '22vh';         /* Cambia da '20px' a '22vh' (così fluttua sopra i tasti) */
+            // --- NUOVO CONTROLLO RESPONSIVE ---
+            let isMobile = window.innerWidth <= 1024;
+            container.style.bottom = isMobile ? '22vh' : '20px';
+            // ----------------------------------
             container.style.left = '50%';
             container.style.transform = 'translateX(-50%)';
             container.style.width = '95vw';
@@ -2888,13 +2925,16 @@ class PvPScene extends Phaser.Scene {
             });
         }
     }
-   createDialogUI() {
+    createDialogUI() {
         let container = document.getElementById('dialog-ui-container');
         if (!container) {
             container = document.createElement('div');
             container.id = 'dialog-ui-container';
             container.style.position = 'absolute';   /* Cambia da 'fixed' ad 'absolute' */
-            container.style.bottom = '22vh';         /* Cambia da '20px' a '22vh' (così fluttua sopra i tasti) */
+            // --- NUOVO CONTROLLO RESPONSIVE ---
+            let isMobile = window.innerWidth <= 1024;
+            container.style.bottom = isMobile ? '22vh' : '20px';
+            // ----------------------------------
             container.style.left = '50%';
             container.style.transform = 'translateX(-50%)';
             container.style.width = '95vw';
@@ -4763,7 +4803,10 @@ class PVEScene extends Phaser.Scene {
             container = document.createElement('div');
             container.id = 'dialog-ui-container';
             container.style.position = 'absolute';   /* Cambia da 'fixed' ad 'absolute' */
-            container.style.bottom = '22vh';         /* Cambia da '20px' a '22vh' (così fluttua sopra i tasti) */
+            // --- NUOVO CONTROLLO RESPONSIVE ---
+            let isMobile = window.innerWidth <= 1024;
+            container.style.bottom = isMobile ? '22vh' : '20px';
+            // ----------------------------------
             container.style.left = '50%'; container.style.transform = 'translateX(-50%)';
             container.style.width = '95vw'; container.style.maxWidth = '800px'; container.style.height = 'auto'; container.style.minHeight = '140px';
             container.style.backgroundColor = '#2b2b2b'; container.style.border = '6px solid #d05050';
@@ -4808,32 +4851,61 @@ class PVEScene extends Phaser.Scene {
         mostraProssimo();
     }
 
-    mostraSceltaSiNo(onChoice) {
+   mostraSceltaSiNo(onChoice) {
         let choiceContainer = document.getElementById('dialog-choice-container');
         if (!choiceContainer) {
             choiceContainer = document.createElement('div');
-            choiceContainer.id = 'dialog-choice-container'; choiceContainer.style.position = 'fixed'; choiceContainer.style.bottom = '160px'; choiceContainer.style.right = '5%';
-            choiceContainer.style.transform = 'none'; choiceContainer.style.width = 'auto'; choiceContainer.style.minWidth = '120px'; choiceContainer.style.backgroundColor = '#2b2b2b';
+            choiceContainer.id = 'dialog-choice-container'; 
+            choiceContainer.style.position = 'absolute'; /* FONDAMENTALE: absolute, non fixed */
+            
+            // --- CONTROLLO SCHERMO (Il trucco magico con calc) ---
+            let isMobile = window.innerWidth <= 1024;
+            choiceContainer.style.bottom = isMobile ? 'calc(22vh + 150px)' : '170px';
+            choiceContainer.style.left = isMobile ? '70%' : 'calc(50% + 280px)';
+            choiceContainer.style.transform = 'translateX(-50%)';
+            choiceContainer.style.right = 'auto';
+            // -----------------------------------------------------
+
+            choiceContainer.style.width = 'auto'; choiceContainer.style.minWidth = '120px'; choiceContainer.style.backgroundColor = '#2b2b2b';
             choiceContainer.style.border = '4px solid #d05050'; choiceContainer.style.boxSizing = 'border-box'; choiceContainer.style.padding = '15px';
             choiceContainer.style.zIndex = '999999'; choiceContainer.style.display = 'flex'; choiceContainer.style.flexDirection = 'column'; choiceContainer.style.gap = '15px'; choiceContainer.style.boxShadow = '0px 10px 20px rgba(0,0,0,0.8)';
+            
             let optSi = document.createElement('div'); optSi.id = 'dialog-opt-si'; optSi.style.color = '#ffffff'; optSi.style.fontFamily = '"Courier New", Courier, monospace'; optSi.style.fontSize = '26px'; optSi.style.fontWeight = 'bold'; optSi.style.textShadow = '2px 2px 0 #000';
             let optNo = document.createElement('div'); optNo.id = 'dialog-opt-no'; optNo.style.color = '#ffffff'; optNo.style.fontFamily = '"Courier New", Courier, monospace'; optNo.style.fontSize = '26px'; optNo.style.fontWeight = 'bold'; optNo.style.textShadow = '2px 2px 0 #000';
-            choiceContainer.appendChild(optSi); choiceContainer.appendChild(optNo); document.body.appendChild(choiceContainer);
+            
+            choiceContainer.appendChild(optSi); choiceContainer.appendChild(optNo); 
+            
+            // FONDAMENTALE: Appeso al game-container e non al body
+            document.getElementById('game-container').appendChild(choiceContainer);
         }
         choiceContainer.style.display = 'flex';
         this.sceltaAttuale = 0;
+        
         const aggiornaCursoreScelta = () => {
             let optSi = document.getElementById('dialog-opt-si'); let optNo = document.getElementById('dialog-opt-no');
             if (this.sceltaAttuale === 0) { optSi.innerHTML = `<span style="display:inline-block; width: 25px; color: #ffcc00;">▶</span><span style="color: #ffcc00;">SÌ</span>`; optNo.innerHTML = `<span style="display:inline-block; width: 25px;"></span><span style="color: #ffffff;">NO</span>`; }
             else { optSi.innerHTML = `<span style="display:inline-block; width: 25px;"></span><span style="color: #ffffff;">SÌ</span>`; optNo.innerHTML = `<span style="display:inline-block; width: 25px; color: #ffcc00;">▶</span><span style="color: #ffcc00;">NO</span>`; }
         };
         aggiornaCursoreScelta();
+        
         const handleChoiceInput = (e) => {
             let key = e.key || (e.detail && e.detail.key);
             if (!key) return;
             if (key === 'ArrowUp' || key === 'w' || key === 'ArrowDown' || key === 's') { this.sceltaAttuale = this.sceltaAttuale === 0 ? 1 : 0; aggiornaCursoreScelta(); }
-            else if (key === 'Enter' || key === ' ') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.keys && this.keys.CONFIRM) this.keys.CONFIRM.reset(); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
-            else if (key === 'Escape' || key === 'Backspace') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.keys && this.keys.CANCEL) this.keys.CANCEL.reset(); onChoice('NO'); }
+            else if (key === 'Enter' || key === ' ') { 
+                if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); 
+                // Compatibilità universale per i tasti
+                if (this.keys && this.keys.CONFIRM) this.keys.CONFIRM.reset(); 
+                if (this.enterKey) this.enterKey.reset();
+                onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); 
+            }
+            else if (key === 'Escape' || key === 'Backspace') { 
+                if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); 
+                // Compatibilità universale per i tasti
+                if (this.keys && this.keys.CANCEL) this.keys.CANCEL.reset(); 
+                if (this.escKey) this.escKey.reset();
+                onChoice('NO'); 
+            }
         };
         setTimeout(() => { window.addEventListener('keydown', handleChoiceInput); window.addEventListener('dpad-input', handleChoiceInput); }, 100);
     }
