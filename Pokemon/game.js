@@ -1862,8 +1862,9 @@ class CPKScene extends Phaser.Scene {
         this.player.body.setSize(32, 32).setOffset(16, 32);
 
         this.physics.add.collider(this.player, this.wallLayer);
-        this.cameras.main.startFollow(this.player, true).setZoom(4).setBounds(0, 0, this.mapWidth, this.mapHeight);
-        this.cameras.main.startFollow(this.player, true).setZoom(4.5);
+        
+        // Zoom aumentato a 6.5 specifico per riempire il canvas nelle stanze interne
+        this.cameras.main.startFollow(this.player, true).setZoom(6.5).setBounds(0, 0, this.mapWidth, this.mapHeight);
     }
 
     update() {
