@@ -355,7 +355,7 @@ class LoginScene extends Phaser.Scene {
         });
     }
 
-    async avviaGioco(user, dom) {
+async avviaGioco(user, dom) {
         if (this.isStarting) return;
         this.isStarting = true;
         multiTabChannel.postMessage('new_login');
@@ -364,14 +364,19 @@ class LoginScene extends Phaser.Scene {
             this.authSubscription = null;
         }
 
-        // 1. RECUPERO PROFILO
+        // 1. RECUPERO PROFILO (Paziente per i login via Google)
         let profiloUtente = null;
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 5; i++) { // Aumentato a 5 tentativi (2.5 secondi totali)
             const { data: profile } = await supabaseClient.from('profilo').select('*').eq('id_utente', user.id).single();
             if (profile) { profiloUtente = profile; break; }
             await new Promise(resolve => setTimeout(resolve, 500));
         }
-        if (!profiloUtente) return;
+        
+        // Se, nonostante l'attesa, non esiste un profilo (Casi rarissimi di errore DB)
+        if (!profiloUtente) {
+             window.showBanner("Errore nel caricamento del profilo. Riprova.");
+             return;
+        }
         this.registry.set('playerProfile', profiloUtente);
 
         // 2. RECUPERO POKÉMON
@@ -401,14 +406,14 @@ class LoginScene extends Phaser.Scene {
         this.registry.set('userPokemon', myPokemon || []);
 
         // 3. REINDIRIZZAMENTO INTELLIGENTE
-        // Controlliamo se l'utente ha già un nickname valido nel DB
+        // La vera guardia del corpo: controlla rigidamente se il campo username è sporco o inesistente
         let haNickname = profiloUtente.username && profiloUtente.username.trim() !== "";
 
         if (!haNickname) {
-            // Se NON ha un nickname (primo accesso assoluto con Google), mostra la scelta
+            // BECCATO! È un account Google appena nato (o con un nome vuoto per qualche glitch)
             this.mostraSceltaNickname(user, profiloUtente, myPokemon, dom, isNewPlayer);
         } else {
-            // Se HA GIÀ un nickname (registrazione normale o vecchio utente), va dritto al gioco
+            // L'utente è in regola. Passa.
             let nomeFinal = profiloUtente.username.toUpperCase();
             
             if (isTouchDevice() || window.innerWidth <= 1024) {
@@ -419,17 +424,15 @@ class LoginScene extends Phaser.Scene {
             setTimeout(() => {
                 if (dom) dom.destroy();
                 if (isNewPlayer) {
-                    // Se è un nuovo utente da registrazione normale, va ai 3 Starter
                     this.scene.start('StarterScene', { name: nomeFinal, user: user, starters: myPokemon });
                 } else {
-                    // Se è un vecchio giocatore, dritto nella Lobby
                     this.scene.start('WorldScene', { name: nomeFinal, user: user });
                 }
             }, 200);
         }
     }
 
-    // Questa finestra apparirà SOLO a chi entra con Google per la prima volta
+    // La Finestra del Nickname
     async mostraSceltaNickname(user, profilo, pkmnList, dom, isNewPlayer) {
         if (dom) dom.destroy();
         
@@ -442,6 +445,7 @@ class LoginScene extends Phaser.Scene {
                 <p id="name-msg" style="color: #ffcc00; font-family: 'Courier New', monospace; font-weight: bold; margin-top: 10px;"></p>
             </div>`;
 
+        // Genera il DOM di Phaser e aspetta un millisecondo in più per far processare tutto bene al browser
         let nameDom = this.add.dom(500, 400).createFromHTML(nameHtml);
 
         nameDom.addListener('click').on('click', async (e) => {
