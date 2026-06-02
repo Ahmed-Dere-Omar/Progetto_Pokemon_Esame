@@ -1,3 +1,5 @@
+import { InputConfig } from './tasti_input.js';
+
 // 1. INIZIALIZZA SUPABASE
 const supabaseUrl = 'https://zlmjvbtmzkphkdfspcht.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpsbWp2YnRtemtwaGtkZnNwY2h0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3NDA4NDUsImV4cCI6MjA5MjMxNjg0NX0.j6aRmC3tTrFiZj62WrEmSKkuICoBHagFzKS3b8_adeM';
@@ -517,10 +519,7 @@ class WorldScene extends Phaser.Scene {
         this.setupNPCs();
         this.setupPlayer();
 
-        this.cursors = this.input.keyboard.createCursorKeys();
-        this.enterKey = this.input.keyboard.addKey('ENTER');
-
-        this.escKey = this.input.keyboard.addKey('ESC');
+        this.keys = this.input.keyboard.addKeys(InputConfig);
         this.isPaused = false;
         this.pauseMenuDom = null;
         this.pcOpen = false;
@@ -530,8 +529,10 @@ class WorldScene extends Phaser.Scene {
         this.isTransitioning = false;
 
         this.events.on('resume', () => {
-            this.cursors.left.reset(); this.cursors.right.reset();
-            this.cursors.up.reset(); this.cursors.down.reset();
+            this.keys.LEFT.reset(); this.keys.RIGHT.reset();
+            this.keys.UP.reset(); this.keys.DOWN.reset();
+            this.keys.A.reset(); this.keys.D.reset();
+            this.keys.W.reset(); this.keys.S.reset();
             this.canEncounter = false;
             setTimeout(() => { this.canEncounter = true; }, 1500);
             this.registry.set('lastBattleResult', null);
@@ -622,7 +623,7 @@ class WorldScene extends Phaser.Scene {
     }
 
     update() {
-        if (Phaser.Input.Keyboard.JustDown(this.escKey) && !this.isTransitioning && !this.pcOpen && !this.isDialogActive) {
+        if (Phaser.Input.Keyboard.JustDown(this.keys.CANCEL) && !this.isTransitioning && !this.pcOpen && !this.isDialogActive) {
             this.togglePauseMenu();
         }
 
@@ -634,10 +635,10 @@ class WorldScene extends Phaser.Scene {
         let dx = 0;
         let dy = 0;
 
-        if (this.cursors.left.isDown) { dx = -TILE_SIZE; currentAnim = 'left'; }
-        else if (this.cursors.right.isDown) { dx = TILE_SIZE; currentAnim = 'right'; }
-        else if (this.cursors.up.isDown) { dy = -TILE_SIZE; currentAnim = 'up'; }
-        else if (this.cursors.down.isDown) { dy = TILE_SIZE; currentAnim = 'down'; }
+        if (this.keys.LEFT.isDown || this.keys.A.isDown) { dx = -TILE_SIZE; currentAnim = 'left'; }
+        else if (this.keys.RIGHT.isDown || this.keys.D.isDown) { dx = TILE_SIZE; currentAnim = 'right'; }
+        else if (this.keys.UP.isDown || this.keys.W.isDown) { dy = -TILE_SIZE; currentAnim = 'up'; }
+        else if (this.keys.DOWN.isDown || this.keys.S.isDown) { dy = TILE_SIZE; currentAnim = 'down'; }
 
         if (dx !== 0 || dy !== 0) {
             let targetX = this.player.x + dx;
@@ -692,7 +693,7 @@ class WorldScene extends Phaser.Scene {
             this.player.anims.stop();
         }
 
-        if (Phaser.Input.Keyboard.JustDown(this.enterKey) && !this.isTransitioning && !this.isDialogActive) {
+        if (Phaser.Input.Keyboard.JustDown(this.keys.CONFIRM) && !this.isTransitioning && !this.isDialogActive) {
 
             if (this.zoneInterattive) {
                 let interazioneVicino = this.zoneInterattive.find(z => Phaser.Math.Distance.Between(this.player.x, this.player.y, z.x + (z.width || 0) / 2, z.y + (z.height || 0) / 2) < 40);
@@ -829,8 +830,8 @@ class WorldScene extends Phaser.Scene {
                         if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
                             e.preventDefault();
                             window.removeEventListener('keydown', handleEnter);
-                            if (this.enterKey) this.enterKey.reset();
-                            if (this.escKey) this.escKey.reset();
+                            if (this.keys && this.keys.CONFIRM) this.keys.CONFIRM.reset();
+                            if (this.keys && this.keys.CANCEL) this.keys.CANCEL.reset();
                             mostraProssimo();
                         }
                     };
@@ -907,8 +908,8 @@ class WorldScene extends Phaser.Scene {
             let key = e.key || (e.detail && e.detail.key);
             if (!key) return;
             if (key === 'ArrowUp' || key === 'w' || key === 'ArrowDown' || key === 's') { this.sceltaAttuale = this.sceltaAttuale === 0 ? 1 : 0; aggiornaCursoreScelta(); }
-            else if (key === 'Enter' || key === ' ') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.enterKey) this.enterKey.reset(); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
-            else if (key === 'Escape' || key === 'Backspace') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.escKey) this.escKey.reset(); onChoice('NO'); }
+            else if (key === 'Enter' || key === ' ') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.keys && this.keys.CONFIRM) this.keys.CONFIRM.reset(); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
+            else if (key === 'Escape' || key === 'Backspace') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.keys && this.keys.CANCEL) this.keys.CANCEL.reset(); onChoice('NO'); }
         };
 
         setTimeout(() => {
@@ -1103,8 +1104,16 @@ class WorldScene extends Phaser.Scene {
 
     togglePauseMenu() {
         if (this.isPaused) {
-            this.isPaused = false;
             let existingMenu = document.getElementById('pause-menu-overlay');
+            if (existingMenu && existingMenu.inSubMenu) {
+                existingMenu.renderMainPause();
+                return;
+            }
+            this.isPaused = false;
+            if (this.handlePauseKeyDown) {
+                window.removeEventListener('keydown', this.handlePauseKeyDown);
+                this.handlePauseKeyDown = null;
+            }
             if (existingMenu) existingMenu.remove();
         } else {
             this.isPaused = true;
@@ -1115,82 +1124,178 @@ class WorldScene extends Phaser.Scene {
             overlay.id = 'pause-menu-overlay';
             overlay.className = 'modal-overlay';
 
+            let selectedIdx = 0;
+            let currentButtons = [];
+
+            const updateSelection = () => {
+                if (overlay.inSubMenu) return;
+                currentButtons.forEach((btnId, idx) => {
+                    let btn = document.getElementById(btnId);
+                    if (btn) {
+                        if (idx === selectedIdx) {
+                            btn.style.transform = 'scale(1.05)';
+                            btn.style.backgroundColor = '#4a3b5c';
+                            btn.style.color = '#ffcc00';
+                            btn.style.borderColor = '#ffcc00';
+                            btn.style.boxShadow = '6px 6px 0 #ffcc00';
+                        } else {
+                            btn.style.transform = 'scale(1)';
+                            btn.style.backgroundColor = '#f6eedf';
+                            btn.style.color = '#ff7477';
+                            btn.style.borderColor = '#ff7477';
+                            btn.style.boxShadow = '4px 4px 0 #e69597';
+                        }
+                    }
+                });
+            };
+
             const renderMainPause = () => {
+                overlay.inSubMenu = false;
+                selectedIdx = 0;
+                currentButtons = ['profile-btn', 'controls-btn', 'logout-btn'];
+
                 overlay.innerHTML = `
-                <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 90%; max-width: 400px;">
-                    <h2 class="text-shadows" style="font-size: clamp(2rem, 6vw, 3.5rem); margin-bottom: 30px; text-align: center;">MENU PAUSA</h2>
-                    <button id="profile-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 10px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">PROFILO</button>
-                    <button id="logout-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">ESCI DAL GIOCO</button>
-                    <p style="color: #fff; margin-top: 40px; font-size: 1.2rem; font-family: 'Courier New'; font-weight: bold; text-align: center;">Premi ESC per tornare al gioco</p>
-                </div>`;
+                    <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 90%; max-width: 400px;">
+                        <h2 class="text-shadows" style="font-size: clamp(2rem, 6vw, 3.5rem); margin-bottom: 30px; text-align: center;">MENU PAUSA</h2>
+                        <button id="profile-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 10px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: all 0.1s;">PROFILO</button>
+                        <button id="controls-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: all 0.1s;">COMANDI</button>
+                        <button id="logout-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: all 0.1s;">ESCI DAL GIOCO</button>
+                        <p style="color: #fff; margin-top: 40px; font-size: 1.2rem; font-family: 'Courier New'; font-weight: bold; text-align: center;">Premi ESC per tornare al gioco</p>
+                    </div>`;
+                updateSelection();
+            };
+
+            overlay.renderMainPause = renderMainPause;
+
+            const renderControls = () => {
+                overlay.inSubMenu = true;
+
+                let controlsHtml = `
+                    <div style="margin-bottom: 15px;">
+                        <h3 style="color: #ffcc00; margin: 0 0 5px 0; font-size: 1.3rem;">MOVIMENTO</h3>
+                        <p style="margin: 0;"><strong>WASD</strong> o <strong>Frecce Direzionali</strong></p>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <h3 style="color: #ffcc00; margin: 0 0 5px 0; font-size: 1.3rem;">AZIONI</h3>
+                        <p style="margin: 0;"><strong>Conferma:</strong> INVIO</p>
+                        <p style="margin: 5px 0 0 0;"><strong>Annulla / Indietro:</strong> ESC</p>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <h3 style="color: #ffcc00; margin: 0 0 5px 0; font-size: 1.3rem;">IN BATTAGLIA</h3>
+                        <p style="margin: 0;"><strong>Statistiche:</strong> SHIFT</p>
+                    </div>
+                    <div>
+                        <h3 style="color: #ffcc00; margin: 0 0 5px 0; font-size: 1.3rem;">GENERICI</h3>
+                        <p style="margin: 0;"><strong>Mouse / Touch:</strong> Interfaccia UI e Dialoghi</p>
+                    </div>
+                `;
+
+                overlay.innerHTML = `
+                    <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 90%; max-width: 500px;">
+                        <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">COMANDI</h2>
+                        <div style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; border: 2px solid #ffcc00; width: 85%; color: #fff; font-family: 'Courier New', monospace; font-size: 1.2rem; text-align: left; max-height: 50vh; overflow-y: auto;">
+                            ${controlsHtml}
+                        </div>
+                        <button id="back-pause-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 30px; font-size: 1.5rem; font-weight: bold; background-color: #4a3b5c; color: #ffcc00; border: 4px solid #ffcc00; border-radius: 8px; cursor: pointer; box-shadow: 6px 6px 0 #ffcc00; transform: scale(1.05);">INDIETRO</button>
+                    </div>
+                `;
             };
 
             renderMainPause();
             document.getElementById('game-container').appendChild(overlay);
 
+            this.handlePauseKeyDown = (e) => {
+                let key = e.key;
+                if (!overlay.inSubMenu) {
+                    if (key === 'ArrowUp' || key === 'w' || key === 'W') {
+                        selectedIdx = (selectedIdx - 1 + currentButtons.length) % currentButtons.length;
+                        updateSelection();
+                    } else if (key === 'ArrowDown' || key === 's' || key === 'S') {
+                        selectedIdx = (selectedIdx + 1) % currentButtons.length;
+                        updateSelection();
+                    } else if (key === 'Enter' || key === ' ') {
+                        let btn = document.getElementById(currentButtons[selectedIdx]);
+                        if (btn) btn.click();
+                    }
+                } else if (overlay.inSubMenu) {
+                    if (key === 'Enter' || key === ' ' || key === 'Escape' || key === 'Backspace') {
+                        let btn = document.getElementById('back-pause-btn');
+                        if (btn) btn.click();
+                    } else if (key === 'ArrowLeft' || key === 'a' || key === 'A') {
+                        let btnPrev = document.getElementById('prev-avatar');
+                        if (btnPrev) btnPrev.click();
+                    } else if (key === 'ArrowRight' || key === 'd' || key === 'D') {
+                        let btnNext = document.getElementById('next-avatar');
+                        if (btnNext) btnNext.click();
+                    }
+                }
+            };
+            window.addEventListener('keydown', this.handlePauseKeyDown);
+
             overlay.addEventListener('click', async (e) => {
                 if (e.target.id === 'logout-btn') {
                     e.target.innerText = "USCITA IN CORSO...";
+                    this.isPaused = false;
+                    if (this.handlePauseKeyDown) window.removeEventListener('keydown', this.handlePauseKeyDown);
                     await supabaseClient.auth.signOut();
                     window.location.reload();
+                } else if (e.target.id === 'controls-btn') {
+                    renderControls();
                 } else if (e.target.id === 'profile-btn') {
+                    overlay.inSubMenu = true;
                     let profilo = this.registry.get('playerProfile');
                     let winRate = profilo.partite_totali > 0 ? ((profilo.vittorie_totali / profilo.partite_totali) * 100).toFixed(1) : 0;
                     let box = document.getElementById('pause-box');
-
                     let avatarNum = profilo.avatar_sprite || 1;
                     let currentAvatarPath = avatarNum == 1 ? 'assets/avatar.png' : `assets/avatar${avatarNum}.png`;
 
                     if (box) {
                         box.innerHTML = `
-                <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">PROFILO</h2>
-                <div style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; border: 2px solid #ff7477; width: 85%; color: #fff; font-family: 'Courier New', monospace; font-size: 1.2rem; text-align: center;">
-                    <p><strong>NOME:</strong> ${profilo.username || 'Sconosciuto'}</p>
-                    <p><strong>VITTORIE:</strong> ${profilo.vittorie_totali || 0}</p>
-                    <p><strong>PARTITE:</strong> ${profilo.partite_totali || 0}</p>
-                    <p><strong>VITTORIE %:</strong> ${winRate}%</p>
-                    <div style="margin-top: 15px; display: flex; justify-content: center; align-items: center; gap: 15px;">
-                        <button id="prev-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&lt;</button>
-                        
-                        <div style="width: 32px; height: 32px; overflow: hidden; position: relative; transform: scale(2); margin: 0 15px; image-rendering: pixelated;">
-                            <img id="profile-avatar" src="${currentAvatarPath}" style="position: absolute; top: 0; left: 0; width: 400%; height: 400%; max-width: none;">
-                        </div>
-
-                        <button id="next-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&gt;</button>
-                    </div>
-                </div>
-                <button id="back-pause-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 30px; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer;">INDIETRO</button>
-            `;
+                            <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">PROFILO</h2>
+                            <div style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; border: 2px solid #ff7477; width: 85%; color: #fff; font-family: 'Courier New', monospace; font-size: 1.2rem; text-align: center;">
+                                <p><strong>NOME:</strong> ${profilo.username || 'Sconosciuto'}</p>
+                                <p><strong>VITTORIE:</strong> ${profilo.vittorie_totali || 0}</p>
+                                <p><strong>PARTITE:</strong> ${profilo.partite_totali || 0}</p>
+                                <p><strong>VITTORIE %:</strong> ${winRate}%</p>
+                                <div style="margin-top: 15px; display: flex; justify-content: center; align-items: center; gap: 15px;">
+                                    <button id="prev-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&lt;</button>
+                                    <div style="width: 32px; height: 32px; overflow: hidden; position: relative; transform: scale(2); margin: 0 15px; image-rendering: pixelated;">
+                                        <img id="profile-avatar" src="${currentAvatarPath}" style="position: absolute; top: 0; left: 0; width: 400%; height: 400%; max-width: none;">
+                                    </div>
+                                    <button id="next-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&gt;</button>
+                                </div>
+                            </div>
+                            <button id="back-pause-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 30px; font-weight: bold; background-color: #4a3b5c; color: #ffcc00; border: 4px solid #ffcc00; border-radius: 8px; cursor: pointer; box-shadow: 6px 6px 0 #ffcc00; transform: scale(1.05);">INDIETRO</button>
+                        `;
                     }
                 } else if (e.target.id === 'prev-avatar' || e.target.id === 'next-avatar') {
                     let profilo = this.registry.get('playerProfile');
-
                     const avatars = ['assets/avatar.png', 'assets/avatar2.png', 'assets/avatar3.png', 'assets/avatar4.png', 'assets/avatar5.png', 'assets/avatar6.png'];
                     let imgEl = document.getElementById('profile-avatar');
-
                     let idx = avatars.indexOf(imgEl.getAttribute('src'));
                     if (idx === -1) idx = 0;
-
                     idx = e.target.id === 'prev-avatar' ? (idx - 1 + avatars.length) % avatars.length : (idx + 1) % avatars.length;
 
                     let newAvatarPath = avatars[idx];
                     imgEl.src = newAvatarPath;
-
                     let numberToSave = idx + 1;
                     profilo.avatar_sprite = numberToSave;
 
-                    await supabaseClient.from('profilo').update({ avatar_sprite: numberToSave }).eq('id_profilo', profilo.id_profilo);
+                    supabaseClient.from('profilo').update({ avatar_sprite: numberToSave }).eq('id_profilo', profilo.id_profilo);
 
                     let textureKey = newAvatarPath.split('/').pop().replace('.png', '');
                     if (this.player) {
                         this.player.setTexture(textureKey);
-                    }
+                        this.textureKey = textureKey;
 
+                        // Distrugge le vecchie animazioni e le ricrea con il nuovo spritesheet
+                        ['down', 'left', 'right', 'up'].forEach(key => { if (this.anims.exists(key)) this.anims.remove(key); });
+                        ['down', 'left', 'right', 'up'].forEach((key, i) => {
+                            this.anims.create({ key, frames: this.anims.generateFrameNumbers(this.textureKey, { start: i * 4, end: i * 4 + 3 }), frameRate: 10, repeat: -1 });
+                        });
+                    }
                 } else if (e.target.id === 'back-pause-btn') {
-                    this.isPaused = false;
-                    let existingMenu = document.getElementById('pause-menu-overlay');
-                    if (existingMenu) existingMenu.remove();
-                    this.scene.restart();
+                    renderMainPause();
                 }
             });
         }
@@ -1670,9 +1775,7 @@ class CPKScene extends Phaser.Scene {
             this.anims.create({ key, frames: this.anims.generateFrameNumbers(this.textureKey, { start: i * 4, end: i * 4 + 3 }), frameRate: 10, repeat: -1 });
         });
 
-        this.cursors = this.input.keyboard.createCursorKeys();
-        this.enterKey = this.input.keyboard.addKey('ENTER');
-        this.escKey = this.input.keyboard.addKey('ESC');
+        this.keys = this.input.keyboard.addKeys(InputConfig);
 
         this.isPaused = false;
         this.isDialogActive = false;
@@ -1728,7 +1831,7 @@ class CPKScene extends Phaser.Scene {
     }
 
     update() {
-        if (Phaser.Input.Keyboard.JustDown(this.escKey) && !this.isTransitioning && !this.pcOpen && !this.isDialogActive) {
+        if (Phaser.Input.Keyboard.JustDown(this.keys.CANCEL) && !this.isTransitioning && !this.pcOpen && !this.isDialogActive) {
             this.togglePauseMenu();
         }
 
@@ -1739,10 +1842,10 @@ class CPKScene extends Phaser.Scene {
         let dx = 0;
         let dy = 0;
 
-        if (this.cursors.left.isDown) { dx = -TILE_SIZE; currentAnim = 'left'; }
-        else if (this.cursors.right.isDown) { dx = TILE_SIZE; currentAnim = 'right'; }
-        else if (this.cursors.up.isDown) { dy = -TILE_SIZE; currentAnim = 'up'; }
-        else if (this.cursors.down.isDown) { dy = TILE_SIZE; currentAnim = 'down'; }
+        if (this.keys.LEFT.isDown || this.keys.A.isDown) { dx = -TILE_SIZE; currentAnim = 'left'; }
+        else if (this.keys.RIGHT.isDown || this.keys.D.isDown) { dx = TILE_SIZE; currentAnim = 'right'; }
+        else if (this.keys.UP.isDown || this.keys.W.isDown) { dy = -TILE_SIZE; currentAnim = 'up'; }
+        else if (this.keys.DOWN.isDown || this.keys.S.isDown) { dy = TILE_SIZE; currentAnim = 'down'; }
 
         if (dx !== 0 || dy !== 0) {
             let targetX = this.player.x + dx;
@@ -1783,7 +1886,7 @@ class CPKScene extends Phaser.Scene {
             this.player.anims.stop();
         }
 
-        if (Phaser.Input.Keyboard.JustDown(this.enterKey) && !this.isTransitioning && !this.isDialogActive) {
+        if (Phaser.Input.Keyboard.JustDown(this.keys.CONFIRM) && !this.isTransitioning && !this.isDialogActive) {
             let interactionHandled = false;
 
             if (this.npc && Phaser.Math.Distance.Between(this.player.x, this.player.y, this.npc.x, this.npc.y) < 40) {
@@ -1905,8 +2008,8 @@ class CPKScene extends Phaser.Scene {
             let key = e.key || (e.detail && e.detail.key);
             if (!key) return;
             if (key === 'ArrowUp' || key === 'w' || key === 'ArrowDown' || key === 's') { this.sceltaAttuale = this.sceltaAttuale === 0 ? 1 : 0; aggiornaCursoreScelta(); }
-            else if (key === 'Enter' || key === ' ') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.enterKey) this.enterKey.reset(); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
-            else if (key === 'Escape' || key === 'Backspace') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.escKey) this.escKey.reset(); onChoice('NO'); }
+            else if (key === 'Enter' || key === ' ') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.keys && this.keys.CONFIRM) this.keys.CONFIRM.reset(); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
+            else if (key === 'Escape' || key === 'Backspace') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.keys && this.keys.CANCEL) this.keys.CANCEL.reset(); onChoice('NO'); }
         };
         setTimeout(() => { window.addEventListener('keydown', handleChoiceInput); window.addEventListener('dpad-input', handleChoiceInput); }, 100);
     }
@@ -1966,10 +2069,9 @@ class CPKScene extends Phaser.Scene {
                 setTimeout(() => {
                     const handleEnter = (e) => {
                         if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
-                            e.preventDefault();
-                            window.removeEventListener('keydown', handleEnter);
-                            if (this.enterKey) this.enterKey.reset();
-                            if (this.escKey) this.escKey.reset();
+                            e.preventDefault(); window.removeEventListener('keydown', handleEnter);
+                            if (this.keys && this.keys.CONFIRM) this.keys.CONFIRM.reset();
+                            if (this.keys && this.keys.CANCEL) this.keys.CANCEL.reset();
                             mostraProssimo();
                         }
                     };
@@ -2009,8 +2111,16 @@ class CPKScene extends Phaser.Scene {
 
     togglePauseMenu() {
         if (this.isPaused) {
-            this.isPaused = false;
             let existingMenu = document.getElementById('pause-menu-overlay');
+            if (existingMenu && existingMenu.inSubMenu) {
+                existingMenu.renderMainPause();
+                return;
+            }
+            this.isPaused = false;
+            if (this.handlePauseKeyDown) {
+                window.removeEventListener('keydown', this.handlePauseKeyDown);
+                this.handlePauseKeyDown = null;
+            }
             if (existingMenu) existingMenu.remove();
         } else {
             this.isPaused = true;
@@ -2021,30 +2131,132 @@ class CPKScene extends Phaser.Scene {
             overlay.id = 'pause-menu-overlay';
             overlay.className = 'modal-overlay';
 
+            let selectedIdx = 0;
+            let currentButtons = [];
+
+            const updateSelection = () => {
+                if (overlay.inSubMenu) return;
+                currentButtons.forEach((btnId, idx) => {
+                    let btn = document.getElementById(btnId);
+                    if (btn) {
+                        if (idx === selectedIdx) {
+                            btn.style.transform = 'scale(1.05)';
+                            btn.style.backgroundColor = '#4a3b5c';
+                            btn.style.color = '#ffcc00';
+                            btn.style.borderColor = '#ffcc00';
+                            btn.style.boxShadow = '6px 6px 0 #ffcc00';
+                        } else {
+                            btn.style.transform = 'scale(1)';
+                            btn.style.backgroundColor = '#f6eedf';
+                            btn.style.color = '#ff7477';
+                            btn.style.borderColor = '#ff7477';
+                            btn.style.boxShadow = '4px 4px 0 #e69597';
+                        }
+                    }
+                });
+            };
+
             const renderMainPause = () => {
+                overlay.inSubMenu = false;
+                selectedIdx = 0;
+                currentButtons = ['profile-btn', 'controls-btn', 'lobby-btn'];
+
                 overlay.innerHTML = `
                     <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 90%; max-width: 400px;">
-                       <h2 class="text-shadows" style="font-size: clamp(2rem, 6vw, 3.5rem); margin-bottom: 30px; text-align: center;">CENTRO POKÉMON</h2>
-                        <button id="profile-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 10px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">PROFILO</button>
-                        <button id="lobby-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">TORNA ALLA LOBBY</button>
+                        <h2 class="text-shadows" style="font-size: clamp(2rem, 6vw, 3.5rem); margin-bottom: 30px; text-align: center;">CENTRO POKÉMON</h2>
+                        <button id="profile-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 10px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: all 0.1s;">PROFILO</button>
+                        <button id="controls-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: all 0.1s;">COMANDI</button>
+                        <button id="lobby-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: all 0.1s;">TORNA ALLA LOBBY</button>
                         <p style="color: #fff; margin-top: 40px; font-size: 1.2rem; font-family: 'Courier New'; font-weight: bold; text-align: center;">Premi ESC per tornare al gioco</p>
                     </div>`;
+                updateSelection();
+            };
+
+            overlay.renderMainPause = renderMainPause;
+
+            const renderControls = () => {
+                overlay.inSubMenu = true;
+
+                let controlsHtml = `
+                    <div style="margin-bottom: 15px;">
+                        <h3 style="color: #ffcc00; margin: 0 0 5px 0; font-size: 1.3rem;">MOVIMENTO</h3>
+                        <p style="margin: 0;"><strong>WASD</strong> o <strong>Frecce Direzionali</strong></p>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <h3 style="color: #ffcc00; margin: 0 0 5px 0; font-size: 1.3rem;">AZIONI</h3>
+                        <p style="margin: 0;"><strong>Conferma:</strong> INVIO</p>
+                        <p style="margin: 5px 0 0 0;"><strong>Annulla / Indietro:</strong> ESC</p>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <h3 style="color: #ffcc00; margin: 0 0 5px 0; font-size: 1.3rem;">IN BATTAGLIA</h3>
+                        <p style="margin: 0;"><strong>Statistiche:</strong> SHIFT</p>
+                    </div>
+                    <div>
+                        <h3 style="color: #ffcc00; margin: 0 0 5px 0; font-size: 1.3rem;">GENERICI</h3>
+                        <p style="margin: 0;"><strong>Mouse / Touch:</strong> Interfaccia UI e Dialoghi</p>
+                    </div>
+                `;
+
+                overlay.innerHTML = `
+                    <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 90%; max-width: 500px;">
+                        <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">COMANDI</h2>
+                        <div style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; border: 2px solid #ffcc00; width: 85%; color: #fff; font-family: 'Courier New', monospace; font-size: 1.2rem; text-align: left; max-height: 50vh; overflow-y: auto;">
+                            ${controlsHtml}
+                        </div>
+                        <button id="back-pause-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 30px; font-size: 1.5rem; font-weight: bold; background-color: #4a3b5c; color: #ffcc00; border: 4px solid #ffcc00; border-radius: 8px; cursor: pointer; box-shadow: 6px 6px 0 #ffcc00; transform: scale(1.05);">INDIETRO</button>
+                    </div>
+                `;
             };
 
             renderMainPause();
             document.getElementById('game-container').appendChild(overlay);
 
-            overlay.addEventListener('click', (e) => {
+            this.handlePauseKeyDown = (e) => {
+                let key = e.key;
+                if (!overlay.inSubMenu) {
+                    if (key === 'ArrowUp' || key === 'w' || key === 'W') {
+                        selectedIdx = (selectedIdx - 1 + currentButtons.length) % currentButtons.length;
+                        updateSelection();
+                    } else if (key === 'ArrowDown' || key === 's' || key === 'S') {
+                        selectedIdx = (selectedIdx + 1) % currentButtons.length;
+                        updateSelection();
+                    } else if (key === 'Enter' || key === ' ') {
+                        let btn = document.getElementById(currentButtons[selectedIdx]);
+                        if (btn) btn.click();
+                    }
+                } else if (overlay.inSubMenu) {
+                    if (key === 'Enter' || key === ' ' || key === 'Escape' || key === 'Backspace') {
+                        let btn = document.getElementById('back-pause-btn');
+                        if (btn) btn.click();
+                    } else if (key === 'ArrowLeft' || key === 'a' || key === 'A') {
+                        let btnPrev = document.getElementById('prev-avatar');
+                        if (btnPrev) btnPrev.click();
+                    } else if (key === 'ArrowRight' || key === 'd' || key === 'D') {
+                        let btnNext = document.getElementById('next-avatar');
+                        if (btnNext) btnNext.click();
+                    }
+                }
+            };
+            window.addEventListener('keydown', this.handlePauseKeyDown);
+
+            overlay.addEventListener('click', async (e) => {
                 if (e.target.id === 'lobby-btn') {
                     e.target.innerText = "USCITA...";
                     this.isPaused = false;
+                    if (this.handlePauseKeyDown) window.removeEventListener('keydown', this.handlePauseKeyDown);
                     let existingMenu = document.getElementById('pause-menu-overlay');
                     if (existingMenu) existingMenu.remove();
                     this.tornaAllaLobby();
+                } else if (e.target.id === 'controls-btn') {
+                    renderControls();
                 } else if (e.target.id === 'profile-btn') {
+                    overlay.inSubMenu = true;
                     let profilo = this.registry.get('playerProfile');
                     let winRate = profilo.partite_totali > 0 ? ((profilo.vittorie_totali / profilo.partite_totali) * 100).toFixed(1) : 0;
                     let box = document.getElementById('pause-box');
+                    let avatarNum = profilo.avatar_sprite || 1;
+                    let currentAvatarPath = avatarNum == 1 ? 'assets/avatar.png' : `assets/avatar${avatarNum}.png`;
+
                     if (box) {
                         box.innerHTML = `
                             <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">PROFILO</h2>
@@ -2055,23 +2267,41 @@ class CPKScene extends Phaser.Scene {
                                 <p><strong>VITTORIE %:</strong> ${winRate}%</p>
                                 <div style="margin-top: 15px; display: flex; justify-content: center; align-items: center; gap: 15px;">
                                     <button id="prev-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&lt;</button>
-                                    <img id="profile-avatar" src="${profilo.avatar || 'assets/avatar.png'}" style="width: 64px; height: 64px; image-rendering: pixelated;">
+                                    <div style="width: 32px; height: 32px; overflow: hidden; position: relative; transform: scale(2); margin: 0 15px; image-rendering: pixelated;">
+                                        <img id="profile-avatar" src="${currentAvatarPath}" style="position: absolute; top: 0; left: 0; width: 400%; height: 400%; max-width: none;">
+                                    </div>
                                     <button id="next-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&gt;</button>
                                 </div>
                             </div>
-                            <button id="back-pause-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 30px; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer;">INDIETRO</button>
+                            <button id="back-pause-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 30px; font-weight: bold; background-color: #4a3b5c; color: #ffcc00; border: 4px solid #ffcc00; border-radius: 8px; cursor: pointer; box-shadow: 6px 6px 0 #ffcc00; transform: scale(1.05);">INDIETRO</button>
                         `;
                     }
                 } else if (e.target.id === 'prev-avatar' || e.target.id === 'next-avatar') {
                     let profilo = this.registry.get('playerProfile');
-                    const avatars = ['assets/avatar.png', 'assets/npc.png', 'assets/nurse.png']; // Inserisci qui i tuoi PNG
+                    const avatars = ['assets/avatar.png', 'assets/avatar2.png', 'assets/avatar3.png', 'assets/avatar4.png', 'assets/avatar5.png', 'assets/avatar6.png'];
                     let imgEl = document.getElementById('profile-avatar');
                     let idx = avatars.indexOf(imgEl.getAttribute('src'));
                     if (idx === -1) idx = 0;
                     idx = e.target.id === 'prev-avatar' ? (idx - 1 + avatars.length) % avatars.length : (idx + 1) % avatars.length;
-                    imgEl.src = avatars[idx];
-                    profilo.avatar = avatars[idx];
-                    supabaseClient.from('profilo').update({ avatar: avatars[idx] }).eq('id_profilo', profilo.id_profilo);
+
+                    let newAvatarPath = avatars[idx];
+                    imgEl.src = newAvatarPath;
+                    let numberToSave = idx + 1;
+                    profilo.avatar_sprite = numberToSave;
+
+                    supabaseClient.from('profilo').update({ avatar_sprite: numberToSave }).eq('id_profilo', profilo.id_profilo);
+
+                    let textureKey = newAvatarPath.split('/').pop().replace('.png', '');
+                    if (this.player) {
+                        this.player.setTexture(textureKey);
+                        this.textureKey = textureKey;
+
+                        // Distrugge le vecchie animazioni e le ricrea con il nuovo spritesheet
+                        ['down', 'left', 'right', 'up'].forEach(key => { if (this.anims.exists(key)) this.anims.remove(key); });
+                        ['down', 'left', 'right', 'up'].forEach((key, i) => {
+                            this.anims.create({ key, frames: this.anims.generateFrameNumbers(this.textureKey, { start: i * 4, end: i * 4 + 3 }), frameRate: 10, repeat: -1 });
+                        });
+                    }
                 } else if (e.target.id === 'back-pause-btn') {
                     renderMainPause();
                 }
@@ -2103,9 +2333,7 @@ class PvPScene extends Phaser.Scene {
         this.setupAnimations();
         this.setupNetwork();
 
-        this.cursors = this.input.keyboard.createCursorKeys();
-        this.enterKey = this.input.keyboard.addKey('ENTER');
-        this.escKey = this.input.keyboard.addKey('ESC');
+        this.keys = this.input.keyboard.addKeys(InputConfig);
 
         this.isPaused = false;
         this.isDialogActive = false;
@@ -2242,7 +2470,7 @@ class PvPScene extends Phaser.Scene {
     }
 
     update() {
-        if (Phaser.Input.Keyboard.JustDown(this.escKey) && !this.isTransitioning && !this.pcOpen && !this.isDialogActive) {
+        if (Phaser.Input.Keyboard.JustDown(this.keys.CANCEL) && !this.isTransitioning && !this.pcOpen && !this.isDialogActive) {
             this.togglePauseMenu();
         }
 
@@ -2253,10 +2481,10 @@ class PvPScene extends Phaser.Scene {
         let dx = 0;
         let dy = 0;
 
-        if (this.cursors.left.isDown) { dx = -TILE_SIZE; currentAnim = 'left'; }
-        else if (this.cursors.right.isDown) { dx = TILE_SIZE; currentAnim = 'right'; }
-        else if (this.cursors.up.isDown) { dy = -TILE_SIZE; currentAnim = 'up'; }
-        else if (this.cursors.down.isDown) { dy = TILE_SIZE; currentAnim = 'down'; }
+        if (this.keys.LEFT.isDown || this.keys.A.isDown) { dx = -TILE_SIZE; currentAnim = 'left'; }
+        else if (this.keys.RIGHT.isDown || this.keys.D.isDown) { dx = TILE_SIZE; currentAnim = 'right'; }
+        else if (this.keys.UP.isDown || this.keys.W.isDown) { dy = -TILE_SIZE; currentAnim = 'up'; }
+        else if (this.keys.DOWN.isDown || this.keys.S.isDown) { dy = TILE_SIZE; currentAnim = 'down'; }
 
         if (dx !== 0 || dy !== 0) {
             let targetX = this.player.x + dx;
@@ -2300,7 +2528,7 @@ class PvPScene extends Phaser.Scene {
             this.player.anims.stop();
         }
 
-        if (Phaser.Input.Keyboard.JustDown(this.enterKey) && !this.isTransitioning && !this.isDialogActive) {
+        if (Phaser.Input.Keyboard.JustDown(this.keys.CONFIRM) && !this.isTransitioning && !this.isDialogActive) {
             if (this.zoneInterattive) {
                 let interazioneVicino = this.zoneInterattive.find(z => Phaser.Math.Distance.Between(this.player.x, this.player.y, z.x + (z.width || 0) / 2, z.y + (z.height || 0) / 2) < 40);
                 if (interazioneVicino) {
@@ -2383,8 +2611,8 @@ class PvPScene extends Phaser.Scene {
             let key = e.key || (e.detail && e.detail.key);
             if (!key) return;
             if (key === 'ArrowUp' || key === 'w' || key === 'ArrowDown' || key === 's') { this.sceltaAttuale = this.sceltaAttuale === 0 ? 1 : 0; aggiornaCursoreScelta(); }
-            else if (key === 'Enter' || key === ' ') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.enterKey) this.enterKey.reset(); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
-            else if (key === 'Escape' || key === 'Backspace') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.escKey) this.escKey.reset(); onChoice('NO'); }
+            else if (key === 'Enter' || key === ' ') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.keys && this.keys.CONFIRM) this.keys.CONFIRM.reset(); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
+            else if (key === 'Escape' || key === 'Backspace') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.keys && this.keys.CANCEL) this.keys.CANCEL.reset(); onChoice('NO'); }
         };
         setTimeout(() => { window.addEventListener('keydown', handleChoiceInput); window.addEventListener('dpad-input', handleChoiceInput); }, 100);
     }
@@ -2459,8 +2687,16 @@ class PvPScene extends Phaser.Scene {
 
     togglePauseMenu() {
         if (this.isPaused) {
-            this.isPaused = false;
             let existingMenu = document.getElementById('pause-menu-overlay');
+            if (existingMenu && existingMenu.inSubMenu) {
+                existingMenu.renderMainPause();
+                return;
+            }
+            this.isPaused = false;
+            if (this.handlePauseKeyDown) {
+                window.removeEventListener('keydown', this.handlePauseKeyDown);
+                this.handlePauseKeyDown = null;
+            }
             if (existingMenu) existingMenu.remove();
         } else {
             this.isPaused = true;
@@ -2471,30 +2707,132 @@ class PvPScene extends Phaser.Scene {
             overlay.id = 'pause-menu-overlay';
             overlay.className = 'modal-overlay';
 
+            let selectedIdx = 0;
+            let currentButtons = [];
+
+            const updateSelection = () => {
+                if (overlay.inSubMenu) return;
+                currentButtons.forEach((btnId, idx) => {
+                    let btn = document.getElementById(btnId);
+                    if (btn) {
+                        if (idx === selectedIdx) {
+                            btn.style.transform = 'scale(1.05)';
+                            btn.style.backgroundColor = '#4a3b5c';
+                            btn.style.color = '#ffcc00';
+                            btn.style.borderColor = '#ffcc00';
+                            btn.style.boxShadow = '6px 6px 0 #ffcc00';
+                        } else {
+                            btn.style.transform = 'scale(1)';
+                            btn.style.backgroundColor = '#f6eedf';
+                            btn.style.color = '#ff7477';
+                            btn.style.borderColor = '#ff7477';
+                            btn.style.boxShadow = '4px 4px 0 #e69597';
+                        }
+                    }
+                });
+            };
+
             const renderMainPause = () => {
+                overlay.inSubMenu = false;
+                selectedIdx = 0;
+                currentButtons = ['profile-btn', 'controls-btn', 'lobby-btn'];
+
                 overlay.innerHTML = `
                     <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 90%; max-width: 400px;">
-                       <h2 class="text-shadows" style="font-size: clamp(2rem, 6vw, 3.5rem); margin-bottom: 30px; text-align: center;">ARENA PVP</h2>
-                        <button id="profile-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 10px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">PROFILO</button>
-                        <button id="lobby-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">TORNA ALLA LOBBY</button>
+                        <h2 class="text-shadows" style="font-size: clamp(2rem, 6vw, 3.5rem); margin-bottom: 30px; text-align: center;">ARENA PVP</h2>
+                        <button id="profile-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 10px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: all 0.1s;">PROFILO</button>
+                        <button id="controls-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: all 0.1s;">COMANDI</button>
+                        <button id="lobby-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: all 0.1s;">TORNA ALLA LOBBY</button>
                         <p style="color: #fff; margin-top: 40px; font-size: 1.2rem; font-family: 'Courier New'; font-weight: bold; text-align: center;">Premi ESC per tornare al gioco</p>
                     </div>`;
+                updateSelection();
+            };
+
+            overlay.renderMainPause = renderMainPause;
+
+            const renderControls = () => {
+                overlay.inSubMenu = true;
+
+                let controlsHtml = `
+                    <div style="margin-bottom: 15px;">
+                        <h3 style="color: #ffcc00; margin: 0 0 5px 0; font-size: 1.3rem;">MOVIMENTO</h3>
+                        <p style="margin: 0;"><strong>WASD</strong> o <strong>Frecce Direzionali</strong></p>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <h3 style="color: #ffcc00; margin: 0 0 5px 0; font-size: 1.3rem;">AZIONI</h3>
+                        <p style="margin: 0;"><strong>Conferma:</strong> INVIO</p>
+                        <p style="margin: 5px 0 0 0;"><strong>Annulla / Indietro:</strong> ESC</p>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <h3 style="color: #ffcc00; margin: 0 0 5px 0; font-size: 1.3rem;">IN BATTAGLIA</h3>
+                        <p style="margin: 0;"><strong>Statistiche:</strong> SHIFT</p>
+                    </div>
+                    <div>
+                        <h3 style="color: #ffcc00; margin: 0 0 5px 0; font-size: 1.3rem;">GENERICI</h3>
+                        <p style="margin: 0;"><strong>Mouse / Touch:</strong> Interfaccia UI e Dialoghi</p>
+                    </div>
+                `;
+
+                overlay.innerHTML = `
+                    <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 90%; max-width: 500px;">
+                        <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">COMANDI</h2>
+                        <div style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; border: 2px solid #ffcc00; width: 85%; color: #fff; font-family: 'Courier New', monospace; font-size: 1.2rem; text-align: left; max-height: 50vh; overflow-y: auto;">
+                            ${controlsHtml}
+                        </div>
+                        <button id="back-pause-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 30px; font-size: 1.5rem; font-weight: bold; background-color: #4a3b5c; color: #ffcc00; border: 4px solid #ffcc00; border-radius: 8px; cursor: pointer; box-shadow: 6px 6px 0 #ffcc00; transform: scale(1.05);">INDIETRO</button>
+                    </div>
+                `;
             };
 
             renderMainPause();
             document.getElementById('game-container').appendChild(overlay);
 
-            overlay.addEventListener('click', (e) => {
+            this.handlePauseKeyDown = (e) => {
+                let key = e.key;
+                if (!overlay.inSubMenu) {
+                    if (key === 'ArrowUp' || key === 'w' || key === 'W') {
+                        selectedIdx = (selectedIdx - 1 + currentButtons.length) % currentButtons.length;
+                        updateSelection();
+                    } else if (key === 'ArrowDown' || key === 's' || key === 'S') {
+                        selectedIdx = (selectedIdx + 1) % currentButtons.length;
+                        updateSelection();
+                    } else if (key === 'Enter' || key === ' ') {
+                        let btn = document.getElementById(currentButtons[selectedIdx]);
+                        if (btn) btn.click();
+                    }
+                } else if (overlay.inSubMenu) {
+                    if (key === 'Enter' || key === ' ' || key === 'Escape' || key === 'Backspace') {
+                        let btn = document.getElementById('back-pause-btn');
+                        if (btn) btn.click();
+                    } else if (key === 'ArrowLeft' || key === 'a' || key === 'A') {
+                        let btnPrev = document.getElementById('prev-avatar');
+                        if (btnPrev) btnPrev.click();
+                    } else if (key === 'ArrowRight' || key === 'd' || key === 'D') {
+                        let btnNext = document.getElementById('next-avatar');
+                        if (btnNext) btnNext.click();
+                    }
+                }
+            };
+            window.addEventListener('keydown', this.handlePauseKeyDown);
+
+            overlay.addEventListener('click', async (e) => {
                 if (e.target.id === 'lobby-btn') {
                     e.target.innerText = "USCITA...";
                     this.isPaused = false;
+                    if (this.handlePauseKeyDown) window.removeEventListener('keydown', this.handlePauseKeyDown);
                     let existingMenu = document.getElementById('pause-menu-overlay');
                     if (existingMenu) existingMenu.remove();
                     this.tornaAllaLobby();
+                } else if (e.target.id === 'controls-btn') {
+                    renderControls();
                 } else if (e.target.id === 'profile-btn') {
+                    overlay.inSubMenu = true;
                     let profilo = this.registry.get('playerProfile');
                     let winRate = profilo.partite_totali > 0 ? ((profilo.vittorie_totali / profilo.partite_totali) * 100).toFixed(1) : 0;
                     let box = document.getElementById('pause-box');
+                    let avatarNum = profilo.avatar_sprite || 1;
+                    let currentAvatarPath = avatarNum == 1 ? 'assets/avatar.png' : `assets/avatar${avatarNum}.png`;
+
                     if (box) {
                         box.innerHTML = `
                             <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">PROFILO</h2>
@@ -2505,30 +2843,47 @@ class PvPScene extends Phaser.Scene {
                                 <p><strong>VITTORIE %:</strong> ${winRate}%</p>
                                 <div style="margin-top: 15px; display: flex; justify-content: center; align-items: center; gap: 15px;">
                                     <button id="prev-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&lt;</button>
-                                    <img id="profile-avatar" src="${profilo.avatar || 'assets/avatar.png'}" style="width: 64px; height: 64px; image-rendering: pixelated;">
+                                    <div style="width: 32px; height: 32px; overflow: hidden; position: relative; transform: scale(2); margin: 0 15px; image-rendering: pixelated;">
+                                        <img id="profile-avatar" src="${currentAvatarPath}" style="position: absolute; top: 0; left: 0; width: 400%; height: 400%; max-width: none;">
+                                    </div>
                                     <button id="next-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&gt;</button>
                                 </div>
                             </div>
-                            <button id="back-pause-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 30px; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer;">INDIETRO</button>
+                            <button id="back-pause-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 30px; font-weight: bold; background-color: #4a3b5c; color: #ffcc00; border: 4px solid #ffcc00; border-radius: 8px; cursor: pointer; box-shadow: 6px 6px 0 #ffcc00; transform: scale(1.05);">INDIETRO</button>
                         `;
                     }
                 } else if (e.target.id === 'prev-avatar' || e.target.id === 'next-avatar') {
                     let profilo = this.registry.get('playerProfile');
-                    const avatars = ['assets/avatar.png', 'assets/npc.png', 'assets/nurse.png']; // Inserisci qui i tuoi PNG
+                    const avatars = ['assets/avatar.png', 'assets/avatar2.png', 'assets/avatar3.png', 'assets/avatar4.png', 'assets/avatar5.png', 'assets/avatar6.png'];
                     let imgEl = document.getElementById('profile-avatar');
                     let idx = avatars.indexOf(imgEl.getAttribute('src'));
                     if (idx === -1) idx = 0;
                     idx = e.target.id === 'prev-avatar' ? (idx - 1 + avatars.length) % avatars.length : (idx + 1) % avatars.length;
-                    imgEl.src = avatars[idx];
-                    profilo.avatar = avatars[idx];
-                    supabaseClient.from('profilo').update({ avatar: avatars[idx] }).eq('id_profilo', profilo.id_profilo);
+
+                    let newAvatarPath = avatars[idx];
+                    imgEl.src = newAvatarPath;
+                    let numberToSave = idx + 1;
+                    profilo.avatar_sprite = numberToSave;
+
+                    supabaseClient.from('profilo').update({ avatar_sprite: numberToSave }).eq('id_profilo', profilo.id_profilo);
+
+                    let textureKey = newAvatarPath.split('/').pop().replace('.png', '');
+                    if (this.player) {
+                        this.player.setTexture(textureKey);
+                        this.textureKey = textureKey;
+
+                        // Distrugge le vecchie animazioni e le ricrea con il nuovo spritesheet
+                        ['down', 'left', 'right', 'up'].forEach(key => { if (this.anims.exists(key)) this.anims.remove(key); });
+                        ['down', 'left', 'right', 'up'].forEach((key, i) => {
+                            this.anims.create({ key, frames: this.anims.generateFrameNumbers(this.textureKey, { start: i * 4, end: i * 4 + 3 }), frameRate: 10, repeat: -1 });
+                        });
+                    }
                 } else if (e.target.id === 'back-pause-btn') {
                     renderMainPause();
                 }
             });
         }
     }
-
     createDialogUI() {
         let container = document.getElementById('dialog-ui-container');
         if (!container) {
@@ -2587,10 +2942,9 @@ class PvPScene extends Phaser.Scene {
                 setTimeout(() => {
                     const handleEnter = (e) => {
                         if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
-                            e.preventDefault();
-                            window.removeEventListener('keydown', handleEnter);
-                            if (this.enterKey) this.enterKey.reset();
-                            if (this.escKey) this.escKey.reset();
+                            e.preventDefault(); window.removeEventListener('keydown', handleEnter);
+                            if (this.keys && this.keys.CONFIRM) this.keys.CONFIRM.reset();
+                            if (this.keys && this.keys.CANCEL) this.keys.CANCEL.reset();
                             mostraProssimo();
                         }
                     };
@@ -2679,7 +3033,7 @@ class BattleScene extends Phaser.Scene {
         this.pkmnDB = this.registry.get('pokemonDB');
         this.moveDB = this.registry.get('moveDB');
 
-        this.shiftKey = this.input.keyboard.addKey('SHIFT');
+        this.keys = this.input.keyboard.addKeys(InputConfig);
         this.createStatsUI();
 
         this.myTeamData = this.buildTeamData(this.registry.get('userPokemon').filter(p => p.in_squadra).sort((a, b) => a.posizione_slot - b.posizione_slot));
@@ -2854,11 +3208,6 @@ class BattleScene extends Phaser.Scene {
         this.isInputActive = false;
         this.menuState = 'MAIN';
 
-        this.moveKeys = this.input.keyboard.createCursorKeys();
-        this.confirmKey = this.input.keyboard.addKey('ENTER');
-        this.cancelKey = this.input.keyboard.addKey('BACKSPACE');
-        this.escapeKey = this.input.keyboard.addKey('ESC');
-
         for (let i = 0; i < 4; i++) {
             let bx = 40 + (i % 2) * 260;
             let by = 690 + Math.floor(i / 2) * 45;
@@ -2924,7 +3273,7 @@ class BattleScene extends Phaser.Scene {
 
 
     update() {
-        if (this.shiftKey && this.shiftKey.isDown && this.isInputActive && (this.menuState === 'MAIN' || this.menuState === 'MOVES')) {
+        if (this.keys.STATS && this.keys.STATS.isDown && this.isInputActive && (this.menuState === 'MAIN' || this.menuState === 'MOVES')) {
             if (this.statsDom.node.querySelector('#stats-overlay').style.display === 'none') {
                 this.updateStatsUI();
                 this.statsDom.node.querySelector('#stats-overlay').style.display = 'block';
@@ -2935,25 +3284,25 @@ class BattleScene extends Phaser.Scene {
 
         if (!this.isInputActive) return;
 
-        if (Phaser.Input.Keyboard.JustDown(this.moveKeys.left)) {
+        if (Phaser.Input.Keyboard.JustDown(this.keys.LEFT) || Phaser.Input.Keyboard.JustDown(this.keys.A)) {
             if (this.selectedMoveIndex % 2 !== 0) this.selectedMoveIndex--;
             this.updateMenuSelection();
-        } else if (Phaser.Input.Keyboard.JustDown(this.moveKeys.right)) {
+        } else if (Phaser.Input.Keyboard.JustDown(this.keys.RIGHT) || Phaser.Input.Keyboard.JustDown(this.keys.D)) {
             if (this.selectedMoveIndex % 2 === 0) this.selectedMoveIndex++;
             this.updateMenuSelection();
-        } else if (Phaser.Input.Keyboard.JustDown(this.moveKeys.up)) {
+        } else if (Phaser.Input.Keyboard.JustDown(this.keys.UP) || Phaser.Input.Keyboard.JustDown(this.keys.W)) {
             if (this.selectedMoveIndex >= 2) this.selectedMoveIndex -= 2;
             this.updateMenuSelection();
-        } else if (Phaser.Input.Keyboard.JustDown(this.moveKeys.down)) {
+        } else if (Phaser.Input.Keyboard.JustDown(this.keys.DOWN) || Phaser.Input.Keyboard.JustDown(this.keys.S)) {
             if (this.selectedMoveIndex <= 1) this.selectedMoveIndex += 2;
             this.updateMenuSelection();
         }
 
-        if (Phaser.Input.Keyboard.JustDown(this.confirmKey)) {
+        if (Phaser.Input.Keyboard.JustDown(this.keys.CONFIRM)) {
             this.handleButtonClick(this.selectedMoveIndex);
         }
 
-        if (Phaser.Input.Keyboard.JustDown(this.cancelKey) || (this.escapeKey && Phaser.Input.Keyboard.JustDown(this.escapeKey))) {
+        if (Phaser.Input.Keyboard.JustDown(this.keys.CANCEL)) {
             if (this.menuState === 'MOVES') {
                 this.menuState = 'MAIN';
                 this.selectedMoveIndex = 0;
@@ -3845,9 +4194,7 @@ class PVEScene extends Phaser.Scene {
             this.anims.create({ key, frames: this.anims.generateFrameNumbers(this.textureKey, { start: i * 4, end: i * 4 + 3 }), frameRate: 10, repeat: -1 });
         });
 
-        this.cursors = this.input.keyboard.createCursorKeys();
-        this.enterKey = this.input.keyboard.addKey('ENTER');
-        this.escKey = this.input.keyboard.addKey('ESC');
+        this.keys = this.input.keyboard.addKeys(InputConfig);
 
         this.isPaused = false;
         this.isDialogActive = false;
@@ -3855,8 +4202,10 @@ class PVEScene extends Phaser.Scene {
         this.isTransitioning = false;
 
         this.events.on('resume', () => {
-            this.cursors.left.reset(); this.cursors.right.reset();
-            this.cursors.up.reset(); this.cursors.down.reset();
+            this.keys.LEFT.reset(); this.keys.RIGHT.reset();
+            this.keys.UP.reset(); this.keys.DOWN.reset();
+            this.keys.A.reset(); this.keys.D.reset();
+            this.keys.W.reset(); this.keys.S.reset();
             this.canEncounter = false;
             setTimeout(() => { this.canEncounter = true; }, 1500);
 
@@ -3946,7 +4295,7 @@ class PVEScene extends Phaser.Scene {
     }
 
     update() {
-        if (Phaser.Input.Keyboard.JustDown(this.escKey) && !this.isTransitioning && !this.isDialogActive) {
+        if (Phaser.Input.Keyboard.JustDown(this.keys.CANCEL) && !this.isTransitioning && !this.isDialogActive) {
             this.togglePauseMenu();
         }
 
@@ -3956,10 +4305,10 @@ class PVEScene extends Phaser.Scene {
         let currentAnim = null;
         let dx = 0; let dy = 0;
 
-        if (this.cursors.left.isDown) { dx = -TILE_SIZE; currentAnim = 'left'; }
-        else if (this.cursors.right.isDown) { dx = TILE_SIZE; currentAnim = 'right'; }
-        else if (this.cursors.up.isDown) { dy = -TILE_SIZE; currentAnim = 'up'; }
-        else if (this.cursors.down.isDown) { dy = TILE_SIZE; currentAnim = 'down'; }
+        if (this.keys.LEFT.isDown || this.keys.A.isDown) { dx = -TILE_SIZE; currentAnim = 'left'; }
+        else if (this.keys.RIGHT.isDown || this.keys.D.isDown) { dx = TILE_SIZE; currentAnim = 'right'; }
+        else if (this.keys.UP.isDown || this.keys.W.isDown) { dy = -TILE_SIZE; currentAnim = 'up'; }
+        else if (this.keys.DOWN.isDown || this.keys.S.isDown) { dy = TILE_SIZE; currentAnim = 'down'; }
 
         if (dx !== 0 || dy !== 0) {
             let targetX = this.player.x + dx;
@@ -4047,7 +4396,7 @@ class PVEScene extends Phaser.Scene {
             this.player.anims.stop();
         }
 
-        if (Phaser.Input.Keyboard.JustDown(this.enterKey) && !this.isTransitioning && !this.isDialogActive) {
+        if (Phaser.Input.Keyboard.JustDown(this.keys.CONFIRM) && !this.isTransitioning && !this.isDialogActive) {
             let interactionHandled = false;
             if (this.npcs) {
                 let npcVicino = this.npcs.getChildren().find(n => Phaser.Math.Distance.Between(this.player.x, this.player.y, n.x, n.y) < 50);
@@ -4206,8 +4555,16 @@ class PVEScene extends Phaser.Scene {
 
     togglePauseMenu() {
         if (this.isPaused) {
-            this.isPaused = false;
             let existingMenu = document.getElementById('pause-menu-overlay');
+            if (existingMenu && existingMenu.inSubMenu) {
+                existingMenu.renderMainPause();
+                return;
+            }
+            this.isPaused = false;
+            if (this.handlePauseKeyDown) {
+                window.removeEventListener('keydown', this.handlePauseKeyDown);
+                this.handlePauseKeyDown = null;
+            }
             if (existingMenu) existingMenu.remove();
         } else {
             this.isPaused = true;
@@ -4218,30 +4575,132 @@ class PVEScene extends Phaser.Scene {
             overlay.id = 'pause-menu-overlay';
             overlay.className = 'modal-overlay';
 
+            let selectedIdx = 0;
+            let currentButtons = [];
+
+            const updateSelection = () => {
+                if (overlay.inSubMenu) return;
+                currentButtons.forEach((btnId, idx) => {
+                    let btn = document.getElementById(btnId);
+                    if (btn) {
+                        if (idx === selectedIdx) {
+                            btn.style.transform = 'scale(1.05)';
+                            btn.style.backgroundColor = '#4a3b5c';
+                            btn.style.color = '#ffcc00';
+                            btn.style.borderColor = '#ffcc00';
+                            btn.style.boxShadow = '6px 6px 0 #ffcc00';
+                        } else {
+                            btn.style.transform = 'scale(1)';
+                            btn.style.backgroundColor = '#f6eedf';
+                            btn.style.color = '#ff7477';
+                            btn.style.borderColor = '#ff7477';
+                            btn.style.boxShadow = '4px 4px 0 #e69597';
+                        }
+                    }
+                });
+            };
+
             const renderMainPause = () => {
+                overlay.inSubMenu = false;
+                selectedIdx = 0;
+                currentButtons = ['profile-btn', 'controls-btn', 'lobby-btn'];
+
                 overlay.innerHTML = `
                     <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 90%; max-width: 400px;">
-                       <h2 class="text-shadows" style="font-size: clamp(2rem, 6vw, 3.5rem); margin-bottom: 30px; text-align: center;">MENU PAUSA PVE</h2>
-                        <button id="profile-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 10px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: transform 0.1s;">PROFILO</button>
-                        <button id="lobby-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">TORNA ALLA LOBBY</button>
+                        <h2 class="text-shadows" style="font-size: clamp(2rem, 6vw, 3.5rem); margin-bottom: 30px; text-align: center;">MENU PAUSA PVE</h2>
+                        <button id="profile-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 10px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: all 0.1s;">PROFILO</button>
+                        <button id="controls-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: all 0.1s;">COMANDI</button>
+                        <button id="lobby-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: all 0.1s;">TORNA ALLA LOBBY</button>
                         <p style="color: #fff; margin-top: 40px; font-size: 1.2rem; font-family: 'Courier New'; font-weight: bold; text-align: center;">Premi ESC per tornare al gioco</p>
                     </div>`;
+                updateSelection();
+            };
+
+            overlay.renderMainPause = renderMainPause;
+
+            const renderControls = () => {
+                overlay.inSubMenu = true;
+
+                let controlsHtml = `
+                    <div style="margin-bottom: 15px;">
+                        <h3 style="color: #ffcc00; margin: 0 0 5px 0; font-size: 1.3rem;">MOVIMENTO</h3>
+                        <p style="margin: 0;"><strong>WASD</strong> o <strong>Frecce Direzionali</strong></p>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <h3 style="color: #ffcc00; margin: 0 0 5px 0; font-size: 1.3rem;">AZIONI</h3>
+                        <p style="margin: 0;"><strong>Conferma:</strong> INVIO</p>
+                        <p style="margin: 5px 0 0 0;"><strong>Annulla / Indietro:</strong> ESC</p>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <h3 style="color: #ffcc00; margin: 0 0 5px 0; font-size: 1.3rem;">IN BATTAGLIA</h3>
+                        <p style="margin: 0;"><strong>Statistiche:</strong> SHIFT</p>
+                    </div>
+                    <div>
+                        <h3 style="color: #ffcc00; margin: 0 0 5px 0; font-size: 1.3rem;">GENERICI</h3>
+                        <p style="margin: 0;"><strong>Mouse / Touch:</strong> Interfaccia UI e Dialoghi</p>
+                    </div>
+                `;
+
+                overlay.innerHTML = `
+                    <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 90%; max-width: 500px;">
+                        <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">COMANDI</h2>
+                        <div style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; border: 2px solid #ffcc00; width: 85%; color: #fff; font-family: 'Courier New', monospace; font-size: 1.2rem; text-align: left; max-height: 50vh; overflow-y: auto;">
+                            ${controlsHtml}
+                        </div>
+                        <button id="back-pause-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 30px; font-size: 1.5rem; font-weight: bold; background-color: #4a3b5c; color: #ffcc00; border: 4px solid #ffcc00; border-radius: 8px; cursor: pointer; box-shadow: 6px 6px 0 #ffcc00; transform: scale(1.05);">INDIETRO</button>
+                    </div>
+                `;
             };
 
             renderMainPause();
             document.getElementById('game-container').appendChild(overlay);
 
-            overlay.addEventListener('click', (e) => {
+            this.handlePauseKeyDown = (e) => {
+                let key = e.key;
+                if (!overlay.inSubMenu) {
+                    if (key === 'ArrowUp' || key === 'w' || key === 'W') {
+                        selectedIdx = (selectedIdx - 1 + currentButtons.length) % currentButtons.length;
+                        updateSelection();
+                    } else if (key === 'ArrowDown' || key === 's' || key === 'S') {
+                        selectedIdx = (selectedIdx + 1) % currentButtons.length;
+                        updateSelection();
+                    } else if (key === 'Enter' || key === ' ') {
+                        let btn = document.getElementById(currentButtons[selectedIdx]);
+                        if (btn) btn.click();
+                    }
+                } else if (overlay.inSubMenu) {
+                    if (key === 'Enter' || key === ' ' || key === 'Escape' || key === 'Backspace') {
+                        let btn = document.getElementById('back-pause-btn');
+                        if (btn) btn.click();
+                    } else if (key === 'ArrowLeft' || key === 'a' || key === 'A') {
+                        let btnPrev = document.getElementById('prev-avatar');
+                        if (btnPrev) btnPrev.click();
+                    } else if (key === 'ArrowRight' || key === 'd' || key === 'D') {
+                        let btnNext = document.getElementById('next-avatar');
+                        if (btnNext) btnNext.click();
+                    }
+                }
+            };
+            window.addEventListener('keydown', this.handlePauseKeyDown);
+
+            overlay.addEventListener('click', async (e) => {
                 if (e.target.id === 'lobby-btn') {
                     e.target.innerText = "USCITA...";
                     this.isPaused = false;
+                    if (this.handlePauseKeyDown) window.removeEventListener('keydown', this.handlePauseKeyDown);
                     let existingMenu = document.getElementById('pause-menu-overlay');
                     if (existingMenu) existingMenu.remove();
                     this.tornaAllaLobby(true);
+                } else if (e.target.id === 'controls-btn') {
+                    renderControls();
                 } else if (e.target.id === 'profile-btn') {
+                    overlay.inSubMenu = true;
                     let profilo = this.registry.get('playerProfile');
                     let winRate = profilo.partite_totali > 0 ? ((profilo.vittorie_totali / profilo.partite_totali) * 100).toFixed(1) : 0;
                     let box = document.getElementById('pause-box');
+                    let avatarNum = profilo.avatar_sprite || 1;
+                    let currentAvatarPath = avatarNum == 1 ? 'assets/avatar.png' : `assets/avatar${avatarNum}.png`;
+
                     if (box) {
                         box.innerHTML = `
                             <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">PROFILO</h2>
@@ -4249,14 +4708,16 @@ class PVEScene extends Phaser.Scene {
                                 <p><strong>NOME:</strong> ${profilo.username || 'Sconosciuto'}</p>
                                 <p><strong>VITTORIE:</strong> ${profilo.vittorie_totali || 0}</p>
                                 <p><strong>PARTITE:</strong> ${profilo.partite_totali || 0}</p>
-                                <p><strong>WIN %:</strong> ${winRate}%</p>
+                                <p><strong>VITTORIE %:</strong> ${winRate}%</p>
                                 <div style="margin-top: 15px; display: flex; justify-content: center; align-items: center; gap: 15px;">
                                     <button id="prev-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&lt;</button>
-                                    <img id="profile-avatar" src="${profilo.avatar || 'assets/avatar.png'}" style="width: 64px; height: 64px; image-rendering: pixelated;">
+                                    <div style="width: 32px; height: 32px; overflow: hidden; position: relative; transform: scale(2); margin: 0 15px; image-rendering: pixelated;">
+                                        <img id="profile-avatar" src="${currentAvatarPath}" style="position: absolute; top: 0; left: 0; width: 400%; height: 400%; max-width: none;">
+                                    </div>
                                     <button id="next-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&gt;</button>
                                 </div>
                             </div>
-                            <button id="back-pause-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 30px; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer;">INDIETRO</button>
+                            <button id="back-pause-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 30px; font-weight: bold; background-color: #4a3b5c; color: #ffcc00; border: 4px solid #ffcc00; border-radius: 8px; cursor: pointer; box-shadow: 6px 6px 0 #ffcc00; transform: scale(1.05);">INDIETRO</button>
                         `;
                     }
                 } else if (e.target.id === 'prev-avatar' || e.target.id === 'next-avatar') {
@@ -4273,8 +4734,16 @@ class PVEScene extends Phaser.Scene {
                     profilo.avatar_sprite = numberToSave;
 
                     supabaseClient.from('profilo').update({ avatar_sprite: numberToSave }).eq('id_profilo', profilo.id_profilo);
+
                     let textureKey = newAvatarPath.split('/').pop().replace('.png', '');
-                    if (this.player) this.player.setTexture(textureKey);
+                    if (this.player) {
+                        this.player.setTexture(textureKey);
+                        this.textureKey = textureKey;
+                        ['down', 'left', 'right', 'up'].forEach(key => { if (this.anims.exists(key)) this.anims.remove(key); });
+                        ['down', 'left', 'right', 'up'].forEach((key, i) => {
+                            this.anims.create({ key, frames: this.anims.generateFrameNumbers(this.textureKey, { start: i * 4, end: i * 4 + 3 }), frameRate: 10, repeat: -1 });
+                        });
+                    }
                 } else if (e.target.id === 'back-pause-btn') {
                     renderMainPause();
                 }
@@ -4317,8 +4786,8 @@ class PVEScene extends Phaser.Scene {
                 setTimeout(() => {
                     const handleEnter = (e) => {
                         if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
-                            e.preventDefault(); window.removeEventListener('keydown', handleEnter); if (this.enterKey) this.enterKey.reset(); mostraProssimo();
-                            if (this.escKey) this.escKey.reset();
+                            e.preventDefault(); window.removeEventListener('keydown', handleEnter); if (this.keys && this.keys.CONFIRM) this.keys.CONFIRM.reset(); mostraProssimo();
+                            if (this.keys && this.keys.CANCEL) this.keys.CANCEL.reset();
                         }
                     };
                     window.addEventListener('keydown', handleEnter);
@@ -4352,8 +4821,8 @@ class PVEScene extends Phaser.Scene {
             let key = e.key || (e.detail && e.detail.key);
             if (!key) return;
             if (key === 'ArrowUp' || key === 'w' || key === 'ArrowDown' || key === 's') { this.sceltaAttuale = this.sceltaAttuale === 0 ? 1 : 0; aggiornaCursoreScelta(); }
-            else if (key === 'Enter' || key === ' ') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.enterKey) this.enterKey.reset(); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
-            else if (key === 'Escape' || key === 'Backspace') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.escKey) this.escKey.reset(); onChoice('NO'); }
+            else if (key === 'Enter' || key === ' ') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.keys && this.keys.CONFIRM) this.keys.CONFIRM.reset(); onChoice(this.sceltaAttuale === 0 ? 'SI' : 'NO'); }
+            else if (key === 'Escape' || key === 'Backspace') { if (e.preventDefault) e.preventDefault(); window.removeEventListener('keydown', handleChoiceInput); window.removeEventListener('dpad-input', handleChoiceInput); if (this.keys && this.keys.CANCEL) this.keys.CANCEL.reset(); onChoice('NO'); }
         };
         setTimeout(() => { window.addEventListener('keydown', handleChoiceInput); window.addEventListener('dpad-input', handleChoiceInput); }, 100);
     }
