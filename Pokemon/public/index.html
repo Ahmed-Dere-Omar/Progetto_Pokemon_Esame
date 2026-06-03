@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neomon</title>
+    <link rel="icon" type="image/png" href="assets/Favicon.png">
+    <link rel="stylesheet" href="game.css">
+</head>
+
+<body>
+    <div id="game-container"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="../shared/core/funzioni_effetti.js"></script>
+    <script src="../shared/core/gestione_flags.js"></script>
+    <script src="../shared/core/gestione_partita.js"></script>
+    <script src="../src/main.js" type="module"></script>
+
+    <div id="mobile-controls" style="display: none;">
+        <div id="btn-menu">☰ MENU</div>
+        
+        <div id="dpad">
+            <div class="dpad-row">
+                <div class="dpad-btn" id="btn-up">▲</div>
+            </div>
+            <div class="dpad-row">
+                <div class="dpad-btn" id="btn-left">◀</div>
+                <div class="dpad-center"></div>
+                <div class="dpad-btn" id="btn-right">▶</div>
+            </div>
+            <div class="dpad-row">
+                <div class="dpad-btn" id="btn-down">▼</div>
+            </div>
+        </div>
+
+        <div id="action-buttons">
+            <div class="action-btn-mobile" id="btn-esc">B</div>
+            <div class="action-btn-mobile" id="btn-enter">A</div>
+        </div>
+    </div>
+
+    <script>
+        // Simulatore Tastiera per Mobile
+        document.addEventListener('DOMContentLoaded', () => {
+            const keyMap = {
+                'btn-up': { key: 'ArrowUp', code: 38 },
+                'btn-down': { key: 'ArrowDown', code: 40 },
+                'btn-left': { key: 'ArrowLeft', code: 37 },
+                'btn-right': { key: 'ArrowRight', code: 39 },
+                'btn-enter': { key: 'Enter', code: 13 },
+                'btn-esc': { key: 'Escape', code: 27 },
+                'btn-menu': { key: 'Escape', code: 27 } // Il Menu apre la pausa (Esc)
+            };
+
+            const triggerKey = (keyCode, keyName, type) => {
+                window.dispatchEvent(new KeyboardEvent(type, {
+                    key: keyName, code: keyName, keyCode: keyCode, which: keyCode, bubbles: true
+                }));
+            };
+
+            Object.keys(keyMap).forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) {
+                    // Quando premi: invia KEYDOWN e cambia colore
+                    btn.addEventListener('touchstart', (e) => {
+                        e.preventDefault(); // Previene zoom o scroll della pagina
+                        btn.style.transform = 'scale(0.9)';
+                        btn.style.backgroundColor = 'var(--battle-accent)';
+                        btn.style.color = '#000';
+                        triggerKey(keyMap[id].code, keyMap[id].key, 'keydown');
+                    }, { passive: false });
+
+                    // Quando rilasci: invia KEYUP e ripristina colore
+                    const releaseBtn = (e) => {
+                        e.preventDefault();
+                        btn.style.transform = 'scale(1)';
+                        btn.style.backgroundColor = 'rgba(38, 28, 51, 0.85)';
+                        btn.style.color = 'white';
+                        triggerKey(keyMap[id].code, keyMap[id].key, 'keyup');
+                    };
+
+                    btn.addEventListener('touchend', releaseBtn, { passive: false });
+                    btn.addEventListener('touchcancel', releaseBtn, { passive: false });
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>

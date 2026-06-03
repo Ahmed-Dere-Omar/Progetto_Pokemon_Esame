@@ -1,0 +1,3610 @@
+[
+  {
+    "nome": "Venusaur",
+    "tipi": [
+      "Erba",
+      "Veleno"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 80
+      },
+      "special-defense": {
+        "base_stat": 100
+      },
+      "special-attack": {
+        "base_stat": 100
+      },
+      "defense": {
+        "base_stat": 83
+      },
+      "attack": {
+        "base_stat": 82
+      },
+      "hp": {
+        "base_stat": 80
+      }
+    },
+    "mosse": [
+      "Azione",
+      "Crescita",
+      "Fiortempesta",
+      "Frustata",
+      "Petalodanza",
+      "Ruggito",
+      "Parassiseme",
+      "Foglielama",
+      "Sonnifero",
+      "Velenpolvere",
+      "Semebomba",
+      "Riduttore",
+      "Profumino",
+      "Sintesi",
+      "Sdoppiatore",
+      "Solarraggio"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/c/c8/Sprnbm0003.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/3/38/Sprnbmsh0003.gif"
+    }
+  },
+  {
+    "nome": "Charizard",
+    "tipi": [
+      "Fuoco",
+      "Volante"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 100
+      },
+      "special-defense": {
+        "base_stat": 85
+      },
+      "special-attack": {
+        "base_stat": 109
+      },
+      "defense": {
+        "base_stat": 78
+      },
+      "attack": {
+        "base_stat": 84
+      },
+      "hp": {
+        "base_stat": 78
+      }
+    },
+    "mosse": [
+      "Braciere",
+      "Dragartiglio",
+      "Graffio",
+      "Muro di Fumo",
+      "Ondacalda",
+      "Ruggito",
+      "Eterelama",
+      "Dragospiro",
+      "Rogodenti",
+      "Lacerazione",
+      "Lanciafiamme",
+      "Visotruce",
+      "Turbofuoco",
+      "Marchiatura",
+      "Fuococarica"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/5/53/Sprnbm0006.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/1/15/Sprnbmsh0006.gif"
+    }
+  },
+  {
+    "nome": "Blastoise",
+    "tipi": [
+      "Acqua"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 78
+      },
+      "special-defense": {
+        "base_stat": 105
+      },
+      "special-attack": {
+        "base_stat": 85
+      },
+      "defense": {
+        "base_stat": 100
+      },
+      "attack": {
+        "base_stat": 83
+      },
+      "hp": {
+        "base_stat": 79
+      }
+    },
+    "mosse": [
+      "Azione",
+      "Cannonflash",
+      "Colpocoda",
+      "Pistolacqua",
+      "Ritirata",
+      "Rapigiro",
+      "Morso",
+      "Idropulsar",
+      "Protezione",
+      "Pioggiadanza",
+      "Idrondata",
+      "Gettaguscio",
+      "Ferroscudo",
+      "Idropompa",
+      "Capocciata"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/c/cf/Sprnbm0009.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/b/ba/Sprnbmsh0009.gif"
+    }
+  },
+  {
+    "nome": "Butterfree",
+    "tipi": [
+      "Coleottero",
+      "Volante"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 70
+      },
+      "special-defense": {
+        "base_stat": 80
+      },
+      "special-attack": {
+        "base_stat": 90
+      },
+      "defense": {
+        "base_stat": 50
+      },
+      "attack": {
+        "base_stat": 45
+      },
+      "hp": {
+        "base_stat": 60
+      }
+    },
+    "mosse": [
+      "Azione",
+      "Millebave",
+      "Raffica",
+      "Rafforzatore"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/8/8d/Sprnbm0012.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/0/0d/Sprnbmsh0012.gif"
+    }
+  },
+  {
+    "nome": "Beedrill",
+    "tipi": [
+      "Coleottero",
+      "Veleno"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 75
+      },
+      "special-defense": {
+        "base_stat": 80
+      },
+      "special-attack": {
+        "base_stat": 45
+      },
+      "defense": {
+        "base_stat": 40
+      },
+      "attack": {
+        "base_stat": 90
+      },
+      "hp": {
+        "base_stat": 65
+      }
+    },
+    "mosse": [
+      "Furia",
+      "Millebave",
+      "Rafforzatore",
+      "Velenospina",
+      "Tagliofuria",
+      "Concentrazione",
+      "Focalenergia",
+      "Velenoshock",
+      "Garanzia",
+      "Fielepunte",
+      "Missilspillo",
+      "Velenpuntura",
+      "Agilità",
+      "Rimonta",
+      "Pungilione"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/2/22/Sprnbm0015.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/e/ed/Sprnbmsh0015.gif"
+    }
+  },
+  {
+    "nome": "Pidgeot",
+    "tipi": [
+      "Normale",
+      "Volante"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 101
+      },
+      "special-defense": {
+        "base_stat": 70
+      },
+      "special-attack": {
+        "base_stat": 70
+      },
+      "defense": {
+        "base_stat": 75
+      },
+      "attack": {
+        "base_stat": 80
+      },
+      "hp": {
+        "base_stat": 83
+      }
+    },
+    "mosse": [
+      "Attacco Rapido",
+      "Azione",
+      "Raffica",
+      "Tifone",
+      "Turbosabbia",
+      "Turbine",
+      "Tornado",
+      "Danzadipiume",
+      "Agilità",
+      "Attacco d'Ala",
+      "Trespolo",
+      "Ventoincoda",
+      "Eterelama"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/2/2d/Sprnbm0018.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/9/90/Sprnbmsh0018.gif"
+    }
+  },
+  {
+    "nome": "Raticate",
+    "tipi": [
+      "Normale"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 97
+      },
+      "special-defense": {
+        "base_stat": 70
+      },
+      "special-attack": {
+        "base_stat": 50
+      },
+      "defense": {
+        "base_stat": 60
+      },
+      "attack": {
+        "base_stat": 81
+      },
+      "hp": {
+        "base_stat": 55
+      }
+    },
+    "mosse": [
+      "Attacco Rapido",
+      "Azione",
+      "Colpocoda",
+      "Danzaspada",
+      "Focalenergia",
+      "Visotruce",
+      "Morso",
+      "Concentrazione",
+      "Riduttore",
+      "Garanzia",
+      "Sgranocchio",
+      "Sbigoattacco",
+      "Superanza",
+      "Sdoppiatore",
+      "Rimonta"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/5/52/Sprnbm0020.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/8/83/Sprnbmsh0020.gif"
+    }
+  },
+  {
+    "nome": "Fearow",
+    "tipi": [
+      "Normale",
+      "Volante"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 100
+      },
+      "special-defense": {
+        "base_stat": 61
+      },
+      "special-attack": {
+        "base_stat": 61
+      },
+      "defense": {
+        "base_stat": 65
+      },
+      "attack": {
+        "base_stat": 90
+      },
+      "hp": {
+        "base_stat": 65
+      }
+    },
+    "mosse": [
+      "Beccata",
+      "Fulmisguardo",
+      "Giravvita",
+      "Ruggito",
+      "Garanzia",
+      "Furia",
+      "Attacco d'Ala",
+      "Riduttore",
+      "Agilità",
+      "Focalenergia",
+      "Trespolo",
+      "Perforbecco"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/0/0b/Sprnbm0022.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/b/b2/Sprnbmsh0022.gif"
+    }
+  },
+  {
+    "nome": "Arbok",
+    "tipi": [
+      "Veleno"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 80
+      },
+      "special-defense": {
+        "base_stat": 79
+      },
+      "special-attack": {
+        "base_stat": 65
+      },
+      "defense": {
+        "base_stat": 69
+      },
+      "attack": {
+        "base_stat": 95
+      },
+      "hp": {
+        "base_stat": 60
+      }
+    },
+    "mosse": [
+      "Avvolgibotta",
+      "Fulmindenti",
+      "Fulmisguardo",
+      "Gelodenti",
+      "Morso",
+      "Rogodenti",
+      "Sgranocchio",
+      "Velenospina",
+      "Sguardo Feroce",
+      "Stridio",
+      "Acido",
+      "Accumulo",
+      "Introenergia",
+      "Sfoghenergia",
+      "Acidobomba",
+      "Fangobomba",
+      "Nube",
+      "Arrotola",
+      "Sporcolancio"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/e/ef/Sprnbm0024.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/3/3e/Sprnbmsh0024.gif"
+    }
+  },
+  {
+    "nome": "Raichu",
+    "tipi": [
+      "Elettro"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 110
+      },
+      "special-defense": {
+        "base_stat": 80
+      },
+      "special-attack": {
+        "base_stat": 90
+      },
+      "defense": {
+        "base_stat": 55
+      },
+      "attack": {
+        "base_stat": 90
+      },
+      "hp": {
+        "base_stat": 60
+      }
+    },
+    "mosse": [
+      "Agilità",
+      "Attacco Rapido",
+      "Codacciaio",
+      "Colpocoda",
+      "Congiura",
+      "Dolcebacio",
+      "Doppioteam",
+      "Elettrococcola",
+      "Energisfera",
+      "Fascino",
+      "Fintoattacco",
+      "Ruggito",
+      "Scarica",
+      "Schermoluce",
+      "Scintilla",
+      "Simpatia",
+      "Tuono",
+      "Tuononda",
+      "Tuonoshock",
+      "Tuonopugno",
+      "Fulmine"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/2/28/Sprnbm0026.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/c/c8/Sprnbmsh0026.gif"
+    }
+  },
+  {
+    "nome": "Sandslash",
+    "tipi": [
+      "Terra"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 65
+      },
+      "special-defense": {
+        "base_stat": 55
+      },
+      "special-attack": {
+        "base_stat": 45
+      },
+      "defense": {
+        "base_stat": 110
+      },
+      "attack": {
+        "base_stat": 100
+      },
+      "hp": {
+        "base_stat": 75
+      }
+    },
+    "mosse": [
+      "Agilità",
+      "Graffio",
+      "Ricciolscudo",
+      "Tirartigli",
+      "Turbosabbia",
+      "Velenospina",
+      "Rotolamento",
+      "Tagliofuria",
+      "Rapigiro",
+      "Battiterra",
+      "Comete",
+      "Sfuriate",
+      "Sabbiotomba",
+      "Lacerazione",
+      "Fossa",
+      "Vortexpalla",
+      "Danzaspada",
+      "Terrempesta",
+      "Terremoto"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/8/8e/Sprnbm0028.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/5/59/Sprnbmsh0028.gif"
+    }
+  },
+  {
+    "nome": "Nidoqueen",
+    "tipi": [
+      "Veleno",
+      "Terra"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 76
+      },
+      "special-defense": {
+        "base_stat": 85
+      },
+      "special-attack": {
+        "base_stat": 75
+      },
+      "defense": {
+        "base_stat": 87
+      },
+      "attack": {
+        "base_stat": 92
+      },
+      "hp": {
+        "base_stat": 90
+      }
+    },
+    "mosse": [
+      "Adulazione",
+      "Altruismo",
+      "Colpocoda",
+      "Doppiocalcio",
+      "Fangonda",
+      "Fielepunte",
+      "Geoforza",
+      "Graffio",
+      "Morso",
+      "Ruggito",
+      "Sfuriate",
+      "Sgranocchio",
+      "Tossina",
+      "Troppoforte",
+      "Velenospina"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/c/cb/Sprnbf0031.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/b/b7/Sprnbfsh0031.gif"
+    }
+  },
+  {
+    "nome": "Nidoking",
+    "tipi": [
+      "Veleno",
+      "Terra"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 85
+      },
+      "special-defense": {
+        "base_stat": 75
+      },
+      "special-attack": {
+        "base_stat": 85
+      },
+      "defense": {
+        "base_stat": 77
+      },
+      "attack": {
+        "base_stat": 102
+      },
+      "hp": {
+        "base_stat": 81
+      }
+    },
+    "mosse": [
+      "Azione",
+      "Crescita",
+      "Fiortempesta",
+      "Frustata",
+      "Petalodanza",
+      "Ruggito",
+      "Parassiseme",
+      "Foglielama",
+      "Sonnifero",
+      "Velenpolvere",
+      "Semebomba",
+      "Riduttore",
+      "Profumino",
+      "Sintesi",
+      "Sdoppiatore",
+      "Solarraggio",
+      "Braciere",
+      "Dragartiglio",
+      "Graffio",
+      "Muro di Fumo",
+      "Ondacalda",
+      "Eterelama",
+      "Dragospiro",
+      "Rogodenti",
+      "Lacerazione",
+      "Lanciafiamme",
+      "Visotruce",
+      "Turbofuoco",
+      "Marchiatura",
+      "Fuococarica",
+      "Cannonflash",
+      "Colpocoda",
+      "Pistolacqua",
+      "Ritirata",
+      "Rapigiro",
+      "Morso",
+      "Idropulsar",
+      "Protezione",
+      "Pioggiadanza",
+      "Idrondata",
+      "Gettaguscio",
+      "Ferroscudo",
+      "Idropompa",
+      "Capocciata",
+      "Millebave",
+      "Raffica",
+      "Rafforzatore",
+      "Furia",
+      "Velenospina",
+      "Tagliofuria",
+      "Concentrazione",
+      "Focalenergia",
+      "Velenoshock",
+      "Garanzia",
+      "Fielepunte",
+      "Missilspillo",
+      "Velenpuntura",
+      "Agilità",
+      "Rimonta",
+      "Pungilione",
+      "Attacco Rapido",
+      "Tifone",
+      "Turbosabbia",
+      "Turbine",
+      "Tornado",
+      "Danzadipiume",
+      "Attacco d'Ala",
+      "Trespolo",
+      "Ventoincoda",
+      "Danzaspada",
+      "Sgranocchio",
+      "Sbigoattacco",
+      "Superanza",
+      "Beccata",
+      "Fulmisguardo",
+      "Giravvita",
+      "Perforbecco",
+      "Avvolgibotta",
+      "Fulmindenti",
+      "Gelodenti",
+      "Sguardo Feroce",
+      "Stridio",
+      "Acido",
+      "Accumulo",
+      "Introenergia",
+      "Sfoghenergia",
+      "Acidobomba",
+      "Fangobomba",
+      "Nube",
+      "Arrotola",
+      "Sporcolancio",
+      "Codacciaio",
+      "Congiura",
+      "Dolcebacio",
+      "Doppioteam",
+      "Elettrococcola",
+      "Energisfera",
+      "Fascino",
+      "Fintoattacco",
+      "Scarica",
+      "Schermoluce",
+      "Scintilla",
+      "Simpatia",
+      "Tuono",
+      "Tuononda",
+      "Tuonoshock",
+      "Tuonopugno",
+      "Fulmine",
+      "Ricciolscudo",
+      "Tirartigli",
+      "Rotolamento",
+      "Battiterra",
+      "Comete",
+      "Sfuriate",
+      "Sabbiotomba",
+      "Fossa",
+      "Vortexpalla",
+      "Terrempesta",
+      "Terremoto",
+      "Adulazione",
+      "Altruismo",
+      "Doppiocalcio",
+      "Fangonda",
+      "Geoforza",
+      "Tossina",
+      "Troppoforte",
+      "Incornata",
+      "Megacorno",
+      "Botta",
+      "Canto",
+      "Copione",
+      "Cortesia",
+      "Cosmoforza",
+      "Curardore",
+      "Forza Lunare",
+      "Goccia Vitale",
+      "Gravità",
+      "Incantavoce",
+      "Lucelunare",
+      "Meteorpugno",
+      "Minimizzato",
+      "Ripeti",
+      "Sonoqui",
+      "Splash",
+      "Veicovaforza",
+      "Dispetto",
+      "Esclusiva",
+      "Extrasenso",
+      "Fuocobomba",
+      "Fuocofatuo",
+      "Inibitore",
+      "Rancore",
+      "Salvaguardia",
+      "Stordiraggio",
+      "Coro",
+      "Corposcontro",
+      "Echeggiavoce",
+      "Granvoce",
+      "Mimica",
+      "Riposo",
+      "Carineria",
+      "Aromaterapia",
+      "Assorbimento",
+      "Campo Erboso",
+      "Gigassorbimento",
+      "Megassorbimento",
+      "Paralizzante",
+      "Velenocroce",
+      "Spora",
+      "Polverabbia",
+      "Forbice X",
+      "Eledanza",
+      "Supersuono",
+      "Confusione",
+      "Psicoraggio",
+      "Ronzio",
+      "Sanguisuga",
+      "Cozzata Zen",
+      "Velenodenti",
+      "Psichico",
+      "Nottesferza",
+      "Sgomento",
+      "Tripletta",
+      "Fangosberla",
+      "Abisso",
+      "Bruciapelo",
+      "Gemmoforza",
+      "Provocazione",
+      "Acquagetto",
+      "Inondazione",
+      "Psicamisù",
+      "Amnesia",
+      "Mirabolanza",
+      "Boato",
+      "Contropiede",
+      "Gridodilotta",
+      "Nemesi",
+      "Ruotafuoco",
+      "Extrarapido",
+      "Bollaraggio",
+      "Colpodifango",
+      "Dinamipugno",
+      "Ipnosi",
+      "Leggimente",
+      "Panciamburo",
+      "Ribaltiro",
+      "Sottomissione",
+      "Cinèsi",
+      "Teletrasporto",
+      "Riflesso",
+      "Cambiaposto",
+      "Psicotaglio",
+      "Ripresa",
+      "Psicoshock",
+      "Divinazione",
+      "Calmamente",
+      "Bodyguard",
+      "Colpo Basso",
+      "Vendetta",
+      "Calciobasso",
+      "Vitaltiro",
+      "Forza",
+      "Doppiocolpo",
+      "Granfisico",
+      "Movimento Sismico",
+      "Incrocolpo",
+      "Schianto",
+      "Vorticerba",
+      "Verdebufera",
+      "Fendifoglia",
+      "Riflettipo",
+      "Sciagura",
+      "Scudo Acido",
+      "Surf",
+      "Lucidatura",
+      "Pesobomba",
+      "Sassata",
+      "Abbattimento",
+      "Autodistruzione",
+      "Levitoroccia",
+      "Cadutamassi",
+      "Esplosione",
+      "Pietrataglio",
+      "Sottilcorno",
+      "Nitrocaica",
+      "Pestone",
+      "Maledizione",
+      "Sbadiglio",
+      "Bottintesta",
+      "Pigro",
+      "Curapulsar",
+      "Taglio",
+      "Aeroassalto",
+      "Aerasoio",
+      "Falsofinale",
+      "Baldeali",
+      "Doppiosmash",
+      "Baraonda",
+      "Acupressione",
+      "Assalto",
+      "Colpo",
+      "Oltraggio",
+      "Ultimascelta",
+      "Cascata",
+      "Perforcorno",
+      "Acquadisale",
+      "Anticipo",
+      "Barattoforza",
+      "Barattoscudo",
+      "Staffetta",
+      "Magibrillio",
+      "Strampadanza",
+      "Polneve",
+      "Falselacrime",
+      "Demonbacio",
+      "Bora",
+      "Presa",
+      "Legatutto",
+      "Tempestretta",
+      "Ghigliottina",
+      "Cuordileone",
+      "Scatanatoro",
+      "Gigaimpatto",
+      "Dragodanza",
+      "Iper Raggio",
+      "Nebbia",
+      "Trasformazione",
+      "Occhioni Teneri",
+      "Fanghiglia",
+      "Lavasbuffo",
+      "Forzantica",
+      "Idrobreccia",
+      "Ferrostrido",
+      "Resistenza",
+      "Acquanello",
+      "Flagello",
+      "Leccata",
+      "Gelopugno",
+      "Malosguardo",
+      "Ultimocanto",
+      "Rivincita",
+      "Bullo",
+      "Mulinello",
+      "Geloscheggia",
+      "Geloraggio",
+      "Purogelo",
+      "Smog",
+      "Raggiaurora",
+      "Aeroattacco",
+      "Assorbipugno",
+      "Breccia",
+      "Calciardente",
+      "Conchilama",
+      "Crescipugno",
+      "Dragofuria",
+      "Elettrocannone",
+      "Elettromistero",
+      "Fango",
+      "Ferrartigli",
+      "Forza Equina",
+      "Frana",
+      "Fuocopugno",
+      "Gelolancia",
+      "Martellata",
+      "Martelpugno",
+      "Mazzuolegno",
+      "Megacalcio",
+      "Megapugno",
+      "Metaltestata",
+      "Neropulsar",
+      "Ossomerang",
+      "Ossoraffica",
+      "Palla Ombra",
+      "Pugnorapido",
+      "Pugnoscarica",
+      "Raggioscossa",
+      "Scagliagelo",
+      "Semitraglia",
+      "Vampata",
+      "Velenogas",
+      "Ventogelato",
+      "Vuotonda",
+      "Zuffa"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/c/c6/Sprnbm0034.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/a/ad/Sprnbmsh0034.gif"
+    }
+  },
+  {
+    "nome": "Clefable",
+    "tipi": [
+      "Folletto"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 60
+      },
+      "special-defense": {
+        "base_stat": 90
+      },
+      "special-attack": {
+        "base_stat": 95
+      },
+      "defense": {
+        "base_stat": 73
+      },
+      "attack": {
+        "base_stat": 70
+      },
+      "hp": {
+        "base_stat": 95
+      }
+    },
+    "mosse": [
+      "Botta",
+      "Canto",
+      "Copione",
+      "Cortesia",
+      "Cosmoforza",
+      "Curardore",
+      "Dolcebacio",
+      "Fascino",
+      "Forza Lunare",
+      "Goccia Vitale",
+      "Gravità",
+      "Incantavoce",
+      "Lucelunare",
+      "Meteorpugno",
+      "Minimizzato",
+      "Ricciolscudo",
+      "Ripeti",
+      "Ruggito",
+      "Sonoqui",
+      "Splash",
+      "Veicovaforza"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/3/36/Sprnbm0036.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/c/c0/Sprnbmsh0036.gif"
+    }
+  },
+  {
+    "nome": "Ninetales",
+    "tipi": [
+      "Fuoco"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 100
+      },
+      "special-defense": {
+        "base_stat": 100
+      },
+      "special-attack": {
+        "base_stat": 81
+      },
+      "defense": {
+        "base_stat": 75
+      },
+      "attack": {
+        "base_stat": 76
+      },
+      "hp": {
+        "base_stat": 73
+      }
+    },
+    "mosse": [
+      "Attacco Rapido",
+      "Braciere",
+      "Colpocoda",
+      "Congiura",
+      "Dispetto",
+      "Esclusiva",
+      "Extrasenso",
+      "Fuocobomba",
+      "Fuocofatuo",
+      "Inibitore",
+      "Lanciafiamme",
+      "Marchiatura",
+      "Rancore",
+      "Salvaguardia",
+      "Stordiraggio",
+      "Turbofuoco"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/a/a3/Sprnbm0038.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/c/cb/Sprnbmsh0038.gif"
+    }
+  },
+  {
+    "nome": "Wigglytuff",
+    "tipi": [
+      "Normale",
+      "Folletto"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 45
+      },
+      "special-defense": {
+        "base_stat": 50
+      },
+      "special-attack": {
+        "base_stat": 85
+      },
+      "defense": {
+        "base_stat": 45
+      },
+      "attack": {
+        "base_stat": 70
+      },
+      "hp": {
+        "base_stat": 140
+      }
+    },
+    "mosse": [
+      "Accumulo",
+      "Botta",
+      "Canto",
+      "Copione",
+      "Coro",
+      "Corposcontro",
+      "Dolcebacio",
+      "Echeggiavoce",
+      "Fascino",
+      "Granvoce",
+      "Incantavoce",
+      "Inibitore",
+      "Introenergia",
+      "Mimica",
+      "Ricciolscudo",
+      "Riposo",
+      "Sdoppiatore",
+      "Sfoghenergia",
+      "Vortexpalla",
+      "Carineria"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/b/b6/Sprnbm0040.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/6/6b/Sprnbmsh0040.gif"
+    }
+  },
+  {
+    "nome": "Vileplume",
+    "tipi": [
+      "Erba",
+      "Veleno"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 50
+      },
+      "special-defense": {
+        "base_stat": 90
+      },
+      "special-attack": {
+        "base_stat": 110
+      },
+      "defense": {
+        "base_stat": 85
+      },
+      "attack": {
+        "base_stat": 80
+      },
+      "hp": {
+        "base_stat": 75
+      }
+    },
+    "mosse": [
+      "Acido",
+      "Aromaterapia",
+      "Assorbimento",
+      "Campo Erboso",
+      "Crescita",
+      "Fiortempesta",
+      "Forza Lunare",
+      "Gigassorbimento",
+      "Lucelunare",
+      "Megassorbimento",
+      "Paralizzante",
+      "Petalodanza",
+      "Profumino",
+      "Sonnifero",
+      "Tossina",
+      "Velenpolvere"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/c/c7/Sprnbm0045.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/3/37/Sprnbmsh0045.gif"
+    }
+  },
+  {
+    "nome": "Parasect",
+    "tipi": [
+      "Coleottero",
+      "Erba"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 30
+      },
+      "special-defense": {
+        "base_stat": 80
+      },
+      "special-attack": {
+        "base_stat": 60
+      },
+      "defense": {
+        "base_stat": 80
+      },
+      "attack": {
+        "base_stat": 95
+      },
+      "hp": {
+        "base_stat": 60
+      }
+    },
+    "mosse": [
+      "Assorbimento",
+      "Graffio",
+      "Paralizzante",
+      "Velenocroce",
+      "Velenpolvere",
+      "Tagliofuria",
+      "Spora",
+      "Lacerazione",
+      "Crescita",
+      "Gigassorbimento",
+      "Aromaterapia",
+      "Polverabbia",
+      "Forbice X"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/6/64/Sprnbm0047.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/b/b3/Sprnbmsh0047.gif"
+    }
+  },
+  {
+    "nome": "Venomoth",
+    "tipi": [
+      "Coleottero",
+      "Veleno"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 90
+      },
+      "special-defense": {
+        "base_stat": 75
+      },
+      "special-attack": {
+        "base_stat": 90
+      },
+      "defense": {
+        "base_stat": 60
+      },
+      "attack": {
+        "base_stat": 65
+      },
+      "hp": {
+        "base_stat": 70
+      }
+    },
+    "mosse": [
+      "Azione",
+      "Eledanza",
+      "Inibitore",
+      "Supersuono",
+      "Eterelama",
+      "Confusione",
+      "Velenpolvere",
+      "Psicoraggio",
+      "Paralizzante",
+      "Ronzio",
+      "Sonnifero",
+      "Sanguisuga",
+      "Cozzata Zen",
+      "Velenodenti",
+      "Psichico"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/8/83/Sprnbm0049.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/3/3b/Sprnbmsh0049.gif"
+    }
+  },
+  {
+    "nome": "Dugtrio",
+    "tipi": [
+      "Terra"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 120
+      },
+      "special-defense": {
+        "base_stat": 70
+      },
+      "special-attack": {
+        "base_stat": 50
+      },
+      "defense": {
+        "base_stat": 50
+      },
+      "attack": {
+        "base_stat": 100
+      },
+      "hp": {
+        "base_stat": 35
+      }
+    },
+    "mosse": [
+      "Graffio",
+      "Nottesferza",
+      "Ruggito",
+      "Sgomento",
+      "Tripletta",
+      "Turbosabbia",
+      "Sabbiotomba",
+      "Fangosberla",
+      "Battiterra",
+      "Sbigoattacco",
+      "Lacerazione",
+      "Terrempesta",
+      "Fossa",
+      "Geoforza",
+      "Terremoto",
+      "Abisso"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/c/c8/Sprnbm0051.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/b/ba/Sprnbmsh0051.gif"
+    }
+  },
+  {
+    "nome": "Persian",
+    "tipi": [
+      "Normale"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 115
+      },
+      "special-defense": {
+        "base_stat": 65
+      },
+      "special-attack": {
+        "base_stat": 65
+      },
+      "defense": {
+        "base_stat": 60
+      },
+      "attack": {
+        "base_stat": 70
+      },
+      "hp": {
+        "base_stat": 65
+      }
+    },
+    "mosse": [
+      "Bruciapelo",
+      "Fintoattacco",
+      "Graffio",
+      "Ruggito",
+      "Gemmoforza",
+      "Morso",
+      "Provocazione",
+      "Garanzia",
+      "Sfuriate",
+      "Stridio",
+      "Lacerazione",
+      "Congiura",
+      "Carineria"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/c/ca/Sprnbm0053.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/8/82/Sprnbmsh0053.gif"
+    }
+  },
+  {
+    "nome": "Golduck",
+    "tipi": [
+      "Acqua"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 85
+      },
+      "special-defense": {
+        "base_stat": 80
+      },
+      "special-attack": {
+        "base_stat": 95
+      },
+      "defense": {
+        "base_stat": 78
+      },
+      "attack": {
+        "base_stat": 82
+      },
+      "hp": {
+        "base_stat": 80
+      }
+    },
+    "mosse": [
+      "Acquagetto",
+      "Colpocoda",
+      "Confusione",
+      "Graffio",
+      "Pistolacqua",
+      "Sfuriate",
+      "Idropulsar",
+      "Inibitore",
+      "Cozzata Zen",
+      "Stridio",
+      "Idrondata",
+      "Inondazione",
+      "Psicamisù",
+      "Amnesia",
+      "Idropompa",
+      "Mirabolanza"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/5/56/Sprnbm0055.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/9/99/Sprnbmsh0055.gif"
+    }
+  },
+  {
+    "nome": "Arcanine",
+    "tipi": [
+      "Fuoco"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 95
+      },
+      "special-defense": {
+        "base_stat": 80
+      },
+      "special-attack": {
+        "base_stat": 100
+      },
+      "defense": {
+        "base_stat": 80
+      },
+      "attack": {
+        "base_stat": 110
+      },
+      "hp": {
+        "base_stat": 90
+      }
+    },
+    "mosse": [
+      "Agilità",
+      "Altruismo",
+      "Boato",
+      "Braciere",
+      "Carineria",
+      "Contropiede",
+      "Fulmisguardo",
+      "Fuococarica",
+      "Gridodilotta",
+      "Morso",
+      "Nemesi",
+      "Riduttore",
+      "Rogodenti",
+      "Ruotafuoco",
+      "Sgranocchio",
+      "Extrarapido",
+      "Lanciafiamme"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/4/43/Sprnbm0059.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/3/39/Sprnbmsh0059.gif"
+    }
+  },
+  {
+    "nome": "Poliwrath",
+    "tipi": [
+      "Acqua"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 70
+      },
+      "special-defense": {
+        "base_stat": 90
+      },
+      "special-attack": {
+        "base_stat": 70
+      },
+      "defense": {
+        "base_stat": 95
+      },
+      "attack": {
+        "base_stat": 95
+      },
+      "hp": {
+        "base_stat": 90
+      }
+    },
+    "mosse": [
+      "Bollaraggio",
+      "Botta",
+      "Colpodifango",
+      "Corposcontro",
+      "Dinamipugno",
+      "Geoforza",
+      "Idropompa",
+      "Ipnosi",
+      "Leggimente",
+      "Panciamburo",
+      "Pioggiadanza",
+      "Pistolacqua",
+      "Ribaltiro",
+      "Sdoppiatore",
+      "Sottomissione"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/c/c8/Sprnbm0062.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/1/14/Sprnbmsh0062.gif"
+    }
+  },
+  {
+    "nome": "Alakazam",
+    "tipi": [
+      "Psico"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 120
+      },
+      "special-defense": {
+        "base_stat": 95
+      },
+      "special-attack": {
+        "base_stat": 135
+      },
+      "defense": {
+        "base_stat": 45
+      },
+      "attack": {
+        "base_stat": 50
+      },
+      "hp": {
+        "base_stat": 55
+      }
+    },
+    "mosse": [
+      "Cinèsi",
+      "Confusione",
+      "Inibitore",
+      "Teletrasporto",
+      "Psicoraggio",
+      "Riflesso",
+      "Cambiaposto",
+      "Psicotaglio",
+      "Ripresa",
+      "Psicoshock",
+      "Psichico",
+      "Divinazione",
+      "Calmamente"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/3/3d/Sprnbm0065.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/d/d3/Sprnbmsh0065.gif"
+    }
+  },
+  {
+    "nome": "Machamp",
+    "tipi": [
+      "Lotta"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 55
+      },
+      "special-defense": {
+        "base_stat": 85
+      },
+      "special-attack": {
+        "base_stat": 65
+      },
+      "defense": {
+        "base_stat": 80
+      },
+      "attack": {
+        "base_stat": 130
+      },
+      "hp": {
+        "base_stat": 90
+      }
+    },
+    "mosse": [
+      "Bodyguard",
+      "Colpo Basso",
+      "Focalenergia",
+      "Fulmisguardo",
+      "Vendetta",
+      "Calciobasso",
+      "Visotruce",
+      "Vitaltiro",
+      "Forza",
+      "Doppiocolpo",
+      "Granfisico",
+      "Movimento Sismico",
+      "Dinamipugno",
+      "Incrocolpo",
+      "Sdoppiatore"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/e/e8/Sprnbm0068.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/2/2b/Sprnbmsh0068.gif"
+    }
+  },
+  {
+    "nome": "Victreebel",
+    "tipi": [
+      "Erba",
+      "Veleno"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 70
+      },
+      "special-defense": {
+        "base_stat": 70
+      },
+      "special-attack": {
+        "base_stat": 100
+      },
+      "defense": {
+        "base_stat": 65
+      },
+      "attack": {
+        "base_stat": 105
+      },
+      "hp": {
+        "base_stat": 80
+      }
+    },
+    "mosse": [
+      "Accumulo",
+      "Acido",
+      "Avvolgibotta",
+      "Crescita",
+      "Foglielama",
+      "Frustata",
+      "Introenergia",
+      "Paralizzante",
+      "Profumino",
+      "Schianto",
+      "Sfoghenergia",
+      "Sonnifero",
+      "Velenpolvere",
+      "Velenpuntura",
+      "Vorticerba",
+      "Verdebufera",
+      "Fendifoglia"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/1/1c/Sprnbm0071.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/6/62/Sprnbmsh0071.gif"
+    }
+  },
+  {
+    "nome": "Tentacruel",
+    "tipi": [
+      "Acqua",
+      "Veleno"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 100
+      },
+      "special-defense": {
+        "base_stat": 120
+      },
+      "special-attack": {
+        "base_stat": 80
+      },
+      "defense": {
+        "base_stat": 65
+      },
+      "attack": {
+        "base_stat": 70
+      },
+      "hp": {
+        "base_stat": 80
+      }
+    },
+    "mosse": [
+      "Acido",
+      "Avvolgibotta",
+      "Pistolacqua",
+      "Riflettipo",
+      "Velenospina",
+      "Supersuono",
+      "Idropulsar",
+      "Stridio",
+      "Bollaraggio",
+      "Sciagura",
+      "Scudo Acido",
+      "Velenpuntura",
+      "Surf",
+      "Fangonda",
+      "Idropompa"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/3/31/Sprnbm0073.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/6/68/Sprnbmsh0073.gif"
+    }
+  },
+  {
+    "nome": "Golem",
+    "tipi": [
+      "Roccia",
+      "Terra"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 45
+      },
+      "special-defense": {
+        "base_stat": 65
+      },
+      "special-attack": {
+        "base_stat": 55
+      },
+      "defense": {
+        "base_stat": 130
+      },
+      "attack": {
+        "base_stat": 120
+      },
+      "hp": {
+        "base_stat": 80
+      }
+    },
+    "mosse": [
+      "Azione",
+      "Lucidatura",
+      "Pesobomba",
+      "Ricciolscudo",
+      "Terrempesta",
+      "Rotolamento",
+      "Rafforzatore",
+      "Sassata",
+      "Abbattimento",
+      "Battiterra",
+      "Autodistruzione",
+      "Levitoroccia",
+      "Cadutamassi",
+      "Terremoto",
+      "Esplosione",
+      "Sdoppiatore",
+      "Pietrataglio"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/a/aa/Sprnbm0076.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/4/4e/Sprnbmsh0076.gif"
+    }
+  },
+  {
+    "nome": "Rapidash",
+    "tipi": [
+      "Fuoco"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 105
+      },
+      "special-defense": {
+        "base_stat": 80
+      },
+      "special-attack": {
+        "base_stat": 80
+      },
+      "defense": {
+        "base_stat": 70
+      },
+      "attack": {
+        "base_stat": 100
+      },
+      "hp": {
+        "base_stat": 65
+      }
+    },
+    "mosse": [
+      "Attacco Rapido",
+      "Azione",
+      "Braciere",
+      "Colpocoda",
+      "Megacorno",
+      "Ruggito",
+      "Sottilcorno",
+      "Velenpuntura",
+      "Nitrocaica",
+      "Agilità",
+      "Ruotafuoco",
+      "Pestone",
+      "Turbofuoco",
+      "Riduttore",
+      "Marchiatura",
+      "Fuocobomba",
+      "Fuococarica"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/5/53/Sprnbm0078.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/4/43/Sprnbmsh0078.gif"
+    }
+  },
+  {
+    "nome": "Slowbro",
+    "tipi": [
+      "Acqua",
+      "Psico"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 30
+      },
+      "special-defense": {
+        "base_stat": 80
+      },
+      "special-attack": {
+        "base_stat": 100
+      },
+      "defense": {
+        "base_stat": 110
+      },
+      "attack": {
+        "base_stat": 75
+      },
+      "hp": {
+        "base_stat": 95
+      }
+    },
+    "mosse": [
+      "Azione",
+      "Divinazione",
+      "Maledizione",
+      "Pistolacqua",
+      "Ritirata",
+      "Ruggito",
+      "Sbadiglio",
+      "Confusione",
+      "Inibitore",
+      "Idropulsar",
+      "Bottintesta",
+      "Cozzata Zen",
+      "Amnesia",
+      "Surf",
+      "Pigro",
+      "Psichico",
+      "Psicamisù",
+      "Pioggiadanza",
+      "Curapulsar"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/4/46/Sprnbm0080.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/d/da/Sprnbmsh0080.gif"
+    }
+  },
+  {
+    "nome": "Farfetch'd",
+    "tipi": [
+      "Normale",
+      "Volante"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 60
+      },
+      "special-defense": {
+        "base_stat": 62
+      },
+      "special-attack": {
+        "base_stat": 58
+      },
+      "defense": {
+        "base_stat": 55
+      },
+      "attack": {
+        "base_stat": 90
+      },
+      "hp": {
+        "base_stat": 52
+      }
+    },
+    "mosse": [
+      "Beccata",
+      "Turbosabbia",
+      "Fulmisguardo",
+      "Tagliofuria",
+      "Taglio",
+      "Aeroassalto",
+      "Aerasoio",
+      "Falsofinale",
+      "Lacerazione",
+      "Danzaspada",
+      "Eterelama",
+      "Fendifoglia",
+      "Agilità",
+      "Baldeali"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/e/e2/Sprnbm0083.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/2/23/Sprnbmsh0083.gif"
+    }
+  },
+  {
+    "nome": "Dodrio",
+    "tipi": [
+      "Normale",
+      "Volante"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 110
+      },
+      "special-defense": {
+        "base_stat": 60
+      },
+      "special-attack": {
+        "base_stat": 60
+      },
+      "defense": {
+        "base_stat": 70
+      },
+      "attack": {
+        "base_stat": 110
+      },
+      "hp": {
+        "base_stat": 60
+      }
+    },
+    "mosse": [
+      "Attacco Rapido",
+      "Beccata",
+      "Ruggito",
+      "Tripletta",
+      "Fulmisguardo",
+      "Furia",
+      "Attacco d'Ala",
+      "Doppiosmash",
+      "Agilità",
+      "Baraonda",
+      "Acupressione",
+      "Danzaspada",
+      "Assalto",
+      "Perforbecco",
+      "Rimonta",
+      "Colpo"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/8/86/Sprnbm0085.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/5/50/Sprnbmsh0085.gif"
+    }
+  },
+  {
+    "nome": "Dewgong",
+    "tipi": [
+      "Acqua",
+      "Ghiaccio"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 70
+      },
+      "special-defense": {
+        "base_stat": 95
+      },
+      "special-attack": {
+        "base_stat": 70
+      },
+      "defense": {
+        "base_stat": 80
+      },
+      "attack": {
+        "base_stat": 70
+      },
+      "hp": {
+        "base_stat": 90
+      }
+    },
+    "mosse": [
+      "Bollaraggio",
+      "Bottintesta",
+      "Pistolacqua",
+      "Purogelo",
+      "Ruggito",
+      "Ventogelato",
+      "Ripeti",
+      "Geloscheggia",
+      "Riposo",
+      "Acquanello",
+      "Raggiaurora",
+      "Acquagetto",
+      "Acquadisale",
+      "Riduttore",
+      "Idrondata",
+      "Geloraggio",
+      "Salvaguardia"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/a/a5/Sprnbm0087.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/b/b2/Sprnbmsh0087.gif"
+    }
+  },
+  {
+    "nome": "Muk",
+    "tipi": [
+      "Veleno"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 50
+      },
+      "special-defense": {
+        "base_stat": 100
+      },
+      "special-attack": {
+        "base_stat": 65
+      },
+      "defense": {
+        "base_stat": 75
+      },
+      "attack": {
+        "base_stat": 105
+      },
+      "hp": {
+        "base_stat": 105
+      }
+    },
+    "mosse": [
+      "Botta",
+      "Fangosberla",
+      "Rafforzatore",
+      "Velenogas",
+      "Inibitore",
+      "Fango",
+      "Colpodifango",
+      "Minimizzato",
+      "Tossina",
+      "Fangobomba",
+      "Fangonda",
+      "Stridio",
+      "Sporcolancio",
+      "Scudo Acido",
+      "Memento"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/3/3c/Sprnbm0089.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/b/bc/Sprnbmsh0089.gif"
+    }
+  },
+  {
+    "nome": "Cloyster",
+    "tipi": [
+      "Acqua",
+      "Ghiaccio"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 70
+      },
+      "special-defense": {
+        "base_stat": 45
+      },
+      "special-attack": {
+        "base_stat": 85
+      },
+      "defense": {
+        "base_stat": 180
+      },
+      "attack": {
+        "base_stat": 95
+      },
+      "hp": {
+        "base_stat": 50
+      }
+    },
+    "mosse": [
+      "Azione",
+      "Ferroscudo",
+      "Fielepunte",
+      "Fulmisguardo",
+      "Geloraggio",
+      "Geloscheggia",
+      "Gettaguscio",
+      "Idropompa",
+      "Mulinello",
+      "Pistolacqua",
+      "Protezione",
+      "Punte",
+      "Raggiaurora",
+      "Ritirata",
+      "Scagliagelo",
+      "Supersuono",
+      "Gelolancia",
+      "Conchilama"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/0/07/Sprnbm0091.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/c/c0/Sprnbmsh0091.gif"
+    }
+  },
+  {
+    "nome": "Gengar",
+    "tipi": [
+      "Spettro",
+      "Veleno"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 110
+      },
+      "special-defense": {
+        "base_stat": 75
+      },
+      "special-attack": {
+        "base_stat": 130
+      },
+      "defense": {
+        "base_stat": 60
+      },
+      "attack": {
+        "base_stat": 65
+      },
+      "hp": {
+        "base_stat": 60
+      }
+    },
+    "mosse": [
+      "Ipnosi",
+      "Leccata",
+      "Malosguardo",
+      "Stordiraggio",
+      "Ultimocanto",
+      "Rivincita",
+      "Dispetto",
+      "Maledizione",
+      "Sciagura",
+      "Ombra Notturna",
+      "Sbigoattacco",
+      "Neropulsar",
+      "Palla Ombra"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/6/66/Sprnbm0094.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/b/bd/Sprnbmsh0094.gif"
+    }
+  },
+  {
+    "nome": "Hypno",
+    "tipi": [
+      "Psico"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 67
+      },
+      "special-defense": {
+        "base_stat": 115
+      },
+      "special-attack": {
+        "base_stat": 73
+      },
+      "defense": {
+        "base_stat": 70
+      },
+      "attack": {
+        "base_stat": 73
+      },
+      "hp": {
+        "base_stat": 85
+      }
+    },
+    "mosse": [
+      "Botta",
+      "Confusione",
+      "Inibitore",
+      "Ipnosi",
+      "Bottintesta",
+      "Velenogas",
+      "Psicoraggio",
+      "Psicamisù",
+      "Cozzata Zen",
+      "Bullo",
+      "Psichico",
+      "Congiura",
+      "Psicoshock",
+      "Divinazione"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/d/d0/Sprnbf0097.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/a/aa/Sprnbfsh0097.gif"
+    }
+  },
+  {
+    "nome": "Kingler",
+    "tipi": [
+      "Acqua"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 75
+      },
+      "special-defense": {
+        "base_stat": 50
+      },
+      "special-attack": {
+        "base_stat": 50
+      },
+      "defense": {
+        "base_stat": 115
+      },
+      "attack": {
+        "base_stat": 130
+      },
+      "hp": {
+        "base_stat": 55
+      }
+    },
+    "mosse": [
+      "Bodyguard",
+      "Ferrartigli",
+      "Fulmisguardo",
+      "Martelpugno",
+      "Pistolacqua",
+      "Rafforzatore",
+      "Colpodifango",
+      "Protezione",
+      "Bollaraggio",
+      "Pestone",
+      "Flagello",
+      "Conchilama",
+      "Schianto",
+      "Danzaspada",
+      "Martellata",
+      "Ghigliottina"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/9/9e/Sprnbm0099.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/3/3a/Sprnbmsh0099.gif"
+    }
+  },
+  {
+    "nome": "Electrode",
+    "tipi": [
+      "Elettro"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 150
+      },
+      "special-defense": {
+        "base_stat": 80
+      },
+      "special-attack": {
+        "base_stat": 80
+      },
+      "defense": {
+        "base_stat": 70
+      },
+      "attack": {
+        "base_stat": 50
+      },
+      "hp": {
+        "base_stat": 60
+      }
+    },
+    "mosse": [
+      "Azione",
+      "Elettromistero",
+      "Tuonoshock",
+      "Scintilla",
+      "Rotolamento",
+      "Stridio",
+      "Raggioscossa",
+      "Comete",
+      "Energisfera",
+      "Autodistruzione",
+      "Schermoluce",
+      "Magnetascesa",
+      "Scarica",
+      "Esplosione",
+      "Vortexpalla",
+      "Specchiovelo"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/b/b1/Sprnbm0101.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/3/34/Sprnbmsh0101.gif"
+    }
+  },
+  {
+    "nome": "Exeggutor",
+    "tipi": [
+      "Erba",
+      "Psico"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 55
+      },
+      "special-defense": {
+        "base_stat": 75
+      },
+      "special-attack": {
+        "base_stat": 125
+      },
+      "defense": {
+        "base_stat": 85
+      },
+      "attack": {
+        "base_stat": 95
+      },
+      "hp": {
+        "base_stat": 95
+      }
+    },
+    "mosse": [
+      "Assorbimento",
+      "Baraonda",
+      "Confusione",
+      "Extrasenso",
+      "Gigassorbimento",
+      "Ipnosi",
+      "Mazzuolegno",
+      "Megassorbimento",
+      "Parassiseme",
+      "Pestone",
+      "Psicoshock",
+      "Riflesso",
+      "Semebomba",
+      "Semitraglia",
+      "Sintesi",
+      "Solarraggio",
+      "Verdebufera"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/d/d1/Sprnbm0103.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/e/ed/Sprnbmsh0103.gif"
+    }
+  },
+  {
+    "nome": "Marowak",
+    "tipi": [
+      "Terra"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 45
+      },
+      "special-defense": {
+        "base_stat": 80
+      },
+      "special-attack": {
+        "base_stat": 50
+      },
+      "defense": {
+        "base_stat": 110
+      },
+      "attack": {
+        "base_stat": 80
+      },
+      "hp": {
+        "base_stat": 60
+      }
+    },
+    "mosse": [
+      "Colpocoda",
+      "Falsofinale",
+      "Fangosberla",
+      "Ruggito",
+      "Bottintesta",
+      "Nemesi",
+      "Ossoraffica",
+      "Focalenergia",
+      "Rimonta",
+      "Ossomerang",
+      "Colpo",
+      "Sdoppiatore"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/a/a3/Sprnbm0105.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/3/32/Sprnbmsh0105.gif"
+    }
+  },
+  {
+    "nome": "Hitmonlee",
+    "tipi": [
+      "Lotta"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 87
+      },
+      "special-defense": {
+        "base_stat": 110
+      },
+      "special-attack": {
+        "base_stat": 35
+      },
+      "defense": {
+        "base_stat": 53
+      },
+      "attack": {
+        "base_stat": 120
+      },
+      "hp": {
+        "base_stat": 50
+      }
+    },
+    "mosse": [
+      "Altruismo",
+      "Azione",
+      "Breccia",
+      "Bruciapelo",
+      "Calciobasso",
+      "Fintoattacco",
+      "Focalenergia",
+      "Doppiocalcio",
+      "Colpo Basso",
+      "Resistenza",
+      "Vendetta",
+      "Bodyguard",
+      "Calciardente",
+      "Leggimente",
+      "Megacalcio",
+      "Zuffa",
+      "Contropiede",
+      "Calcinvolo"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/a/aa/Sprnbm0106.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/5/5b/Sprnbmsh0106.gif"
+    }
+  },
+  {
+    "nome": "Hitmonchan",
+    "tipi": [
+      "Lotta"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 76
+      },
+      "special-defense": {
+        "base_stat": 110
+      },
+      "special-attack": {
+        "base_stat": 35
+      },
+      "defense": {
+        "base_stat": 79
+      },
+      "attack": {
+        "base_stat": 105
+      },
+      "hp": {
+        "base_stat": 50
+      }
+    },
+    "mosse": [
+      "Altruismo",
+      "Assorbipugno",
+      "Azione",
+      "Bruciapelo",
+      "Fintoattacco",
+      "Focalenergia",
+      "Pugnoscarica",
+      "Vuotonda",
+      "Pugnorapido",
+      "Crescipugno",
+      "Protezione",
+      "Vendetta",
+      "Anticipo",
+      "Fuocopugno",
+      "Gelopugno",
+      "Tuonopugno",
+      "Agilità",
+      "Megapugno",
+      "Zuffa",
+      "Contrattacco",
+      "Cetripugno"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/5/59/Sprnbm0107.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/f/f6/Sprnbmsh0107.gif"
+    }
+  },
+  {
+    "nome": "Weezing",
+    "tipi": [
+      "Veleno"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 60
+      },
+      "special-defense": {
+        "base_stat": 70
+      },
+      "special-attack": {
+        "base_stat": 85
+      },
+      "defense": {
+        "base_stat": 120
+      },
+      "attack": {
+        "base_stat": 90
+      },
+      "hp": {
+        "base_stat": 65
+      }
+    },
+    "mosse": [
+      "Azione",
+      "Doppiosmash",
+      "Muro di Fumo",
+      "Ondacalda",
+      "Smog",
+      "Velenogas",
+      "Pulifumo",
+      "Garanzia",
+      "Fango",
+      "Nube",
+      "Autodistruzione",
+      "Fangobomba",
+      "Tossina",
+      "Esplosione",
+      "Memento"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/4/43/Sprnbm0110.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/e/ef/Sprnbmsh0110.gif"
+    }
+  },
+  {
+    "nome": "Kangaskhan",
+    "tipi": [
+      "Normale"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 90
+      },
+      "special-defense": {
+        "base_stat": 80
+      },
+      "special-attack": {
+        "base_stat": 40
+      },
+      "defense": {
+        "base_stat": 80
+      },
+      "attack": {
+        "base_stat": 95
+      },
+      "hp": {
+        "base_stat": 105
+      }
+    },
+    "mosse": [
+      "Botta",
+      "Colpocoda",
+      "Ruggito",
+      "Bruciapelo",
+      "Morso",
+      "Pestone",
+      "Focalenergia",
+      "Bottintesta",
+      "Sbigoattacco",
+      "Doppiosmash",
+      "Sgranocchio",
+      "Resistenza",
+      "Contropiede",
+      "Oltraggio",
+      "Ultimascelta"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/a/a9/Sprnbf0115.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/6/64/Sprnbfsh0115.gif"
+    }
+  },
+  {
+    "nome": "Seaking",
+    "tipi": [
+      "Acqua"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 68
+      },
+      "special-defense": {
+        "base_stat": 80
+      },
+      "special-attack": {
+        "base_stat": 65
+      },
+      "defense": {
+        "base_stat": 65
+      },
+      "attack": {
+        "base_stat": 92
+      },
+      "hp": {
+        "base_stat": 80
+      }
+    },
+    "mosse": [
+      "Beccata",
+      "Colpocoda",
+      "Idropulsar",
+      "Supersuono",
+      "Incornata",
+      "Agilità",
+      "Acquanello",
+      "Flagello",
+      "Cascata",
+      "Inondazione",
+      "Megacorno",
+      "Perforcorno"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/7/79/Sprnbm0119.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/7/75/Sprnbmsh0119.gif"
+    }
+  },
+  {
+    "nome": "Starmie",
+    "tipi": [
+      "Acqua"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 115
+      },
+      "special-defense": {
+        "base_stat": 85
+      },
+      "special-attack": {
+        "base_stat": 100
+      },
+      "defense": {
+        "base_stat": 85
+      },
+      "attack": {
+        "base_stat": 75
+      },
+      "hp": {
+        "base_stat": 60
+      }
+    },
+    "mosse": [
+      "Acquadisale",
+      "Azione",
+      "Comete",
+      "Cosmoforza",
+      "Gemmoforza",
+      "Idropompa",
+      "Minimizzato",
+      "Pistolacqua",
+      "Psichico",
+      "Psicoraggio",
+      "Rafforzatore",
+      "Rapigiro",
+      "Ripresa",
+      "Schermoluce",
+      "Stordiraggio",
+      "Surf"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/3/32/Sprnbm0121.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/3/3b/Sprnbmsh0121.gif"
+    }
+  },
+  {
+    "nome": "Mr.mime",
+    "tipi": [
+      "Psico",
+      "Folletto"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 90
+      },
+      "special-defense": {
+        "base_stat": 120
+      },
+      "special-attack": {
+        "base_stat": 100
+      },
+      "defense": {
+        "base_stat": 65
+      },
+      "attack": {
+        "base_stat": 45
+      },
+      "hp": {
+        "base_stat": 40
+      }
+    },
+    "mosse": [
+      "Anticipo",
+      "Barattoforza",
+      "Barattoscudo",
+      "Bodyguard",
+      "Botta",
+      "Copione",
+      "Ripeti",
+      "Staffetta",
+      "Confusione",
+      "Protezione",
+      "Psicoraggio",
+      "Mimica",
+      "Riflesso",
+      "Salvaguardia",
+      "Schermoluce",
+      "Sbigoattacco",
+      "Magibrillio",
+      "Psichico",
+      "Strampadanza"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/b/bd/Sprnbm0122.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/9/90/Sprnbmsh0122.gif"
+    }
+  },
+  {
+    "nome": "Jynx",
+    "tipi": [
+      "Ghiaccio",
+      "Psico"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 95
+      },
+      "special-defense": {
+        "base_stat": 95
+      },
+      "special-attack": {
+        "base_stat": 115
+      },
+      "defense": {
+        "base_stat": 35
+      },
+      "attack": {
+        "base_stat": 50
+      },
+      "hp": {
+        "base_stat": 65
+      }
+    },
+    "mosse": [
+      "Botta",
+      "Copione",
+      "Dolcebacio",
+      "Leccata",
+      "Polneve",
+      "Confusione",
+      "Canto",
+      "Falselacrime",
+      "Gelopugno",
+      "Psichico",
+      "Demonbacio",
+      "Malosguardo",
+      "Ultimocanto",
+      "Bora"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/0/05/Sprnbf0124.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/4/44/Sprnbfsh0124.gif"
+    }
+  },
+  {
+    "nome": "Pinsir",
+    "tipi": [
+      "Coleottero"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 85
+      },
+      "special-defense": {
+        "base_stat": 70
+      },
+      "special-attack": {
+        "base_stat": 55
+      },
+      "defense": {
+        "base_stat": 100
+      },
+      "attack": {
+        "base_stat": 125
+      },
+      "hp": {
+        "base_stat": 65
+      }
+    },
+    "mosse": [
+      "Presa",
+      "Rafforzatore",
+      "Focalenergia",
+      "Legatutto",
+      "Movimento Sismico",
+      "Tempestretta",
+      "Doppiosmash",
+      "Vitaltiro",
+      "Forbice X",
+      "Forza",
+      "Danzaspada",
+      "Sottomissione",
+      "Ghigliottina",
+      "Troppoforte"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/4/43/Sprnbm0127.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/d/db/Sprnbmsh0127.gif"
+    }
+  },
+  {
+    "nome": "Tauros",
+    "tipi": [
+      "Normale"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 110
+      },
+      "special-defense": {
+        "base_stat": 70
+      },
+      "special-attack": {
+        "base_stat": 40
+      },
+      "defense": {
+        "base_stat": 95
+      },
+      "attack": {
+        "base_stat": 100
+      },
+      "hp": {
+        "base_stat": 75
+      }
+    },
+    "mosse": [
+      "Azione",
+      "Colpocoda",
+      "Cuordileone",
+      "Rivincita",
+      "Garanzia",
+      "Incornata",
+      "Visotruce",
+      "Cozzata Zen",
+      "Scatanatoro",
+      "Riposo",
+      "Bullo",
+      "Colpocoda",
+      "Sdoppiatore",
+      "Gigaimpatto"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/8/8f/Sprnbm0128.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/e/e6/Sprnbmsh0128.gif"
+    }
+  },
+  {
+    "nome": "Gyarados",
+    "tipi": [
+      "Acqua",
+      "Volante"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 81
+      },
+      "special-defense": {
+        "base_stat": 100
+      },
+      "special-attack": {
+        "base_stat": 60
+      },
+      "defense": {
+        "base_stat": 79
+      },
+      "attack": {
+        "base_stat": 125
+      },
+      "hp": {
+        "base_stat": 95
+      }
+    },
+    "mosse": [
+      "Azione",
+      "Flagello",
+      "Fulmisguardo",
+      "Splash",
+      "Tornado",
+      "Morso",
+      "Mulinello",
+      "Gelodenti",
+      "Acquadisale",
+      "Visotruce",
+      "Cascata",
+      "Sgranocchio",
+      "Pioggiadanza",
+      "Idrondata",
+      "Dragodanza",
+      "Idropompa",
+      "Tifone",
+      "Colpo",
+      "Iper Raggio"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/7/7b/Sprnbm0130.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/7/73/Sprnbmsh0130.gif"
+    }
+  },
+  {
+    "nome": "Lapras",
+    "tipi": [
+      "Acqua",
+      "Ghiaccio"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 60
+      },
+      "special-defense": {
+        "base_stat": 95
+      },
+      "special-attack": {
+        "base_stat": 85
+      },
+      "defense": {
+        "base_stat": 80
+      },
+      "attack": {
+        "base_stat": 85
+      },
+      "hp": {
+        "base_stat": 130
+      }
+    },
+    "mosse": [
+      "Pistolacqua",
+      "Ruggito",
+      "Canto",
+      "Nebbia",
+      "Goccia Vitale",
+      "Geloscheggia",
+      "Stordiraggio",
+      "Idropulsar",
+      "Acquadisale",
+      "Corposcontro",
+      "Geloraggio",
+      "Pioggiadanza",
+      "Idropompa",
+      "Ultimocanto",
+      "Purogelo"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/7/78/Sprnbm0131.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/2/25/Sprnbmsh0131.gif"
+    }
+  },
+  {
+    "nome": "Ditto",
+    "tipi": [
+      "Normale"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 48
+      },
+      "special-defense": {
+        "base_stat": 48
+      },
+      "special-attack": {
+        "base_stat": 48
+      },
+      "defense": {
+        "base_stat": 48
+      },
+      "attack": {
+        "base_stat": 48
+      },
+      "hp": {
+        "base_stat": 48
+      }
+    },
+    "mosse": [
+      "Trasformazione"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/d/d4/Sprnbm0132.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/0/01/Sprnbmsh0132.gif"
+    }
+  },
+  {
+    "nome": "Vaporeon",
+    "tipi": [
+      "Acqua"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 65
+      },
+      "special-defense": {
+        "base_stat": 95
+      },
+      "special-attack": {
+        "base_stat": 110
+      },
+      "defense": {
+        "base_stat": 60
+      },
+      "attack": {
+        "base_stat": 65
+      },
+      "hp": {
+        "base_stat": 130
+      }
+    },
+    "mosse": [
+      "Altruismo",
+      "Azione",
+      "Colpocoda",
+      "Comete",
+      "Copione",
+      "Fascino",
+      "Morso",
+      "Riduttore",
+      "Ruggito",
+      "Sdoppiatore",
+      "Staffetta",
+      "Pistolacqua",
+      "Turbosabbia",
+      "Attacco Rapido",
+      "Occhioni Teneri",
+      "Nube",
+      "Idropulsar",
+      "Raggiaurora",
+      "Acquanello",
+      "Fanghiglia",
+      "Scudo Acido",
+      "Idropompa",
+      "Ultimascelta"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/0/0e/Sprnbm0134.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/c/c6/Sprnbmsh0134.gif"
+    }
+  },
+  {
+    "nome": "Jolteon",
+    "tipi": [
+      "Elettro"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 130
+      },
+      "special-defense": {
+        "base_stat": 95
+      },
+      "special-attack": {
+        "base_stat": 110
+      },
+      "defense": {
+        "base_stat": 60
+      },
+      "attack": {
+        "base_stat": 65
+      },
+      "hp": {
+        "base_stat": 65
+      }
+    },
+    "mosse": [
+      "Altruismo",
+      "Azione",
+      "Colpocoda",
+      "Comete",
+      "Copione",
+      "Fascino",
+      "Morso",
+      "Riduttore",
+      "Ruggito",
+      "Sdoppiatore",
+      "Staffetta",
+      "Tuonoshock",
+      "Turbosabbia",
+      "Attacco Rapido",
+      "Occhioni Teneri",
+      "Tuononda",
+      "Doppiocalcio",
+      "Fulmindenti",
+      "Missilspillo",
+      "Scarica",
+      "Agilità",
+      "Tuono",
+      "Ultimascelta"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/f/f1/Sprnbm0135.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/6/67/Sprnbmsh0135.gif"
+    }
+  },
+  {
+    "nome": "Flareon",
+    "tipi": [
+      "Fuoco"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 65
+      },
+      "special-defense": {
+        "base_stat": 110
+      },
+      "special-attack": {
+        "base_stat": 95
+      },
+      "defense": {
+        "base_stat": 60
+      },
+      "attack": {
+        "base_stat": 130
+      },
+      "hp": {
+        "base_stat": 65
+      }
+    },
+    "mosse": [
+      "Altruismo",
+      "Azione",
+      "Colpocoda",
+      "Comete",
+      "Copione",
+      "Fascino",
+      "Morso",
+      "Riduttore",
+      "Ruggito",
+      "Sdoppiatore",
+      "Staffetta",
+      "Braciere",
+      "Turbosabbia",
+      "Attacco Rapido",
+      "Occhioni Teneri",
+      "Smog",
+      "Morso",
+      "Rogodenti",
+      "Turbofuoco",
+      "Lavasbuffo",
+      "Visotruce",
+      "Fuococarica",
+      "Ultimascelta"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/e/e4/Sprnbm0136.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/d/df/Sprnbmsh0136.gif"
+    }
+  },
+  {
+    "nome": "Omastar",
+    "tipi": [
+      "Roccia",
+      "Acqua"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 55
+      },
+      "special-defense": {
+        "base_stat": 70
+      },
+      "special-attack": {
+        "base_stat": 115
+      },
+      "defense": {
+        "base_stat": 125
+      },
+      "attack": {
+        "base_stat": 60
+      },
+      "hp": {
+        "base_stat": 70
+      }
+    },
+    "mosse": [
+      "Legatutto",
+      "Ritirata",
+      "Rotolamento",
+      "Sgranocchio",
+      "Turbosabbia",
+      "Sgranocchio",
+      "Pistolacqua",
+      "Fulmisguardo",
+      "Colpodifango",
+      "Forzantica",
+      "Acquadisale",
+      "Protezione",
+      "Cadutamassi",
+      "Surf",
+      "Gettaguscio",
+      "Idropompa"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/d/df/Sprnbm0139.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/a/a8/Sprnbmsh0139.gif"
+    }
+  },
+  {
+    "nome": "Kabutops",
+    "tipi": [
+      "Roccia",
+      "Acqua"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 80
+      },
+      "special-defense": {
+        "base_stat": 70
+      },
+      "special-attack": {
+        "base_stat": 65
+      },
+      "defense": {
+        "base_stat": 105
+      },
+      "attack": {
+        "base_stat": 115
+      },
+      "hp": {
+        "base_stat": 60
+      }
+    },
+    "mosse": [
+      "Assorbimento",
+      "Fintoattacco",
+      "Graffio",
+      "Lacerazione",
+      "Nottesferza",
+      "Rafforzatore",
+      "Turbosabbia",
+      "Lacerazione",
+      "Acquagetto",
+      "Fulmisguardo",
+      "Colpodifango",
+      "Forzantica",
+      "Acquadisale",
+      "Protezione",
+      "Sanguisuga",
+      "Idrobreccia",
+      "Ferrostrido",
+      "Pietrataglio"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/6/69/Sprnbm0141.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/7/7f/Sprnbmsh0141.gif"
+    }
+  },
+  {
+    "nome": "Aerodactyl",
+    "tipi": [
+      "Roccia",
+      "Volante"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 130
+      },
+      "special-defense": {
+        "base_stat": 75
+      },
+      "special-attack": {
+        "base_stat": 60
+      },
+      "defense": {
+        "base_stat": 65
+      },
+      "attack": {
+        "base_stat": 105
+      },
+      "hp": {
+        "base_stat": 80
+      }
+    },
+    "mosse": [
+      "Forzantica",
+      "Morso",
+      "Supersuono",
+      "Attacco d'Ala",
+      "Visotruce",
+      "Frana",
+      "Boato",
+      "Sgranocchio",
+      "Metaltestata",
+      "Riduttore",
+      "Pietrataglio",
+      "Agilità",
+      "Iper Raggio",
+      "Gigaimpatto"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/b/b5/Sprnbm0142.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/8/88/Sprnbmsh0142.gif"
+    }
+  },
+  {
+    "nome": "Snorlax",
+    "tipi": [
+      "Normale"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 30
+      },
+      "special-defense": {
+        "base_stat": 110
+      },
+      "special-attack": {
+        "base_stat": 65
+      },
+      "defense": {
+        "base_stat": 65
+      },
+      "attack": {
+        "base_stat": 110
+      },
+      "hp": {
+        "base_stat": 160
+      }
+    },
+    "mosse": [
+      "Accumulo",
+      "Azione",
+      "Blocco",
+      "Flagello",
+      "Introenergia",
+      "Leccata",
+      "Ricciolscudo",
+      "Stridio",
+      "Ultimascelta",
+      "Sbadiglio",
+      "Morso",
+      "Riposo",
+      "Sgranocchio",
+      "Corposcontro",
+      "Pesobomba",
+      "Amnesia",
+      "Forza Equina",
+      "Martelpugno",
+      "Panciamburo",
+      "Gigaimpatto"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/0/08/Sprnbm0143.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/9/90/Sprnbmsh0143.gif"
+    }
+  },
+  {
+    "nome": "Articuno",
+    "tipi": [
+      "Ghiaccio",
+      "Volante"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 85
+      },
+      "special-defense": {
+        "base_stat": 125
+      },
+      "special-attack": {
+        "base_stat": 95
+      },
+      "defense": {
+        "base_stat": 100
+      },
+      "attack": {
+        "base_stat": 85
+      },
+      "hp": {
+        "base_stat": 90
+      }
+    },
+    "mosse": [
+      "Nebbia",
+      "Raffica",
+      "Polneve",
+      "Riflesso",
+      "Geloscheggia",
+      "Agilità",
+      "Forzantica",
+      "Ventoincoda",
+      "Trespolo",
+      "Geloraggio",
+      "Tifone",
+      "Nube",
+      "Bora",
+      "Purogelo"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/0/0a/Sprnbm0144.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/3/32/Sprnbmsh0144.gif"
+    }
+  },
+  {
+    "nome": "Zapdos",
+    "tipi": [
+      "Elettro",
+      "Volante"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 100
+      },
+      "special-defense": {
+        "base_stat": 90
+      },
+      "special-attack": {
+        "base_stat": 125
+      },
+      "defense": {
+        "base_stat": 85
+      },
+      "attack": {
+        "base_stat": 90
+      },
+      "hp": {
+        "base_stat": 90
+      }
+    },
+    "mosse": [
+      "Beccata",
+      "Tuononda",
+      "Tuonoshock",
+      "Schermoluce",
+      "Agilità",
+      "Forzantica",
+      "Perforbecco",
+      "Trespolo",
+      "Scarica",
+      "Pioggiadanza",
+      "Tuono",
+      "Protezione",
+      "Elettrocannone"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/1/16/Sprnbm0145.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/9/9c/Sprnbmsh0145.gif"
+    }
+  },
+  {
+    "nome": "Moltres",
+    "tipi": [
+      "Fuoco",
+      "Volante"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 90
+      },
+      "special-defense": {
+        "base_stat": 85
+      },
+      "special-attack": {
+        "base_stat": 125
+      },
+      "defense": {
+        "base_stat": 90
+      },
+      "attack": {
+        "base_stat": 100
+      },
+      "hp": {
+        "base_stat": 90
+      }
+    },
+    "mosse": [
+      "Fulmisguardo",
+      "Raffica",
+      "Braciere",
+      "Salvaguardia",
+      "Attacco d'Ala",
+      "Agilità",
+      "Forzantica",
+      "Eterelama",
+      "Trespolo",
+      "Ondacalda",
+      "Tifone",
+      "Resistenza",
+      "Vampata",
+      "Aeroattacco"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/8/88/Sprnbm0146.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/6/63/Sprnbmsh0146.gif"
+    }
+  },
+  {
+    "nome": "Dragonite",
+    "tipi": [
+      "Drago",
+      "Volante"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 80
+      },
+      "special-defense": {
+        "base_stat": 100
+      },
+      "special-attack": {
+        "base_stat": 100
+      },
+      "defense": {
+        "base_stat": 95
+      },
+      "attack": {
+        "base_stat": 134
+      },
+      "hp": {
+        "base_stat": 91
+      }
+    },
+    "mosse": [
+      "Attacco d'Ala",
+      "Avvolgibotta",
+      "Extrarapido",
+      "Fulmisguardo",
+      "Fuocopugno",
+      "Tornado",
+      "Trespolo",
+      "Tuononda",
+      "Tuonopugno",
+      "Tifone",
+      "Codadrago",
+      "Agilità",
+      "Schianto",
+      "Idrondata",
+      "Dragofuria",
+      "Oltraggio",
+      "Salvaguardia",
+      "Pioggiadanza",
+      "Dragodanza",
+      "Iper Raggio"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/c/c6/Sprnbm0149.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/f/f8/Sprnbmsh0149.gif"
+    }
+  },
+  {
+    "nome": "Mewtwo",
+    "tipi": [
+      "Psico"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 130
+      },
+      "special-defense": {
+        "base_stat": 90
+      },
+      "special-attack": {
+        "base_stat": 154
+      },
+      "defense": {
+        "base_stat": 90
+      },
+      "attack": {
+        "base_stat": 110
+      },
+      "hp": {
+        "base_stat": 106
+      }
+    },
+    "mosse": [
+      "Comete",
+      "Confusione",
+      "Goccia vitale",
+      "Inibitore",
+      "Forzantica",
+      "Psicoraggio",
+      "Salvaguardia",
+      "Amnesia",
+      "Sferapulsar",
+      "Psichico",
+      "Barattoforza",
+      "Barattoscudo",
+      "Nebbia",
+      "Psicobotta",
+      "Ripresa",
+      "Divinazione"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/d/db/Sprnbm0150.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/b/b8/Sprnbmsh0150.gif"
+    }
+  },
+  {
+    "nome": "Mew",
+    "tipi": [
+      "Psico"
+    ],
+    "statistiche": {
+      "speed": {
+        "base_stat": 100
+      },
+      "special-defense": {
+        "base_stat": 100
+      },
+      "special-attack": {
+        "base_stat": 100
+      },
+      "defense": {
+        "base_stat": 100
+      },
+      "attack": {
+        "base_stat": 100
+      },
+      "hp": {
+        "base_stat": 100
+      }
+    },
+    "mosse": [
+      "Botta",
+      "Riflettipo",
+      "Amnesia",
+      "Staffetta",
+      "Forzantica",
+      "Goccia Vitale",
+      "Congiura",
+      "Esclusiva",
+      "Trasformazione",
+      "Sferapulsar",
+      "Psichico"
+    ],
+    "sprite": {
+      "normal": "https://media.pokemoncentral.it/wiki/e/e2/Sprnbm0151.gif",
+      "shiny": "https://media.pokemoncentral.it/wiki/c/c2/Sprnbmsh0151.gif"
+    }
+  }
+]
