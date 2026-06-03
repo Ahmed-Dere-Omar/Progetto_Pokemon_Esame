@@ -2419,7 +2419,6 @@ class PvPScene extends Phaser.Scene {
     setupMap() {
         const map = this.make.tilemap({ key: 'mapPvP' });
 
-        // Stessa soluzione anti-corruzione grafica adottata nel CPK
         const tilesetA = map.addTilesetImage('a', 'tilesA');
         const tilesetD = map.addTilesetImage('d', 'tilesD');
         const tilesetE = map.addTilesetImage('e', 'tilesE');
@@ -2450,7 +2449,7 @@ class PvPScene extends Phaser.Scene {
     setupNetwork() {
         this.otherPlayers = this.physics.add.group();
         this.socket = io('https://neomon-server.onrender.com');
-        this.socket.emit('joinGame', this.myPlayerName); // Rimosso + " (PvP)"
+        this.socket.emit('joinGame', this.myPlayerName);
 
         this.socket.on('currentPlayers', (players) => {
             Object.values(players).forEach(p => p.playerId === this.socket.id ? this.addPlayer(p) : this.addOtherPlayer(p));
@@ -2466,13 +2465,14 @@ class PvPScene extends Phaser.Scene {
                 if (op.playerId === p.playerId) {
                     op.setPosition(p.x, p.y);
                     op.nameText.setPosition(p.x, p.y - 15);
+                    if (p.avatar && op.texture.key !== p.avatar) op.setTexture(p.avatar);
                     p.anim ? op.anims.play(p.anim, true) : op.anims.stop();
                 }
             });
         });
 
         this.socket.on('challengeReceived', (id) => this.socket.emit('acceptChallenge', id));
-        this.socket.on('opponentBusy', () => window.showBanner("Questo allenatore è già impegnato!"));
+        this.socket.on('opponentBusy', () => window.showBanner("La persona è in battaglia e non può essere sfidata ora."));
 
         this.socket.on('startPvP', (data) => {
             data.socket = this.socket;
@@ -2482,9 +2482,14 @@ class PvPScene extends Phaser.Scene {
     }
 
     setupAnimations() {
-        ['down', 'left', 'right', 'up'].forEach(key => { if (this.anims.exists(key)) this.anims.remove(key); });
-        ['down', 'left', 'right', 'up'].forEach((key, i) => {
-            this.anims.create({ key, frames: this.anims.generateFrameNumbers(this.textureKey, { start: i * 4, end: i * 4 + 3 }), frameRate: 10, repeat: -1 });
+        const avatars = ['avatar', 'avatar2', 'avatar3', 'avatar4', 'avatar5', 'avatar6'];
+        avatars.forEach(tex => {
+            ['down', 'left', 'right', 'up'].forEach((key, i) => {
+                let animKey = tex + '_' + key;
+                if (!this.anims.exists(animKey)) {
+                    this.anims.create({ key: animKey, frames: this.anims.generateFrameNumbers(tex, { start: i * 4, end: i * 4 + 3 }), frameRate: 10, repeat: -1 });
+                }
+            });
         });
     }
 
@@ -2507,18 +2512,17 @@ class PvPScene extends Phaser.Scene {
 
         this.physics.add.collider(this.player, this.wallLayer);
 
-        // Inizializzazione corretta del NameTag locale
         this.playerNameText = this.createNameTag(startX, startY, info.name);
         this.playerNameText.setDepth(10);
 
-        this.cameras.main.startFollow(this.player, true).setZoom(4).setBounds(0, 0, this.mapWidth, this.mapHeight);
-        this.cameras.main.startFollow(this.player, true).setZoom(4.5);
+        this.cameras.main.startFollow(this.player, true).setZoom(4.5).setBounds(0, 0, this.mapWidth, this.mapHeight);
     }
 
     addOtherPlayer(info) {
-        let op = this.add.sprite(info.x, info.y, 'avatar');
+        let tex = info.avatar || 'avatar';
+        let op = this.add.sprite(info.x, info.y, tex);
         op.playerId = info.playerId;
-        op.setScale(0.5); // Ridimensionamento sistemato
+        op.setScale(0.5);
         op.setDepth(10);
 
         let colori = ['#ff4444', '#44ff44', '#4444ff', '#ffff44', '#ff44ff', '#44ffff', '#ff8800'];
@@ -2549,10 +2553,10 @@ class PvPScene extends Phaser.Scene {
         let dx = 0;
         let dy = 0;
 
-        if (this.keys.LEFT.isDown || this.keys.A.isDown) { dx = -TILE_SIZE; currentAnim = 'left'; }
-        else if (this.keys.RIGHT.isDown || this.keys.D.isDown) { dx = TILE_SIZE; currentAnim = 'right'; }
-        else if (this.keys.UP.isDown || this.keys.W.isDown) { dy = -TILE_SIZE; currentAnim = 'up'; }
-        else if (this.keys.DOWN.isDown || this.keys.S.isDown) { dy = TILE_SIZE; currentAnim = 'down'; }
+        if (this.keys.LEFT.isDown || this.keys.A.isDown) { dx = -TILE_SIZE; currentAnim = this.textureKey + '_left'; }
+        else if (this.keys.RIGHT.isDown || this.keys.D.isDown) { dx = TILE_SIZE; currentAnim = this.textureKey + '_right'; }
+        else if (this.keys.UP.isDown || this.keys.W.isDown) { dy = -TILE_SIZE; currentAnim = this.textureKey + '_up'; }
+        else if (this.keys.DOWN.isDown || this.keys.S.isDown) { dy = TILE_SIZE; currentAnim = this.textureKey + '_down'; }
 
         if (dx !== 0 || dy !== 0) {
             let targetX = this.player.x + dx;
@@ -2566,7 +2570,7 @@ class PvPScene extends Phaser.Scene {
 
             if (!isWall && !isOutOfBounds) {
                 this.isMovingGrid = true;
-                if (this.socket) this.socket.emit('playerMovement', { x: targetX, y: targetY, anim: currentAnim });
+                if (this.socket) this.socket.emit('playerMovement', { x: targetX, y: targetY, anim: currentAnim, avatar: this.textureKey });
 
                 this.tweens.add({
                     targets: this.player,
@@ -2580,7 +2584,6 @@ class PvPScene extends Phaser.Scene {
                         this.isMovingGrid = false;
                         this.player.anims.stop();
 
-                        // Controllo porta d'uscita PvP
                         if (this.zoneInterattive && !this.isDialogActive && !this.isTransitioning) {
                             let interazioneCalpestata = this.zoneInterattive.find(z => Phaser.Math.Distance.Between(this.player.x, this.player.y, z.x + (z.width || 0) / 2, z.y + (z.height || 0) / 2) < 20);
                             if (interazioneCalpestata && interazioneCalpestata.nomeInterazione === 'Porta Inizio') {
@@ -2635,8 +2638,8 @@ class PvPScene extends Phaser.Scene {
                 } else {
                     this.time.delayedCall(100, () => {
                         this.isDialogActive = false;
-                        this.player.y += 32; // Allontana di un passo
-                        if (this.socket) this.socket.emit('playerMovement', { x: this.player.x, y: this.player.y, anim: 'up' });
+                        this.player.y += 32; 
+                        if (this.socket) this.socket.emit('playerMovement', { x: this.player.x, y: this.player.y, anim: 'up', avatar: this.textureKey });
                     });
                 }
             });
@@ -2702,7 +2705,6 @@ class PvPScene extends Phaser.Scene {
         overlay.style.pointerEvents = 'none';
         overlay.style.zIndex = '9999';
 
-        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 7vw; text-align: center; max-width: 90%;">${testo}</h1>`;
         overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: clamp(2rem, 5vw, 3.5rem); text-align: center; width: 90%;">${testo}</h1>`;
         document.getElementById('game-container').appendChild(overlay);
 
@@ -2739,7 +2741,6 @@ class PvPScene extends Phaser.Scene {
         overlay.style.alignItems = 'center';
         overlay.style.zIndex = '9999';
 
-        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 7vw; text-align: center; max-width: 90%; color: #fff;">TORNO ALLA LOBBY...</h1>`;
         overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: clamp(2rem, 5vw, 3.5rem); text-align: center; width: 90%; color: #fff;">TORNO ALLA LOBBY...</h1>`;
         document.getElementById('game-container').appendChild(overlay);
 
@@ -2748,7 +2749,6 @@ class PvPScene extends Phaser.Scene {
             this.isTransitioning = false;
 
             this.scene.stop('PvPScene');
-            this.scene.start('WorldScene', { name: this.myPlayerName, user: this.user, vengoDa: 'Porta Centro' });
             this.scene.start('WorldScene', { name: this.myPlayerName, user: this.user, vengoDa: 'Porta PVP' });
         }, 1000);
     }
@@ -2933,7 +2933,6 @@ class PvPScene extends Phaser.Scene {
                     let numberToSave = idx + 1;
                     profilo.avatar_sprite = numberToSave;
 
-                    // 2. MAGIA: L'await che costringe Supabase a "spedire la lettera" al database!
                     const { error } = await supabaseClient.from('profilo')
                         .update({ avatar_sprite: numberToSave })
                         .eq('id_profilo', profilo.id_profilo);
@@ -2948,11 +2947,12 @@ class PvPScene extends Phaser.Scene {
                         this.player.setTexture(textureKey);
                         this.textureKey = textureKey;
 
-                        // Distrugge le vecchie animazioni e le ricrea con il nuovo spritesheet
                         ['down', 'left', 'right', 'up'].forEach(key => { if (this.anims.exists(key)) this.anims.remove(key); });
                         ['down', 'left', 'right', 'up'].forEach((key, i) => {
                             this.anims.create({ key, frames: this.anims.generateFrameNumbers(this.textureKey, { start: i * 4, end: i * 4 + 3 }), frameRate: 10, repeat: -1 });
                         });
+                        
+                        if (this.socket) this.socket.emit('playerMovement', { x: this.player.x, y: this.player.y, anim: 'down', avatar: this.textureKey });
                     }
                 } else if (e.target.id === 'back-pause-btn') {
                     renderMainPause();
@@ -2965,11 +2965,9 @@ class PvPScene extends Phaser.Scene {
         if (!container) {
             container = document.createElement('div');
             container.id = 'dialog-ui-container';
-            container.style.position = 'absolute';   /* Cambia da 'fixed' ad 'absolute' */
-            // --- NUOVO CONTROLLO RESPONSIVE ---
+            container.style.position = 'absolute';
             let isMobile = window.innerWidth <= 1024;
             container.style.bottom = isMobile ? '22vh' : '20px';
-            // ----------------------------------
             container.style.left = '50%';
             container.style.transform = 'translateX(-50%)';
             container.style.width = '95vw';
@@ -2996,8 +2994,6 @@ class PvPScene extends Phaser.Scene {
             textEl.style.lineHeight = '1.3';
 
             container.appendChild(textEl);
-
-            // Cambia 'document.body' con 'document.getElementById('game-container')'
             document.getElementById('game-container').appendChild(container);
         }
         container.style.display = 'flex';

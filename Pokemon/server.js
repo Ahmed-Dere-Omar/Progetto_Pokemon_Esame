@@ -9,7 +9,7 @@ app.use(cors());
 // Abilitiamo il CORS anche direttamente su Socket.io
 const io = require('socket.io')(server, {
     cors: {
-        origin: "*", 
+        origin: "*",
         methods: ["GET", "POST"]
     }
 });
@@ -54,6 +54,7 @@ io.on('connection', (socket) => {
     socket.on('joinGame', (playerName) => {
         players[socket.id] = {
             playerId: socket.id,
+            avatar: 'avatar',
             name: playerName,
             x: 100, y: 100, anim: 'down',
             inBattle: false
@@ -85,6 +86,7 @@ io.on('connection', (socket) => {
 
     socket.on('playerMovement', (data) => {
         if (players[socket.id]) {
+            players[socket.id].avatar = data.avatar;
             players[socket.id].x = data.x;
             players[socket.id].y = data.y;
             players[socket.id].anim = data.anim;
@@ -100,6 +102,8 @@ io.on('connection', (socket) => {
     });
 
     socket.on('challengePlayer', (targetId) => {
+        if (players[socket.id] && players[socket.id].inBattle) return;
+
         if (players[targetId] && players[targetId].inBattle) {
             socket.emit('opponentBusy');
         } else {
@@ -108,6 +112,9 @@ io.on('connection', (socket) => {
     });
 
     socket.on('acceptChallenge', (challengerId) => {
+        if (players[challengerId]) players[challengerId].inBattle = true;
+        if (players[socket.id]) players[socket.id].inBattle = true;
+
         let roomId = `battle_${challengerId}_${socket.id}`;
         battleRooms[roomId] = {
             p1: challengerId,
