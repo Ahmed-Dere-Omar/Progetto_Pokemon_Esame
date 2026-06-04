@@ -6,7 +6,7 @@ export default class WorldScene extends Phaser.Scene {
     constructor() { super({ key: 'WorldScene' }); }
     init(data) {
         this.myPlayerName = data.name;
-        this.vengoDa = data.vengoDa; // Registra da quale porta stai uscendo
+        this.vengoDa = data.vengoDa;
     }
     create() {
         let profilo = this.registry.get('playerProfile');
@@ -19,7 +19,7 @@ export default class WorldScene extends Phaser.Scene {
         this.isMovingGrid = false;
 
         this.setupMap();
-        this.setupAnimations(); // <-- CORRETTO
+        this.setupAnimations();
         this.setupNPCs();
         this.setupPlayer();
 
@@ -32,6 +32,8 @@ export default class WorldScene extends Phaser.Scene {
         this.canEncounter = true;
         this.isTransitioning = false;
 
+        this.inizializzaMusicaLobby();
+
         this.events.on('resume', () => {
             this.keys.LEFT.reset(); this.keys.RIGHT.reset();
             this.keys.UP.reset(); this.keys.DOWN.reset();
@@ -40,14 +42,20 @@ export default class WorldScene extends Phaser.Scene {
             this.canEncounter = false;
             setTimeout(() => { this.canEncounter = true; }, 1500);
             this.registry.set('lastBattleResult', null);
+
+            // --- FIX DEL VOLUME AL RITORNO DALLA BATTAGLIA ---
+            let ms = this.registry.get('musicState');
+            let ls = this.registry.get('lobbySound');
+            if (ms && ls) {
+                ls.setVolume(ms.volume);
+                if (ms.isPlaying && !ls.isPlaying) ls.play();
+            }
         });
     }
 
     setupMap() {
         const map = this.make.tilemap({ key: 'map' });
 
-        // I parametri sono: (nome_tileset, chiave_asset, tileWidth, tileHeight, margin, spacing)
-        // Impostiamo spacing a 1 per allineare perfettamente i disegni di Pokémon FireRed
         const tilesetA = map.addTilesetImage('a', 'tilesA', 16, 16, 1, 1);
         const tilesetB = map.addTilesetImage('e', 'tilesE', 16, 16, 0, 0);
         const tilesetC = map.addTilesetImage('c', 'tilesC', 16, 16, 1, 1);
@@ -55,20 +63,16 @@ export default class WorldScene extends Phaser.Scene {
 
         const allTilesets = [tilesetA, tilesetB, tilesetC, tilesetD];
 
-        // Caricamento dei layer definiti in Tiled
         map.createLayer('Sfondo', allTilesets, 0, 0);
         this.wallLayer = map.createLayer('Ostacoli', allTilesets, 0, 0);
         this.grassLayer = map.createLayer('Erba', allTilesets, 0, 0);
 
-        // Dimensioni fisiche del mondo
         this.mapWidth = map.widthInPixels;
         this.mapHeight = map.heightInPixels;
         this.physics.world.setBounds(0, 0, this.mapWidth, this.mapHeight);
 
-        // Collisioni (tutti i tile tranne quelli vuoti)
         this.wallLayer.setCollisionByExclusion([-1]);
 
-        // Setup delle zone interattive (PC, porte, ecc.)
         this.zoneInterattive = [];
         const objLayer = map.getObjectLayer('Interazioni');
         if (objLayer && objLayer.objects) {
@@ -88,8 +92,6 @@ export default class WorldScene extends Phaser.Scene {
         this.npc.setImmovable(true);
         this.physics.add.collider(this.npc, this.wallLayer);
     }
-
-
 
     setupAnimations() {
         ['down', 'left', 'right', 'up'].forEach(key => { if (this.anims.exists(key)) this.anims.remove(key); });
@@ -198,7 +200,6 @@ export default class WorldScene extends Phaser.Scene {
         }
 
         if (Phaser.Input.Keyboard.JustDown(this.keys.CONFIRM) && !this.isTransitioning && !this.isDialogActive) {
-
             if (this.zoneInterattive) {
                 let interazioneVicino = this.zoneInterattive.find(z => Phaser.Math.Distance.Between(this.player.x, this.player.y, z.x + (z.width || 0) / 2, z.y + (z.height || 0) / 2) < 40);
                 if (interazioneVicino) {
@@ -232,7 +233,6 @@ export default class WorldScene extends Phaser.Scene {
         this.player.anims.stop();
 
         try {
-            // 1. Controlla il salvataggio sul DB
             let profilo = this.registry.get('playerProfile');
             let hasSave = false;
             let savedLevel = 1;
@@ -242,15 +242,12 @@ export default class WorldScene extends Phaser.Scene {
                 console.warn("Nessun salvataggio trovato o colonna mancante sul DB:", error.message);
             } else if (data && data.id_mappa && data.id_mappa.startsWith('mappa_pve')) {
                 hasSave = true;
-                // Estrapola il numero del livello (es. "mappa_pve_2" -> 2)
                 let parts = data.id_mappa.split('_');
                 if (parts.length === 3) savedLevel = parseInt(parts[2]) || 1;
             }
 
-            // 2. Crea la UI del dialogo
             this.createDialogUI();
 
-            // 3. Mostra i testi in sequenza
             let dialoghi = hasSave
                 ? [`Hai un salvataggio in corso al Livello ${savedLevel}.`, "Vuoi riprendere la tua avventura?"]
                 : ["Benvenuto nella modalità PvE!", "Vuoi iniziare una nuova avventura?"];
@@ -279,11 +276,9 @@ export default class WorldScene extends Phaser.Scene {
         if (!container) {
             container = document.createElement('div');
             container.id = 'dialog-ui-container';
-            container.style.position = 'absolute';   /* Cambia da 'fixed' ad 'absolute' */
-            // --- NUOVO CONTROLLO RESPONSIVE ---
+            container.style.position = 'absolute';
             let isMobile = window.innerWidth <= 1024;
             container.style.bottom = isMobile ? '22vh' : '20px';
-            // ----------------------------------
             container.style.left = '50%';
             container.style.transform = 'translateX(-50%)';
             container.style.width = '95vw';
@@ -310,8 +305,6 @@ export default class WorldScene extends Phaser.Scene {
             textEl.style.lineHeight = '1.3';
 
             container.appendChild(textEl);
-
-            // Cambia 'document.body' con 'document.getElementById('game-container')'
             document.getElementById('game-container').appendChild(container);
         }
         container.style.display = 'flex';
@@ -359,10 +352,10 @@ export default class WorldScene extends Phaser.Scene {
             choiceContainer = document.createElement('div');
             choiceContainer.id = 'dialog-choice-container';
             choiceContainer.style.position = 'fixed';
-            choiceContainer.style.bottom = '180px'; /* Alzato sopra il dialogo */
-            choiceContainer.style.left = '65%';     /* Centrato orizzontalmente */
+            choiceContainer.style.bottom = '180px';
+            choiceContainer.style.left = '65%';
             choiceContainer.style.transform = 'translateX(-50%)';
-            choiceContainer.style.right = 'auto';   /* Rimosso l'ancoraggio a destra */
+            choiceContainer.style.right = 'auto';
             choiceContainer.style.width = 'auto';
             choiceContainer.style.minWidth = '120px';
             choiceContainer.style.backgroundColor = '#2b2b2b';
@@ -397,7 +390,7 @@ export default class WorldScene extends Phaser.Scene {
         }
 
         choiceContainer.style.display = 'flex';
-        this.sceltaAttuale = 0; // 0 = SÌ, 1 = NO
+        this.sceltaAttuale = 0;
 
         const aggiornaCursoreScelta = () => {
             let optSi = document.getElementById('dialog-opt-si');
@@ -442,6 +435,7 @@ export default class WorldScene extends Phaser.Scene {
             this.time.delayedCall(100, () => { this.isDialogActive = false; });
         });
     }
+
     parlaConTutorialNPC() {
         if (this.isDialogActive) return;
         this.isDialogActive = true;
@@ -451,7 +445,7 @@ export default class WorldScene extends Phaser.Scene {
         this.mostraTestiDialogo([
             "Benvenuto nel mondo di NEOMON!",
             "Qui puoi sfidare altri giocatori nel PvP, progredire nella campagna PvE o completare il tuo Pokédex.",
-            "Vuoi testare le tue abilità con una battaglia tutorial? ▼"
+            "Vuoi testare le tue abilità con una battaglia tutorial?"
         ], () => {
             this.mostraSceltaSiNo((scelta) => {
                 this.chiudiDialogo();
@@ -472,7 +466,7 @@ export default class WorldScene extends Phaser.Scene {
 
         this.createDialogUI();
 
-        this.mostraTestiDialogo(["Vuoi entrare nell'Arena PvP? ▼"], () => {
+        this.mostraTestiDialogo(["Vuoi entrare nell'Arena PvP?"], () => {
             this.mostraSceltaSiNo((scelta) => {
                 this.chiudiDialogo();
                 if (scelta === 'SI') {
@@ -606,9 +600,47 @@ export default class WorldScene extends Phaser.Scene {
             this.isDialogActive = false;
 
             this.scene.stop('WorldScene');
-            // Passiamo il levelToLoad alla PVEScene
             this.scene.start('PVEScene', { name: this.myPlayerName, user: this.registry.get('playerProfile'), level: levelToLoad });
         }, 1000);
+    }
+
+    inizializzaMusicaLobby() {
+        try {
+            let lobbyTracks = this.registry.get('lobbyTracks');
+            let musicState = this.registry.get('musicState');
+            if (!lobbyTracks || lobbyTracks.length === 0) return;
+
+            let existingSound = this.registry.get('lobbySound');
+            if (existingSound && !existingSound.pendingRemove) {
+                if (!existingSound.isPlaying && !existingSound.isPaused) {
+                    existingSound.play();
+                    musicState.isPlaying = true;
+                }
+                return;
+            }
+
+            let trackIdx = musicState.currentTrackIndex || 0;
+            let track = lobbyTracks[trackIdx];
+            // Applica il loop dal db se presente
+            let sound = this.sound.add(track.key, { loop: musicState.isLooping, volume: musicState.volume });
+
+            sound.on('complete', () => {
+                let ms = this.registry.get('musicState');
+                let lt = this.registry.get('lobbyTracks');
+                ms.currentTrackIndex = (ms.currentTrackIndex + 1) % lt.length;
+                let nextTrack = lt[ms.currentTrackIndex];
+                let newSound = this.sound.add(nextTrack.key, { loop: ms.isLooping, volume: ms.volume });
+                newSound.on('complete', sound._events.complete.fn);
+                newSound.play();
+                this.registry.set('lobbySound', newSound);
+            });
+
+            sound.play();
+            musicState.isPlaying = true;
+            this.registry.set('lobbySound', sound);
+        } catch (e) {
+            console.warn('Errore inizializzazione musica lobby:', e);
+        }
     }
 
     togglePauseMenu() {
@@ -631,7 +663,18 @@ export default class WorldScene extends Phaser.Scene {
 
             let overlay = document.createElement('div');
             overlay.id = 'pause-menu-overlay';
-            overlay.className = 'modal-overlay';
+            overlay.className = 'pause-overlay';
+
+            overlay.innerHTML = `
+                <div class="pause-bg-stack">
+                    <div class="pause-bg-layer active-bg" id="bg-menu" style="background-image: url('assets/img_menu1.png');"></div>
+                    <div class="pause-bg-layer" id="bg-profile" style="background-image: url('assets/img_menu2.png');"></div>
+                    <div class="pause-bg-layer" id="bg-controls" style="background-image: url('assets/img_menu3.png');"></div>
+                    <div class="pause-bg-layer" id="bg-music" style="background-image: url('assets/img_menu4.png');"></div>
+                </div>
+                <div class="pause-card" id="pause-box"></div>
+            `;
+            document.getElementById('game-container').appendChild(overlay);
 
             let selectedIdx = 0;
             let currentButtons = [];
@@ -641,77 +684,147 @@ export default class WorldScene extends Phaser.Scene {
                 currentButtons.forEach((btnId, idx) => {
                     let btn = document.getElementById(btnId);
                     if (btn) {
-                        if (idx === selectedIdx) {
-                            btn.style.transform = 'scale(1.05)';
-                            btn.style.backgroundColor = '#4a3b5c';
-                            btn.style.color = '#ffcc00';
-                            btn.style.borderColor = '#ffcc00';
-                            btn.style.boxShadow = '6px 6px 0 #ffcc00';
-                        } else {
-                            btn.style.transform = 'scale(1)';
-                            btn.style.backgroundColor = '#f6eedf';
-                            btn.style.color = '#ff7477';
-                            btn.style.borderColor = '#ff7477';
-                            btn.style.boxShadow = '4px 4px 0 #e69597';
-                        }
+                        if (idx === selectedIdx) btn.classList.add('selected');
+                        else btn.classList.remove('selected');
                     }
                 });
+            };
+
+            const setBgLayer = (activeId) => {
+                ['bg-menu', 'bg-profile', 'bg-controls', 'bg-music'].forEach(id => {
+                    let el = document.getElementById(id);
+                    if (el) el.classList.remove('active-bg');
+                });
+                let activeEl = document.getElementById(activeId);
+                if (activeEl) activeEl.classList.add('active-bg');
             };
 
             const renderMainPause = () => {
                 overlay.inSubMenu = false;
                 selectedIdx = 0;
-                currentButtons = ['profile-btn', 'controls-btn', 'logout-btn'];
+                currentButtons = ['profile-btn', 'controls-btn', 'music-btn', 'logout-btn'];
 
-                overlay.innerHTML = `
-                    <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 90%; max-width: 400px;">
-                        <h2 class="text-shadows" style="font-size: clamp(2rem, 6vw, 3.5rem); margin-bottom: 30px; text-align: center;">MENU PAUSA</h2>
-                        <button id="profile-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 10px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: all 0.1s;">PROFILO</button>
-                        <button id="controls-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: all 0.1s;">COMANDI</button>
-                        <button id="logout-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: all 0.1s;">ESCI DAL GIOCO</button>
-                        <p style="color: #fff; margin-top: 40px; font-size: 1.2rem; font-family: 'Courier New'; font-weight: bold; text-align: center;">Premi ESC per tornare al gioco</p>
-                    </div>`;
+                let box = document.getElementById('pause-box');
+                if (box) {
+                    box.innerHTML = `
+                        <h2 class="pause-title">MENU PAUSA</h2>
+                        <button id="profile-btn" class="pause-btn"><span class="pause-btn-icon"></span>PROFILO</button>
+                        <button id="controls-btn" class="pause-btn"><span class="pause-btn-icon"></span>COMANDI</button>
+                        <button id="music-btn" class="pause-btn"><span class="pause-btn-icon"></span>MUSICA</button>
+                        <button id="logout-btn" class="pause-btn"><span class="pause-btn-icon"></span>ESCI DAL GIOCO</button>
+                        <p class="pause-footer">// PREMI ESC PER TORNARE AL GIOCO</p>
+                    `;
+                }
                 updateSelection();
+                setBgLayer('bg-menu');
             };
 
             overlay.renderMainPause = renderMainPause;
 
             const renderControls = () => {
                 overlay.inSubMenu = true;
-
-                let controlsHtml = `
-                    <div style="margin-bottom: 15px;">
-                        <h3 style="color: #ffcc00; margin: 0 0 5px 0; font-size: 1.3rem;">MOVIMENTO</h3>
-                        <p style="margin: 0;"><strong>WASD</strong> o <strong>Frecce Direzionali</strong></p>
-                    </div>
-                    <div style="margin-bottom: 15px;">
-                        <h3 style="color: #ffcc00; margin: 0 0 5px 0; font-size: 1.3rem;">AZIONI</h3>
-                        <p style="margin: 0;"><strong>Conferma:</strong> INVIO</p>
-                        <p style="margin: 5px 0 0 0;"><strong>Annulla / Indietro:</strong> ESC</p>
-                    </div>
-                    <div style="margin-bottom: 15px;">
-                        <h3 style="color: #ffcc00; margin: 0 0 5px 0; font-size: 1.3rem;">IN BATTAGLIA</h3>
-                        <p style="margin: 0;"><strong>Statistiche:</strong> SHIFT</p>
-                    </div>
-                    <div>
-                        <h3 style="color: #ffcc00; margin: 0 0 5px 0; font-size: 1.3rem;">GENERICI</h3>
-                        <p style="margin: 0;"><strong>Mouse / Touch:</strong> Interfaccia UI e Dialoghi</p>
-                    </div>
-                `;
-
-                overlay.innerHTML = `
-                    <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 90%; max-width: 500px;">
-                        <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">COMANDI</h2>
-                        <div style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; border: 2px solid #ffcc00; width: 85%; color: #fff; font-family: 'Courier New', monospace; font-size: 1.2rem; text-align: left; max-height: 50vh; overflow-y: auto;">
-                            ${controlsHtml}
+                let box = document.getElementById('pause-box');
+                if (box) {
+                    box.innerHTML = `
+                        <h2 class="pause-title">COMANDI</h2>
+                        <div class="pause-info-panel">
+                            <div class="info-section"><h3>MOVIMENTO</h3><p><strong>WASD</strong> o <strong>Frecce Direzionali</strong></p></div>
+                            <div class="info-section"><h3>AZIONI</h3><p><strong>Conferma:</strong> INVIO</p><p><strong>Annulla / Indietro:</strong> ESC</p></div>
+                            <div class="info-section"><h3>IN BATTAGLIA</h3><p><strong>Statistiche:</strong> SHIFT</p></div>
+                            <div class="info-section"><h3>GENERICI</h3><p><strong>Mouse / Touch:</strong> Interfaccia UI e Dialoghi</p></div>
                         </div>
-                        <button id="back-pause-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 30px; font-size: 1.5rem; font-weight: bold; background-color: #4a3b5c; color: #ffcc00; border: 4px solid #ffcc00; border-radius: 8px; cursor: pointer; box-shadow: 6px 6px 0 #ffcc00; transform: scale(1.05);">INDIETRO</button>
-                    </div>
-                `;
+                        <button id="back-pause-btn" class="pause-back-btn">INDIETRO</button>
+                    `;
+                }
+            };
+
+            const renderMusicMenu = () => {
+                overlay.inSubMenu = true;
+                let lobbyTracks = this.registry.get('lobbyTracks') || [];
+                let musicState = this.registry.get('musicState') || { currentTrackIndex: 0, volume: 0.5, isPlaying: false, isLooping: false };
+                let currentTrack = lobbyTracks[musicState.currentTrackIndex] || { name: 'Nessuna traccia' };
+                let lobbySound = this.registry.get('lobbySound');
+                let isActuallyPlaying = lobbySound && lobbySound.isPlaying;
+
+                let box = document.getElementById('pause-box');
+                if (box) {
+                    box.innerHTML = `
+                        <h2 class="pause-title">MUSICA</h2>
+                        <div class="music-player-card">
+                            <div class="music-track-label">IN RIPRODUZIONE</div>
+                            <div class="music-track-name" id="music-track-name">${currentTrack.name}</div>
+                            <div class="music-controls">
+                                <button class="music-btn" id="music-loop" style="${musicState.isLooping ? 'color: var(--ab-cyan); border-color: var(--ab-cyan); box-shadow: 0 0 10px rgba(0,240,255,0.3);' : ''}">🔁</button>
+                                <button class="music-btn" id="music-prev">⏮</button>
+                                <button class="music-btn music-btn-play" id="music-play">${isActuallyPlaying ? '⏸' : '▶'}</button>
+                                <button class="music-btn" id="music-next">⏭</button>
+                            </div>
+                            <div class="music-volume-wrap">
+                                <span class="music-volume-icon">🔉</span>
+                                <input type="range" min="0" max="100" value="${Math.round(musicState.volume * 100)}" class="music-volume-slider" id="music-volume">
+                                <span class="music-volume-val" id="music-vol-val">${Math.round(musicState.volume * 100)}%</span>
+                            </div>
+                        </div>
+                        <button id="back-pause-btn" class="pause-back-btn">INDIETRO</button>
+                    `;
+
+                    let volSlider = document.getElementById('music-volume');
+                    if (volSlider) {
+                        volSlider.addEventListener('input', (ev) => {
+                            let val = parseInt(ev.target.value) / 100;
+                            let ms = this.registry.get('musicState');
+                            ms.volume = val;
+                            let ls = this.registry.get('lobbySound');
+                            if (ls) ls.setVolume(val);
+                            let volLabel = document.getElementById('music-vol-val');
+                            if (volLabel) volLabel.innerText = Math.round(val * 100) + '%';
+                        });
+
+                        volSlider.addEventListener('change', async (ev) => {
+                            let val = parseInt(ev.target.value) / 100;
+                            let profilo = this.registry.get('playerProfile');
+                            profilo.volume = val;
+
+                            const { error } = await supabaseClient.from('profilo')
+                                .update({ volume: val })
+                                .eq('id_profilo', profilo.id_profilo);
+
+                            if (error) console.error("Errore salvataggio volume DB:", error);
+                        });
+                    }
+                }
+            };
+
+            const switchTrack = (direction) => {
+                let lobbyTracks = this.registry.get('lobbyTracks') || [];
+                let musicState = this.registry.get('musicState');
+                let lobbySound = this.registry.get('lobbySound');
+                if (!lobbyTracks.length) return;
+
+                if (lobbySound) { lobbySound.stop(); lobbySound.destroy(); }
+
+                musicState.currentTrackIndex = (musicState.currentTrackIndex + direction + lobbyTracks.length) % lobbyTracks.length;
+                let track = lobbyTracks[musicState.currentTrackIndex];
+
+                let newSound = this.sound.add(track.key, { loop: musicState.isLooping, volume: musicState.volume });
+
+                newSound.on('complete', () => {
+                    let ms = this.registry.get('musicState');
+                    let lt = this.registry.get('lobbyTracks');
+                    ms.currentTrackIndex = (ms.currentTrackIndex + 1) % lt.length;
+                    switchTrack(0);
+                });
+                newSound.play();
+                musicState.isPlaying = true;
+                this.registry.set('lobbySound', newSound);
+
+                let nameEl = document.getElementById('music-track-name');
+                if (nameEl) nameEl.innerText = track.name;
+                let playBtn = document.getElementById('music-play');
+                if (playBtn) playBtn.innerText = '⏸';
             };
 
             renderMainPause();
-            document.getElementById('game-container').appendChild(overlay);
 
             this.handlePauseKeyDown = (e) => {
                 let key = e.key;
@@ -727,7 +840,7 @@ export default class WorldScene extends Phaser.Scene {
                         if (btn) btn.click();
                     }
                 } else if (overlay.inSubMenu) {
-                    if (key === 'Enter' || key === ' ' || key === 'Escape' || key === 'Backspace') {
+                    if (key === 'Enter' || key === ' ' || key === 'Backspace') {
                         let btn = document.getElementById('back-pause-btn');
                         if (btn) btn.click();
                     } else if (key === 'ArrowLeft' || key === 'a' || key === 'A') {
@@ -746,11 +859,69 @@ export default class WorldScene extends Phaser.Scene {
                     e.target.innerText = "USCITA IN CORSO...";
                     this.isPaused = false;
                     if (this.handlePauseKeyDown) window.removeEventListener('keydown', this.handlePauseKeyDown);
+
+                    // 1. Disconnette da Supabase
                     await supabaseClient.auth.signOut();
-                    window.location.reload();
+
+                    // 2. Spegne la musica
+                    let ls = this.registry.get('lobbySound');
+                    if (ls) { ls.stop(); ls.destroy(); }
+
+                    // 3. Rimuove il menu
+                    let existingMenu = document.getElementById('pause-menu-overlay');
+                    if (existingMenu) existingMenu.remove();
+
+                    // 4. Pulisce la memoria del giocatore corrente e torna al Login Istananeamente!
+                    this.registry.set('playerProfile', null);
+                    this.registry.set('userPokemon', null);
+
+                    this.scene.stop(); // Ferma la scena corrente
+                    this.scene.start('LoginScene'); // Torna al login in 0.1 secondi
                 } else if (e.target.id === 'controls-btn') {
+                    setBgLayer('bg-controls');
                     renderControls();
+                } else if (e.target.id === 'music-btn') {
+                    setBgLayer('bg-music');
+                    renderMusicMenu();
+                } else if (e.target.id === 'music-loop') {
+                    let ms = this.registry.get('musicState');
+                    ms.isLooping = !ms.isLooping;
+
+                    let ls = this.registry.get('lobbySound');
+                    if (ls) ls.setLoop(ms.isLooping);
+
+                    if (ms.isLooping) {
+                        e.target.style.color = 'var(--ab-cyan)';
+                        e.target.style.borderColor = 'var(--ab-cyan)';
+                        e.target.style.boxShadow = '0 0 10px rgba(0,240,255,0.3)';
+                    } else {
+                        e.target.style.color = 'var(--ab-paper)';
+                        e.target.style.borderColor = 'var(--ab-border)';
+                        e.target.style.boxShadow = 'none';
+                    }
+                } else if (e.target.id === 'music-play') {
+                    let lobbySound = this.registry.get('lobbySound');
+                    let musicState = this.registry.get('musicState');
+                    if (lobbySound) {
+                        if (lobbySound.isPlaying) {
+                            lobbySound.pause();
+                            musicState.isPlaying = false;
+                            e.target.innerText = '▶';
+                        } else {
+                            lobbySound.resume();
+                            musicState.isPlaying = true;
+                            e.target.innerText = '⏸';
+                        }
+                    } else {
+                        this.inizializzaMusicaLobby();
+                        e.target.innerText = '⏸';
+                    }
+                } else if (e.target.id === 'music-prev') {
+                    switchTrack(-1);
+                } else if (e.target.id === 'music-next') {
+                    switchTrack(1);
                 } else if (e.target.id === 'profile-btn') {
+                    setBgLayer('bg-profile');
                     overlay.inSubMenu = true;
                     let profilo = this.registry.get('playerProfile');
                     let winRate = profilo.partite_totali > 0 ? ((profilo.vittorie_totali / profilo.partite_totali) * 100).toFixed(1) : 0;
@@ -760,21 +931,21 @@ export default class WorldScene extends Phaser.Scene {
 
                     if (box) {
                         box.innerHTML = `
-                            <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">PROFILO</h2>
-                            <div style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; border: 2px solid #ff7477; width: 85%; color: #fff; font-family: 'Courier New', monospace; font-size: 1.2rem; text-align: center;">
+                            <h2 class="pause-title">PROFILO</h2>
+                            <div class="pause-profile-panel">
                                 <p><strong>NOME:</strong> ${profilo.username || 'Sconosciuto'}</p>
                                 <p><strong>VITTORIE:</strong> ${profilo.vittorie_totali || 0}</p>
                                 <p><strong>PARTITE:</strong> ${profilo.partite_totali || 0}</p>
                                 <p><strong>VITTORIE %:</strong> ${winRate}%</p>
-                                <div style="margin-top: 15px; display: flex; justify-content: center; align-items: center; gap: 15px;">
-                                    <button id="prev-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&lt;</button>
+                                <div class="avatar-selector">
+                                    <button id="prev-avatar" class="avatar-nav-btn">&lt;</button>
                                     <div style="width: 32px; height: 32px; overflow: hidden; position: relative; transform: scale(2); margin: 0 15px; image-rendering: pixelated;">
                                         <img id="profile-avatar" src="${currentAvatarPath}" style="position: absolute; top: 0; left: 0; width: 400%; height: 400%; max-width: none;">
                                     </div>
-                                    <button id="next-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&gt;</button>
+                                    <button id="next-avatar" class="avatar-nav-btn">&gt;</button>
                                 </div>
                             </div>
-                            <button id="back-pause-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 30px; font-weight: bold; background-color: #4a3b5c; color: #ffcc00; border: 4px solid #ffcc00; border-radius: 8px; cursor: pointer; box-shadow: 6px 6px 0 #ffcc00; transform: scale(1.05);">INDIETRO</button>
+                            <button id="back-pause-btn" class="pause-back-btn">INDIETRO</button>
                         `;
                     }
                 } else if (e.target.id === 'prev-avatar' || e.target.id === 'next-avatar') {
@@ -789,10 +960,8 @@ export default class WorldScene extends Phaser.Scene {
                     imgEl.src = newAvatarPath;
                     let numberToSave = idx + 1;
 
-                    // 1. Aggiorna il profilo locale nel gioco
                     profilo.avatar_sprite = numberToSave;
 
-                    // 2. MAGIA: L'await che costringe Supabase a "spedire la lettera" al database!
                     const { error } = await supabaseClient.from('profilo')
                         .update({ avatar_sprite: numberToSave })
                         .eq('id_profilo', profilo.id_profilo);
@@ -807,7 +976,6 @@ export default class WorldScene extends Phaser.Scene {
                         this.player.setTexture(textureKey);
                         this.textureKey = textureKey;
 
-                        // Distrugge le vecchie animazioni e le ricrea con il nuovo spritesheet
                         ['down', 'left', 'right', 'up'].forEach(key => { if (this.anims.exists(key)) this.anims.remove(key); });
                         ['down', 'left', 'right', 'up'].forEach((key, i) => {
                             this.anims.create({ key, frames: this.anims.generateFrameNumbers(this.textureKey, { start: i * 4, end: i * 4 + 3 }), frameRate: 10, repeat: -1 });
@@ -819,6 +987,8 @@ export default class WorldScene extends Phaser.Scene {
             });
         }
     }
+
+    // ... METODI APRI PC E BATTLES NON TOCCATI ...
     async apriPC() {
         if (this.pcOpen) return;
         this.pcOpen = true;
@@ -838,7 +1008,6 @@ export default class WorldScene extends Phaser.Scene {
 
         this.pcState = { view: 'browsing', area: 'squadra', index: 0, actionIdx: 0, summaryPage: 0, moveSelectionIdx: 0 };
 
-        // APPLICHIAMO LE NUOVE CLASSI GLOBALI!
         let overlay = document.createElement('div');
         overlay.className = 'pkmn-modal-overlay';
         overlay.id = 'pc-overlay-main';
@@ -925,10 +1094,8 @@ export default class WorldScene extends Phaser.Scene {
             .pc-action-btn { background: var(--battle-panel); border: 2px solid var(--battle-border); color: #fff; padding: 10px; font-weight: bold; cursor: pointer; }
             .pc-action-btn.selected { border-color: var(--battle-accent); color: var(--battle-accent); background: #3d2b4f; transform: translateX(-5px); box-shadow: 4px 4px 0 var(--battle-accent); }
             
-            /* Griglia Box dinamica (Desktop) */
             .pc-grid-box { grid-template-columns: repeat(6, 1fr); }
 
-            /* MEDIA QUERIES PER MOBILE */
             @media (max-width: 1024px) {
                 #pc-modal-content { height: 90dvh !important; max-height: 90dvh !important; overflow-y: scroll !important; overflow-x: hidden !important; }
                 #pc-main-view { flex-direction: column !important; overflow-y: visible !important; }
@@ -946,7 +1113,6 @@ export default class WorldScene extends Phaser.Scene {
                 let p = squadra[i];
                 if (p) {
                     let sprite = pkmnDB[p.id_specie]?.sprite?.normal || '';
-                    // Immagine passata da 60px a 80px!
                     sqHtml += `<div class="pc-sq-slot" data-area="squadra" data-index="${i}"><img src="${sprite}" style="width: 80px; max-height: 80px; image-rendering: pixelated;"><span style="color: white; font-weight: bold; font-size: 1.2rem;">${p.id_specie.toUpperCase()}</span></div>`;
                 } else {
                     sqHtml += `<div class="pc-sq-slot" data-area="squadra" data-index="${i}"><span style="color: #666; font-style: italic;">SLOT VUOTO</span></div>`;
@@ -1213,6 +1379,7 @@ export default class WorldScene extends Phaser.Scene {
         renderPCLists();
         updateVisuals();
     }
+
     startEncounter(battleData, testo = "BATTAGLIA!") {
         this.isTransitioning = true;
         this.player.body.setVelocity(0);
@@ -1248,7 +1415,6 @@ export default class WorldScene extends Phaser.Scene {
                 return;
             }
 
-            // Bypassiamo SelectionScene e andiamo dritti alla lotta!
             battleData.parentScene = 'WorldScene';
             this.scene.launch('BattleScene', battleData);
         }, 2000);

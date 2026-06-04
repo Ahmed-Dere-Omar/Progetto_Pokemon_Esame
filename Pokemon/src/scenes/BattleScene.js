@@ -24,6 +24,58 @@ export default class BattleScene extends Phaser.Scene {
         this.load.image('pokeball_scuoti', 'assets/Pokeball.png');
     }
 
+avviaMusicaBattaglia() {
+        try {
+            // 1. Fade out rapido e pausa della musica della lobby
+            let lobbySound = this.registry.get('lobbySound');
+            if (lobbySound && lobbySound.isPlaying) {
+                this.tweens.add({
+                    targets: lobbySound,
+                    volume: 0,
+                    duration: 200,
+                    onComplete: () => { lobbySound.pause(); }
+                });
+            }
+
+            // 2. Avvia la musica della battaglia usando ESATTAMENTE il volume salvato nel DB
+            let battleTracks = this.registry.get('battleTracks');
+            if (battleTracks && battleTracks.length > 0) {
+                let randomIdx = Phaser.Math.Between(0, battleTracks.length - 1);
+                let track = battleTracks[randomIdx];
+                
+                // Peschiamo la variabile aggiornata dal database
+                let musicState = this.registry.get('musicState');
+                let volumeDb = musicState ? musicState.volume : 0.5;
+                
+                this.battleMusic = this.sound.add(track.key, { loop: true, volume: volumeDb });
+                this.battleMusic.play();
+            }
+        } catch (e) {
+            console.warn('Errore avvio musica battaglia:', e);
+        }
+    }
+
+    fermaEripristinaMusica() {
+        try {
+            // Ferma e distruggi definitivamente la musica di battaglia
+            if (this.battleMusic) {
+                this.battleMusic.stop();
+                this.battleMusic.destroy();
+                this.battleMusic = null;
+            }
+
+            // Mettiamo il volume della lobby a zero per azzerare conflitti.
+            // Sarà il nuovo comando "ls.setVolume(ms.volume)" che abbiamo iniettato 
+            // nell'evento 'resume' delle mappe a far ripartire l'audio al volume perfetto!
+            let lobbySound = this.registry.get('lobbySound');
+            if (lobbySound) {
+                lobbySound.setVolume(0);
+            }
+        } catch (e) {
+            console.warn('Errore ripristino musica lobby:', e);
+        }
+    }
+
     buildTeamData(dbTeam) {
         let pkmnDB = this.registry.get('pokemonDB');
         let moveDB = this.registry.get('moveDB');
@@ -60,6 +112,9 @@ export default class BattleScene extends Phaser.Scene {
 
         this.keys = this.input.keyboard.addKeys(InputConfig);
         this.createStatsUI();
+
+        // === OBIETTIVO 5: Pausa musica lobby e avvia musica battaglia ===
+        this.avviaMusicaBattaglia();
 
         this.myTeamData = this.buildTeamData(this.registry.get('userPokemon').filter(p => p.in_squadra).sort((a, b) => a.posizione_slot - b.posizione_slot));
         this.myActiveIdx = 0;
@@ -433,7 +488,7 @@ export default class BattleScene extends Phaser.Scene {
                     this.logText.setText("Sei fuggito con successo!");
                     this.time.delayedCall(1500, () => {
                         if (this.socket) this.socket.emit('setInBattle', false);
-                        this.scene.stop(); this.scene.resume(this.parentScene);
+                        this.fermaEripristinaMusica(); this.scene.stop(); this.scene.resume(this.parentScene);
                     });
                 } else {
                     this.logText.setText("In attesa dell'avversario...");
@@ -514,6 +569,7 @@ export default class BattleScene extends Phaser.Scene {
         ball.setTint(0xffff00);
         this.time.delayedCall(2000, () => {
             this.registry.set('lastBattleResult', 'win');
+            this.fermaEripristinaMusica();
             this.scene.stop();
             this.scene.resume(this.parentScene);
         });
@@ -677,7 +733,7 @@ export default class BattleScene extends Phaser.Scene {
                         targets: fadeTweens, y: '+=100', alpha: 0, duration: 1000,
                         onComplete: () => {
                             if (this.socket) this.socket.emit('setInBattle', false);
-                            this.scene.stop(); this.scene.resume(this.parentScene);
+                            this.fermaEripristinaMusica(); this.scene.stop(); this.scene.resume(this.parentScene);
                         }
                     });
                 });
@@ -694,6 +750,7 @@ export default class BattleScene extends Phaser.Scene {
                     this.logText.setText("Tutti i tuoi Pokémon sono esausti! Sei tornato alla base.");
                     this.time.delayedCall(2000, () => {
                         this.registry.set('lastBattleResult', 'lose');
+                        this.fermaEripristinaMusica();
                         this.scene.stop();
                         this.scene.resume(this.parentScene);
                     });

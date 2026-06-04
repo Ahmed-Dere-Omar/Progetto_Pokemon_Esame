@@ -21,7 +21,7 @@
 body {
     margin: 0;
     padding: 0;
-    background-color: #3E1E68;
+    background-color: #0B0C10;
     height: 100dvh;
     min-height: -webkit-fill-available;
     overflow: hidden;
@@ -57,8 +57,8 @@ canvas {
 }
 
 #login-container {
-    background-color: #3E1E68;
-    color: white;
+    background-color: #0B0C10;
+    color: #F5F5F5;
 }
 
 .selection-overlay {
@@ -75,34 +75,6 @@ canvas {
     font-size: 2rem;
     margin-bottom: 30px;
     letter-spacing: 2px;
-}
-
-/* --- Barra di testo del Nome --- */
-#username-input {
-    width: 300px;
-    padding: 15px;
-    font-size: 1.5rem;
-    font-family: 'Courier New', Courier, monospace;
-    font-weight: bold;
-    text-align: center;
-    background-color: var(--color-primary);
-    color: var(--color-secondary);
-    border: 4px solid var(--color-secondary);
-    border-radius: 8px;
-    outline: none;
-    margin-top: 20px;
-    margin-bottom: 10px;
-    box-shadow: 4px 4px 0 var(--color-tertiary);
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-#username-input::placeholder {
-    color: var(--color-quaternary);
-}
-
-#username-input:focus {
-    transform: translate(-2px, -2px);
-    box-shadow: 6px 6px 0 var(--color-tertiary);
 }
 
 /* --- Bottoni --- */
@@ -238,7 +210,7 @@ canvas {
 
 .modal-content::before,
 .modal-content::after {
-    content: '◈';
+    content: 'â—ˆ';
     position: absolute;
     font-size: 28px;
     color: var(--color-secondary);
@@ -614,7 +586,7 @@ canvas {
 
 .pkmn-modal-content::before,
 .pkmn-modal-content::after {
-    content: '◈';
+    content: 'â—ˆ';
     position: absolute;
     font-size: 28px;
     color: var(--color-secondary);
@@ -695,7 +667,7 @@ canvas {
    ========================================= */
 .battle-hp-box {
     width: 320px;
-    /* Molto più largo e imponente */
+    /* Molto piÃ¹ largo e imponente */
     background: rgba(38, 28, 51, 0.85);
     border: 4px solid var(--battle-border);
     padding: 15px 20px;
@@ -727,7 +699,7 @@ canvas {
 /* Modifichiamo la barra interna SOLO per la battaglia */
 .battle-hp-box .hp-bar-bg {
     height: 18px;
-    /* Barra molto più spessa */
+    /* Barra molto piÃ¹ spessa */
     border-radius: 9px;
     border: 3px solid var(--battle-black);
 }
@@ -737,7 +709,7 @@ canvas {
     text-shadow: 2px 2px 0 #000;
 }
 
-/* Status (es. PARALISI) più visibile */
+/* Status (es. PARALISI) piÃ¹ visibile */
 .battle-status-label {
     font-size: 14px !important;
     padding: 4px 10px !important;
@@ -914,9 +886,827 @@ canvas {
     }
 }
 
-/* Nascondiamo su PC e schermi grandi! */
 @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
     #mobile-controls {
         display: none !important;
     }
+}
+
+/* =========================================================
+   ABYSSAL CYBER / NEO-RETRO JRPG THEME
+   Persona 5 × Brutalist × Cyberpunk
+   ========================================================= */
+
+:root {
+    --ab-void: #0B0C10;
+    --ab-deep: #0F2537;
+    --ab-panel: #111827;
+    --ab-paper: #F5F5F5;
+    --ab-cyan: #00F0FF;
+    --ab-coral: #FF2A6D;
+    --ab-coral-dim: #cc1f57;
+    --ab-cyan-dim: #00b8c4;
+    --ab-text-dim: #6b7a8d;
+    --ab-border: #1e293b;
+    --ab-shadow: #000000;
+    --ab-snap: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    --ab-fast: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* =========================================================
+   LOGIN / REGISTRAZIONE — PERSONA STYLE
+   ========================================================= */
+#login-container {
+    background: var(--ab-void) !important;
+    font-family: 'Outfit', 'Courier New', monospace !important;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Taglio diagonale decorativo */
+#login-container::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -10%;
+    width: 60%; height: 100%;
+    background: var(--ab-deep);
+    transform: skewX(-12deg);
+    z-index: 0;
+    pointer-events: none;
+}
+
+#login-container > * {
+    position: relative;
+    z-index: 1;
+}
+
+.login-subtitle {
+    font-family: 'Outfit', 'Courier New', monospace;
+    font-weight: 300;
+    font-size: 1.3rem;
+    letter-spacing: 14px;
+    margin-top: 0;
+    color: var(--ab-cyan);
+    text-transform: uppercase;
+    text-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+}
+
+.login-card {
+    background: var(--ab-panel);
+    border: 3px solid var(--ab-border);
+    border-left: 6px solid var(--ab-coral);
+    padding: 32px 28px 24px;
+    width: 380px;
+    max-width: 90%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
+    animation: abSlashIn 0.3s var(--ab-snap);
+    position: relative;
+}
+
+@keyframes abSlashIn {
+    from { opacity: 0; transform: translateX(-30px) skewX(-4deg); }
+    to   { opacity: 1; transform: translateX(0) skewX(0); }
+}
+
+/* Taglio angolo decorativo */
+.login-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0; right: 0;
+    width: 20px; height: 20px;
+    background: var(--ab-coral);
+    clip-path: polygon(100% 0, 100% 100%, 0 100%);
+}
+
+.login-input-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.login-input-icon { display: none; }
+
+.login-input {
+    width: 100%;
+    padding: 14px 16px;
+    font-size: 1rem;
+    font-family: 'Outfit', 'Courier New', monospace;
+    font-weight: 600;
+    color: var(--ab-paper);
+    background: var(--ab-void);
+    border: 2px solid var(--ab-border);
+    border-left: 4px solid transparent;
+    outline: none;
+    margin-top: 12px;
+    box-sizing: border-box;
+    transition: all 0.15s var(--ab-fast);
+    letter-spacing: 1px;
+}
+
+.login-input::placeholder {
+    color: var(--ab-text-dim);
+    font-weight: 400;
+    letter-spacing: 2px;
+}
+
+.login-input:focus {
+    border-color: var(--ab-cyan);
+    border-left: 4px solid var(--ab-cyan);
+    box-shadow: 0 0 14px rgba(0, 240, 255, 0.2), inset 0 0 8px rgba(0, 240, 255, 0.05);
+    color: #fff;
+}
+
+.login-btn-primary {
+    width: 100%;
+    padding: 16px;
+    margin-top: 22px;
+    font-size: 1.2rem;
+    font-family: 'Outfit', 'Courier New', monospace;
+    font-weight: 900;
+    color: var(--ab-void);
+    background: var(--ab-coral);
+    border: none;
+    border-bottom: 4px solid var(--ab-coral-dim);
+    cursor: pointer;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%);
+    transition: all 0.15s var(--ab-snap);
+    position: relative;
+}
+
+.login-btn-primary:hover {
+    transform: translateX(6px) skewX(-2deg);
+    background: #ff4488;
+    box-shadow: -6px 0 0 var(--ab-coral-dim);
+}
+
+.login-btn-primary:active {
+    transform: translateX(2px) skewX(0);
+    box-shadow: none;
+    border-bottom-width: 2px;
+}
+
+.login-btn-google {
+    width: 100%;
+    padding: 14px;
+    margin-top: 12px;
+    font-size: 0.9rem;
+    font-family: 'Outfit', 'Courier New', monospace;
+    font-weight: 700;
+    color: var(--ab-paper);
+    background: var(--ab-void);
+    border: 2px solid var(--ab-border);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    transition: all 0.15s var(--ab-fast);
+}
+
+.login-btn-google:hover {
+    border-color: var(--ab-cyan);
+    transform: translateX(4px);
+    box-shadow: -4px 0 0 var(--ab-cyan);
+}
+
+.login-btn-google:active {
+    transform: translateX(1px);
+    box-shadow: none;
+}
+
+.login-btn-google img {
+    width: 18px; height: 18px;
+}
+
+.login-toggle {
+    color: var(--ab-cyan);
+    font-family: 'Outfit', 'Courier New', monospace;
+    font-weight: 700;
+    font-size: 0.88rem;
+    margin-top: 24px;
+    cursor: pointer;
+    transition: all 0.15s var(--ab-fast);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.login-toggle:hover {
+    color: #fff;
+    text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+    transform: translateX(4px);
+}
+
+.login-forgot {
+    color: var(--ab-text-dim);
+    font-family: 'Outfit', 'Courier New', monospace;
+    font-weight: 500;
+    font-size: 0.82rem;
+    margin-top: 10px;
+    cursor: pointer;
+    transition: all 0.15s var(--ab-fast);
+}
+
+.login-forgot:hover {
+    color: var(--ab-coral);
+    text-shadow: 0 0 8px rgba(255, 42, 109, 0.3);
+}
+
+.login-msg {
+    color: var(--ab-cyan);
+    font-family: 'Outfit', 'Courier New', monospace;
+    font-weight: 700;
+    font-size: 0.88rem;
+    margin-top: 14px;
+    text-align: center;
+    min-height: 20px;
+    letter-spacing: 0.5px;
+}
+
+/* =========================================================
+   MODALE PASSWORD DIMENTICATA — IRRUPTION STYLE
+   ========================================================= */
+.forgot-modal-overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: linear-gradient(135deg, rgba(15, 37, 55, 0.95) 0%, rgba(11, 12, 16, 0.95) 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    animation: abIrrupt 0.25s var(--ab-snap);
+}
+
+@keyframes abIrrupt {
+    from { clip-path: polygon(0 0, 0 0, 0 100%, 0 100%); }
+    to   { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); }
+}
+
+.forgot-modal-card {
+    background: var(--ab-panel);
+    border: 3px solid var(--ab-coral);
+    border-left: 6px solid var(--ab-coral);
+    padding: 30px 26px;
+    width: 360px;
+    max-width: 85%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%);
+    animation: abSlashIn 0.3s var(--ab-snap) 0.15s both;
+}
+
+.forgot-modal-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0; right: 0;
+    width: 16px; height: 16px;
+    background: var(--ab-coral);
+    clip-path: polygon(100% 0, 100% 100%, 0 100%);
+}
+
+.forgot-modal-close {
+    position: absolute;
+    top: 8px; right: 14px;
+    background: none;
+    border: none;
+    color: var(--ab-text-dim);
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: all 0.15s var(--ab-snap);
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    line-height: 1;
+}
+
+.forgot-modal-close:hover {
+    color: var(--ab-coral);
+    transform: scale(1.3) rotate(90deg);
+}
+
+.forgot-modal-title {
+    font-family: 'Outfit', 'Courier New', monospace;
+    font-weight: 900;
+    font-size: 1.3rem;
+    color: var(--ab-coral);
+    margin-bottom: 8px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    text-shadow: 3px 3px 0px rgba(255, 42, 109, 0.2);
+}
+
+.forgot-modal-desc {
+    font-family: 'Outfit', 'Courier New', monospace;
+    font-weight: 400;
+    font-size: 0.82rem;
+    color: var(--ab-text-dim);
+    text-align: center;
+    margin-bottom: 18px;
+    line-height: 1.5;
+}
+
+.forgot-modal-btn {
+    width: 100%;
+    padding: 14px;
+    margin-top: 14px;
+    font-size: 0.95rem;
+    font-family: 'Outfit', 'Courier New', monospace;
+    font-weight: 900;
+    color: var(--ab-void);
+    background: var(--ab-coral);
+    border: none;
+    border-bottom: 3px solid var(--ab-coral-dim);
+    cursor: pointer;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%);
+    transition: all 0.15s var(--ab-snap);
+}
+
+.forgot-modal-btn:hover {
+    transform: translateX(5px) skewX(-2deg);
+    box-shadow: -5px 0 0 var(--ab-coral-dim);
+}
+
+.forgot-modal-btn:active {
+    transform: translateX(1px);
+    box-shadow: none;
+}
+
+.forgot-modal-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.forgot-modal-msg {
+    font-family: 'Outfit', 'Courier New', monospace;
+    font-weight: 600;
+    font-size: 0.82rem;
+    color: var(--ab-cyan);
+    margin-top: 12px;
+    text-align: center;
+    min-height: 18px;
+}
+
+/* =========================================================
+   MENU PAUSA — PERSONA 5 LATERAL EXPLOSION
+   ========================================================= */
+.pause-overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(11, 12, 16, 0.92);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    font-family: 'Outfit', 'Courier New', monospace;
+    animation: abFadeSlash 0.3s var(--ab-fast);
+    overflow: hidden;
+}
+
+@keyframes abFadeSlash {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* Background images stack */
+.pause-bg-stack {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.pause-bg-layer {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background-size: cover;
+    background-position: center;
+    mix-blend-mode: screen;
+    filter: contrast(130%) brightness(0.9);
+    opacity: 0;
+    clip-path: polygon(100% 0, 100% 0, 100% 100%, 100% 100%);
+    transform: scale(1.08);
+    transition: opacity 0.5s var(--ab-fast), clip-path 0.5s var(--ab-snap), transform 0.6s var(--ab-fast);
+}
+
+.pause-bg-layer.active-bg {
+    opacity: 1;
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+    transform: scale(1);
+}
+
+.pause-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    width: 90%;
+    max-width: 500px;
+    padding: 20px 30px;
+    position: relative;
+    z-index: 1;
+}
+
+.pause-title {
+    font-family: 'Bungee', 'Courier New', monospace;
+    font-size: clamp(2rem, 6vw, 3.2rem);
+    color: var(--ab-paper);
+    text-shadow: 4px 4px 0px var(--ab-coral), 0 0 20px rgba(255, 42, 109, 0.15);
+    text-align: left;
+    margin-bottom: 20px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    transform: skewX(-3deg);
+}
+
+.pause-btn {
+    width: 100%;
+    max-width: 360px;
+    box-sizing: border-box;
+    padding: 16px 24px;
+    margin-top: 6px;
+    font-size: 1.15rem;
+    font-family: 'Outfit', 'Courier New', monospace;
+    font-weight: 800;
+    color: var(--ab-paper);
+    background: transparent;
+    border: none;
+    border-left: 4px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s var(--ab-snap);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-align: left;
+    position: relative;
+}
+
+.pause-btn .pause-btn-icon {
+    display: none;
+}
+
+.pause-btn::before {
+    content: '';
+    display: inline-block;
+    width: 0;
+    font-size: 0;
+    transition: all 0.12s var(--ab-snap);
+    color: var(--ab-cyan);
+}
+
+.pause-btn:hover {
+    color: var(--ab-cyan);
+    border-left-color: var(--ab-cyan);
+    transform: translateX(10px) skewX(-3deg);
+    background: linear-gradient(90deg, rgba(0, 240, 255, 0.06) 0%, transparent 100%);
+}
+
+.pause-btn:active {
+    transform: translateX(4px) skewX(-1deg);
+}
+
+.pause-btn.selected {
+    color: var(--ab-cyan);
+    border-left-color: var(--ab-cyan);
+    transform: translateX(12px) skewX(-3deg);
+    background: linear-gradient(90deg, rgba(0, 240, 255, 0.08) 0%, transparent 100%);
+    text-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+}
+
+.pause-btn.selected::before {
+    content: '//';
+    display: inline-block;
+    width: auto;
+    font-size: 1rem;
+    font-weight: 900;
+    color: var(--ab-coral);
+    margin-right: 4px;
+    text-shadow: 0 0 8px rgba(255, 42, 109, 0.4);
+}
+
+.pause-footer {
+    color: var(--ab-text-dim);
+    margin-top: 32px;
+    font-size: 0.72rem;
+    font-weight: 400;
+    text-align: left;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    border-top: 1px solid var(--ab-border);
+    padding-top: 14px;
+    width: 100%;
+    max-width: 360px;
+}
+
+/* Comandi panel */
+.pause-info-panel {
+    background: var(--ab-void);
+    border: 2px solid var(--ab-border);
+    border-left: 4px solid var(--ab-cyan);
+    padding: 22px;
+    width: 90%;
+    max-width: 440px;
+    color: var(--ab-paper);
+    font-family: 'Outfit', 'Courier New', monospace;
+    font-size: 0.92rem;
+    text-align: left;
+    max-height: 50vh;
+    overflow-y: auto;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+}
+
+.pause-info-panel h3 {
+    color: var(--ab-cyan);
+    margin: 0 0 6px 0;
+    font-size: 1rem;
+    font-weight: 900;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+}
+
+.pause-info-panel p {
+    margin: 0;
+    font-weight: 400;
+    color: var(--ab-text-dim);
+    line-height: 1.6;
+}
+
+.pause-info-panel strong {
+    color: var(--ab-paper);
+}
+
+.pause-info-panel .info-section {
+    margin-bottom: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--ab-border);
+}
+
+.pause-info-panel .info-section:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+/* Back button */
+.pause-back-btn {
+    width: 100%;
+    max-width: 280px;
+    box-sizing: border-box;
+    padding: 13px 20px;
+    margin-top: 22px;
+    font-size: 1rem;
+    font-family: 'Outfit', 'Courier New', monospace;
+    font-weight: 900;
+    color: var(--ab-coral);
+    background: transparent;
+    border: 2px solid var(--ab-coral);
+    border-left: 5px solid var(--ab-coral);
+    cursor: pointer;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    transition: all 0.15s var(--ab-snap);
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%);
+}
+
+.pause-back-btn:hover {
+    transform: translateX(6px) skewX(-2deg);
+    background: rgba(255, 42, 109, 0.08);
+    box-shadow: -6px 0 0 var(--ab-coral-dim);
+}
+
+.pause-back-btn:active {
+    transform: translateX(2px);
+    box-shadow: none;
+}
+
+/* Profilo panel */
+.pause-profile-panel {
+    background: var(--ab-void);
+    border: 2px solid var(--ab-border);
+    border-left: 4px solid var(--ab-coral);
+    padding: 22px;
+    width: 85%;
+    max-width: 400px;
+    color: var(--ab-paper);
+    font-family: 'Outfit', 'Courier New', monospace;
+    text-align: left;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+}
+
+.pause-profile-panel p {
+    margin: 8px 0;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--ab-text-dim);
+}
+
+.pause-profile-panel strong {
+    color: var(--ab-cyan);
+    font-weight: 900;
+    letter-spacing: 1px;
+}
+
+.pause-profile-panel .avatar-selector {
+    margin-top: 16px;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 16px;
+}
+
+.pause-profile-panel .avatar-nav-btn {
+    padding: 8px 18px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 1.1rem;
+    font-family: 'Courier New', monospace;
+    background: transparent;
+    border: 2px solid var(--ab-border);
+    color: var(--ab-paper);
+    transition: all 0.15s var(--ab-snap);
+}
+
+.pause-profile-panel .avatar-nav-btn:hover {
+    border-color: var(--ab-cyan);
+    color: var(--ab-cyan);
+    transform: translateX(3px);
+    box-shadow: -3px 0 0 var(--ab-cyan);
+}
+
+.pause-profile-panel .avatar-nav-btn:active {
+    transform: translateX(1px);
+    box-shadow: none;
+}
+
+/* =========================================================
+   MUSIC PLAYER — INDUSTRIAL ARCADE
+   ========================================================= */
+.music-player-card {
+    background: var(--ab-void);
+    border: 2px solid var(--ab-border);
+    border-left: 4px solid var(--ab-cyan);
+    padding: 22px 18px;
+    width: 90%;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+}
+
+.music-track-label {
+    font-family: 'Outfit', 'Courier New', monospace;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--ab-text-dim);
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    width: 100%;
+    text-align: left;
+}
+
+.music-track-name {
+    font-family: 'Outfit', 'Courier New', monospace;
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--ab-cyan);
+    text-align: left;
+    text-shadow: 0 0 10px rgba(0, 240, 255, 0.25);
+    width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    letter-spacing: 1px;
+}
+
+.music-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    justify-content: center;
+}
+
+.music-btn {
+    width: 46px;
+    height: 46px;
+    background: var(--ab-panel);
+    border: 2px solid var(--ab-border);
+    color: var(--ab-paper);
+    font-size: 1.1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s var(--ab-snap);
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%);
+}
+
+.music-btn:hover {
+    border-color: var(--ab-cyan);
+    color: var(--ab-cyan);
+    transform: translateX(3px) skewX(-3deg);
+    box-shadow: -3px 0 0 var(--ab-cyan-dim);
+}
+
+.music-btn:active {
+    transform: translateX(1px) skewX(0);
+    box-shadow: none;
+}
+
+.music-btn-play {
+    width: 58px;
+    height: 58px;
+    font-size: 1.5rem;
+    background: var(--ab-coral);
+    border: 2px solid var(--ab-coral-dim);
+    color: var(--ab-void);
+}
+
+.music-btn-play:hover {
+    transform: scale(1.08) skewX(-3deg);
+    box-shadow: -4px 0 0 var(--ab-coral-dim), 0 0 16px rgba(255, 42, 109, 0.3);
+    background: #ff4488;
+    color: var(--ab-void);
+    border-color: var(--ab-coral-dim);
+}
+
+.music-btn-play:active {
+    transform: scale(0.96);
+    box-shadow: none;
+}
+
+.music-volume-wrap {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 0;
+}
+
+.music-volume-icon {
+    font-size: 1rem;
+    color: var(--ab-text-dim);
+    flex-shrink: 0;
+}
+
+.music-volume-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    background: var(--ab-border);
+    outline: none;
+    transition: background 0.15s;
+}
+
+.music-volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 22px;
+    background: var(--ab-cyan);
+    border: 2px solid var(--ab-cyan-dim);
+    cursor: pointer;
+    transition: all 0.15s var(--ab-snap);
+    clip-path: polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%);
+}
+
+.music-volume-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.3);
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+}
+
+.music-volume-slider::-moz-range-thumb {
+    width: 14px;
+    height: 22px;
+    background: var(--ab-cyan);
+    border: 2px solid var(--ab-cyan-dim);
+    cursor: pointer;
+    border-radius: 0;
+}
+
+.music-volume-val {
+    font-family: 'Outfit', 'Courier New', monospace;
+    font-size: 0.8rem;
+    font-weight: 800;
+    color: var(--ab-cyan);
+    min-width: 36px;
+    text-align: right;
+    letter-spacing: 1px;
 }

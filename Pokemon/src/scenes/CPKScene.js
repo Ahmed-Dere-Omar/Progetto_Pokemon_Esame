@@ -43,6 +43,21 @@ export default class CPKScene extends Phaser.Scene {
         this.isDialogActive = false;
         this.isTransitioning = false;
         this.pcOpen = false;
+
+        // --- FIX DEL VOLUME AL RITORNO DALLA BATTAGLIA (PvP e CPK) ---
+        this.events.on('resume', () => {
+            this.keys.LEFT.reset(); this.keys.RIGHT.reset();
+            this.keys.UP.reset(); this.keys.DOWN.reset();
+            this.keys.A.reset(); this.keys.D.reset();
+            this.keys.W.reset(); this.keys.S.reset();
+            
+            let ms = this.registry.get('musicState');
+            let ls = this.registry.get('lobbySound');
+            if (ms && ls) {
+                ls.setVolume(ms.volume);
+                if (ms.isPlaying && !ls.isPlaying) ls.play();
+            }
+        });
     }
 
     setupMap() {
@@ -381,9 +396,12 @@ export default class CPKScene extends Phaser.Scene {
         if (this.isPaused) {
             let existingMenu = document.getElementById('pause-menu-overlay');
             if (existingMenu && existingMenu.inSubMenu) {
+                // Se premo ESC nel sottomenu, Phaser chiama questa funzione.
+                // Invece di chiudere, torniamo al menu principale!
                 existingMenu.renderMainPause();
                 return;
             }
+            // Se non sono in un sottomenu, chiudo tutto.
             this.isPaused = false;
             if (this.handlePauseKeyDown) {
                 window.removeEventListener('keydown', this.handlePauseKeyDown);
@@ -397,7 +415,19 @@ export default class CPKScene extends Phaser.Scene {
 
             let overlay = document.createElement('div');
             overlay.id = 'pause-menu-overlay';
-            overlay.className = 'modal-overlay';
+            overlay.className = 'pause-overlay';
+
+            // 1. IL TRUCCO DELLE IMMAGINI: Le creiamo una volta sola e non le cancelliamo più!
+            overlay.innerHTML = `
+                <div class="pause-bg-stack">
+                    <div class="pause-bg-layer active-bg" id="bg-menu" style="background-image: url('assets/img_menu1.png');"></div>
+                    <div class="pause-bg-layer" id="bg-profile" style="background-image: url('assets/img_menu2.png');"></div>
+                    <div class="pause-bg-layer" id="bg-controls" style="background-image: url('assets/img_menu3.png');"></div>
+                    <div class="pause-bg-layer" id="bg-music" style="background-image: url('assets/img_menu4.png');"></div>
+                </div>
+                <div class="pause-card" id="pause-box"></div>
+            `;
+            document.getElementById('game-container').appendChild(overlay);
 
             let selectedIdx = 0;
             let currentButtons = [];
@@ -407,77 +437,149 @@ export default class CPKScene extends Phaser.Scene {
                 currentButtons.forEach((btnId, idx) => {
                     let btn = document.getElementById(btnId);
                     if (btn) {
-                        if (idx === selectedIdx) {
-                            btn.style.transform = 'scale(1.05)';
-                            btn.style.backgroundColor = '#4a3b5c';
-                            btn.style.color = '#ffcc00';
-                            btn.style.borderColor = '#ffcc00';
-                            btn.style.boxShadow = '6px 6px 0 #ffcc00';
-                        } else {
-                            btn.style.transform = 'scale(1)';
-                            btn.style.backgroundColor = '#f6eedf';
-                            btn.style.color = '#ff7477';
-                            btn.style.borderColor = '#ff7477';
-                            btn.style.boxShadow = '4px 4px 0 #e69597';
-                        }
+                        if (idx === selectedIdx) btn.classList.add('selected');
+                        else btn.classList.remove('selected');
                     }
                 });
             };
 
+            const setBgLayer = (activeId) => {
+                ['bg-menu', 'bg-profile', 'bg-controls', 'bg-music'].forEach(id => {
+                    let el = document.getElementById(id);
+                    if (el) el.classList.remove('active-bg');
+                });
+                let activeEl = document.getElementById(activeId);
+                if (activeEl) activeEl.classList.add('active-bg');
+            };
+
+            // 2. RENDER MAIN PAUSE ora aggiorna SOLO i bottoni, attivando fluidamente la transition
             const renderMainPause = () => {
                 overlay.inSubMenu = false;
                 selectedIdx = 0;
-                currentButtons = ['profile-btn', 'controls-btn', 'lobby-btn'];
+                currentButtons = ['profile-btn', 'controls-btn', 'music-btn', 'lobby-btn']; // <-- LOBBY BTN
 
-                overlay.innerHTML = `
-                    <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 90%; max-width: 400px;">
-                        <h2 class="text-shadows" style="font-size: clamp(2rem, 6vw, 3.5rem); margin-bottom: 30px; text-align: center;">CENTRO POKÉMON</h2>
-                        <button id="profile-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 10px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: all 0.1s;">PROFILO</button>
-                        <button id="controls-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: all 0.1s;">COMANDI</button>
-                        <button id="lobby-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597; transition: all 0.1s;">TORNA ALLA LOBBY</button>
-                        <p style="color: #fff; margin-top: 40px; font-size: 1.2rem; font-family: 'Courier New'; font-weight: bold; text-align: center;">Premi ESC per tornare al gioco</p>
-                    </div>`;
+                let box = document.getElementById('pause-box');
+                if (box) {
+                    box.innerHTML = `
+                        <h2 class="pause-title">CENTRO NEOMON</h2>
+                        <button id="profile-btn" class="pause-btn"><span class="pause-btn-icon"></span>PROFILO</button>
+                        <button id="controls-btn" class="pause-btn"><span class="pause-btn-icon"></span>COMANDI</button>
+                        <button id="music-btn" class="pause-btn"><span class="pause-btn-icon"></span>MUSICA</button>
+                        <button id="lobby-btn" class="pause-btn"><span class="pause-btn-icon"></span>TORNA ALLA LOBBY</button> 
+                        <p class="pause-footer">// PREMI ESC PER TORNARE AL GIOCO</p>
+                    `;
+                }
                 updateSelection();
+                setBgLayer('bg-menu'); // Forza la transizione al menu base
             };
 
             overlay.renderMainPause = renderMainPause;
 
             const renderControls = () => {
                 overlay.inSubMenu = true;
-
-                let controlsHtml = `
-                    <div style="margin-bottom: 15px;">
-                        <h3 style="color: #ffcc00; margin: 0 0 5px 0; font-size: 1.3rem;">MOVIMENTO</h3>
-                        <p style="margin: 0;"><strong>WASD</strong> o <strong>Frecce Direzionali</strong></p>
-                    </div>
-                    <div style="margin-bottom: 15px;">
-                        <h3 style="color: #ffcc00; margin: 0 0 5px 0; font-size: 1.3rem;">AZIONI</h3>
-                        <p style="margin: 0;"><strong>Conferma:</strong> INVIO</p>
-                        <p style="margin: 5px 0 0 0;"><strong>Annulla / Indietro:</strong> ESC</p>
-                    </div>
-                    <div style="margin-bottom: 15px;">
-                        <h3 style="color: #ffcc00; margin: 0 0 5px 0; font-size: 1.3rem;">IN BATTAGLIA</h3>
-                        <p style="margin: 0;"><strong>Statistiche:</strong> SHIFT</p>
-                    </div>
-                    <div>
-                        <h3 style="color: #ffcc00; margin: 0 0 5px 0; font-size: 1.3rem;">GENERICI</h3>
-                        <p style="margin: 0;"><strong>Mouse / Touch:</strong> Interfaccia UI e Dialoghi</p>
-                    </div>
-                `;
-
-                overlay.innerHTML = `
-                    <div class="selection-box" id="pause-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 90%; max-width: 500px;">
-                        <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">COMANDI</h2>
-                        <div style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; border: 2px solid #ffcc00; width: 85%; color: #fff; font-family: 'Courier New', monospace; font-size: 1.2rem; text-align: left; max-height: 50vh; overflow-y: auto;">
-                            ${controlsHtml}
+                let box = document.getElementById('pause-box');
+                if (box) {
+                    box.innerHTML = `
+                        <h2 class="pause-title">COMANDI</h2>
+                        <div class="pause-info-panel">
+                            <div class="info-section"><h3>MOVIMENTO</h3><p><strong>WASD</strong> o <strong>Frecce Direzionali</strong></p></div>
+                            <div class="info-section"><h3>AZIONI</h3><p><strong>Conferma:</strong> INVIO</p><p><strong>Annulla / Indietro:</strong> ESC</p></div>
+                            <div class="info-section"><h3>IN BATTAGLIA</h3><p><strong>Statistiche:</strong> SHIFT</p></div>
+                            <div class="info-section"><h3>GENERICI</h3><p><strong>Mouse / Touch:</strong> Interfaccia UI e Dialoghi</p></div>
                         </div>
-                        <button id="back-pause-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 30px; font-size: 1.5rem; font-weight: bold; background-color: #4a3b5c; color: #ffcc00; border: 4px solid #ffcc00; border-radius: 8px; cursor: pointer; box-shadow: 6px 6px 0 #ffcc00; transform: scale(1.05);">INDIETRO</button>
-                    </div>
-                `;
+                        <button id="back-pause-btn" class="pause-back-btn">INDIETRO</button>
+                    `;
+                }
             };
 
+           const renderMusicMenu = () => {
+                overlay.inSubMenu = true;
+                let lobbyTracks = this.registry.get('lobbyTracks') || [];
+                let musicState = this.registry.get('musicState') || { currentTrackIndex: 0, volume: 0.5, isPlaying: false, isLooping: false };
+                let currentTrack = lobbyTracks[musicState.currentTrackIndex] || { name: 'Nessuna traccia' };
+                let lobbySound = this.registry.get('lobbySound');
+                let isActuallyPlaying = lobbySound && lobbySound.isPlaying;
+
+                let box = document.getElementById('pause-box');
+                if (box) {
+                    box.innerHTML = `
+                        <h2 class="pause-title">MUSICA</h2>
+                        <div class="music-player-card">
+                            <div class="music-track-label">IN RIPRODUZIONE</div>
+                            <div class="music-track-name" id="music-track-name">${currentTrack.name}</div>
+                            <div class="music-controls">
+                                <button class="music-btn" id="music-loop" style="${musicState.isLooping ? 'color: var(--ab-cyan); border-color: var(--ab-cyan); box-shadow: 0 0 10px rgba(0,240,255,0.3);' : ''}">🔁</button>
+                                <button class="music-btn" id="music-prev">⏮</button>
+                                <button class="music-btn music-btn-play" id="music-play">${isActuallyPlaying ? '⏸' : '▶'}</button>
+                                <button class="music-btn" id="music-next">⏭</button>
+                            </div>
+                            <div class="music-volume-wrap">
+                                <span class="music-volume-icon">🔉</span>
+                                <input type="range" min="0" max="100" value="${Math.round(musicState.volume * 100)}" class="music-volume-slider" id="music-volume">
+                                <span class="music-volume-val" id="music-vol-val">${Math.round(musicState.volume * 100)}%</span>
+                            </div>
+                        </div>
+                        <button id="back-pause-btn" class="pause-back-btn">INDIETRO</button>
+                    `;
+
+                    let volSlider = document.getElementById('music-volume');
+                    if (volSlider) {
+                        volSlider.addEventListener('input', (ev) => {
+                            let val = parseInt(ev.target.value) / 100;
+                            let ms = this.registry.get('musicState');
+                            ms.volume = val;
+                            let ls = this.registry.get('lobbySound');
+                            if (ls) ls.setVolume(val); 
+                            let volLabel = document.getElementById('music-vol-val');
+                            if (volLabel) volLabel.innerText = Math.round(val * 100) + '%';
+                        });
+
+                        volSlider.addEventListener('change', async (ev) => {
+                            let val = parseInt(ev.target.value) / 100;
+                            let profilo = this.registry.get('playerProfile');
+                            profilo.volume = val; 
+                            
+                            const { error } = await supabaseClient.from('profilo')
+                                .update({ volume: val })
+                                .eq('id_profilo', profilo.id_profilo);
+                            
+                            if (error) console.error("Errore salvataggio volume DB:", error);
+                        });
+                    }
+                }
+            };
+
+            const switchTrack = (direction) => {
+                let lobbyTracks = this.registry.get('lobbyTracks') || [];
+                let musicState = this.registry.get('musicState');
+                let lobbySound = this.registry.get('lobbySound');
+                if (!lobbyTracks.length) return;
+
+                if (lobbySound) { lobbySound.stop(); lobbySound.destroy(); }
+
+                musicState.currentTrackIndex = (musicState.currentTrackIndex + direction + lobbyTracks.length) % lobbyTracks.length;
+                let track = lobbyTracks[musicState.currentTrackIndex];
+                
+                let newSound = this.sound.add(track.key, { loop: musicState.isLooping, volume: musicState.volume });
+                
+                newSound.on('complete', () => {
+                    let ms = this.registry.get('musicState');
+                    let lt = this.registry.get('lobbyTracks');
+                    ms.currentTrackIndex = (ms.currentTrackIndex + 1) % lt.length;
+                    switchTrack(0);
+                });
+                newSound.play();
+                musicState.isPlaying = true;
+                this.registry.set('lobbySound', newSound);
+
+                let nameEl = document.getElementById('music-track-name');
+                if (nameEl) nameEl.innerText = track.name;
+                let playBtn = document.getElementById('music-play');
+                if (playBtn) playBtn.innerText = '⏸';
+            };
+
+            // Inizializza il menu base al primo avvio
             renderMainPause();
-            document.getElementById('game-container').appendChild(overlay);
 
             this.handlePauseKeyDown = (e) => {
                 let key = e.key;
@@ -493,7 +595,8 @@ export default class CPKScene extends Phaser.Scene {
                         if (btn) btn.click();
                     }
                 } else if (overlay.inSubMenu) {
-                    if (key === 'Enter' || key === ' ' || key === 'Escape' || key === 'Backspace') {
+                    // 3. TOLTO 'Escape' DA QUI. Adesso i conflitti di sistema non esistono più!
+                    if (key === 'Enter' || key === ' ' || key === 'Backspace') {
                         let btn = document.getElementById('back-pause-btn');
                         if (btn) btn.click();
                     } else if (key === 'ArrowLeft' || key === 'a' || key === 'A') {
@@ -514,10 +617,52 @@ export default class CPKScene extends Phaser.Scene {
                     if (this.handlePauseKeyDown) window.removeEventListener('keydown', this.handlePauseKeyDown);
                     let existingMenu = document.getElementById('pause-menu-overlay');
                     if (existingMenu) existingMenu.remove();
-                    this.tornaAllaLobby();
+                    this.tornaAllaLobby(); // <-- Richiama la funzione di uscita del Centro!
                 } else if (e.target.id === 'controls-btn') {
+                    setBgLayer('bg-controls');
                     renderControls();
+                } else if (e.target.id === 'music-btn') {
+                    setBgLayer('bg-music');
+                    renderMusicMenu();
+                } else if (e.target.id === 'music-loop') {
+                    let ms = this.registry.get('musicState');
+                    ms.isLooping = !ms.isLooping; 
+                    
+                    let ls = this.registry.get('lobbySound');
+                    if (ls) ls.setLoop(ms.isLooping); 
+                    
+                    if (ms.isLooping) {
+                        e.target.style.color = 'var(--ab-cyan)';
+                        e.target.style.borderColor = 'var(--ab-cyan)';
+                        e.target.style.boxShadow = '0 0 10px rgba(0,240,255,0.3)';
+                    } else {
+                        e.target.style.color = 'var(--ab-paper)';
+                        e.target.style.borderColor = 'var(--ab-border)';
+                        e.target.style.boxShadow = 'none';
+                    }
+                } else if (e.target.id === 'music-play') {
+                    let lobbySound = this.registry.get('lobbySound');
+                    let musicState = this.registry.get('musicState');
+                    if (lobbySound) {
+                        if (lobbySound.isPlaying) {
+                            lobbySound.pause();
+                            musicState.isPlaying = false;
+                            e.target.innerText = '▶';
+                        } else {
+                            lobbySound.resume();
+                            musicState.isPlaying = true;
+                            e.target.innerText = '⏸';
+                        }
+                    } else {
+                        this.inizializzaMusicaLobby();
+                        e.target.innerText = '⏸';
+                    }
+                } else if (e.target.id === 'music-prev') {
+                    switchTrack(-1);
+                } else if (e.target.id === 'music-next') {
+                    switchTrack(1);
                 } else if (e.target.id === 'profile-btn') {
+                    setBgLayer('bg-profile');
                     overlay.inSubMenu = true;
                     let profilo = this.registry.get('playerProfile');
                     let winRate = profilo.partite_totali > 0 ? ((profilo.vittorie_totali / profilo.partite_totali) * 100).toFixed(1) : 0;
@@ -527,21 +672,21 @@ export default class CPKScene extends Phaser.Scene {
 
                     if (box) {
                         box.innerHTML = `
-                            <h2 class="text-shadows" style="font-size: 3rem; margin-bottom: 20px; text-align: center;">PROFILO</h2>
-                            <div style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; border: 2px solid #ff7477; width: 85%; color: #fff; font-family: 'Courier New', monospace; font-size: 1.2rem; text-align: center;">
+                            <h2 class="pause-title">PROFILO</h2>
+                            <div class="pause-profile-panel">
                                 <p><strong>NOME:</strong> ${profilo.username || 'Sconosciuto'}</p>
                                 <p><strong>VITTORIE:</strong> ${profilo.vittorie_totali || 0}</p>
                                 <p><strong>PARTITE:</strong> ${profilo.partite_totali || 0}</p>
                                 <p><strong>VITTORIE %:</strong> ${winRate}%</p>
-                                <div style="margin-top: 15px; display: flex; justify-content: center; align-items: center; gap: 15px;">
-                                    <button id="prev-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&lt;</button>
+                                <div class="avatar-selector">
+                                    <button id="prev-avatar" class="avatar-nav-btn">&lt;</button>
                                     <div style="width: 32px; height: 32px; overflow: hidden; position: relative; transform: scale(2); margin: 0 15px; image-rendering: pixelated;">
                                         <img id="profile-avatar" src="${currentAvatarPath}" style="position: absolute; top: 0; left: 0; width: 400%; height: 400%; max-width: none;">
                                     </div>
-                                    <button id="next-avatar" style="padding: 5px 15px; cursor: pointer; font-weight: bold;">&gt;</button>
+                                    <button id="next-avatar" class="avatar-nav-btn">&gt;</button>
                                 </div>
                             </div>
-                            <button id="back-pause-btn" style="width: 100%; max-width: 280px; box-sizing: border-box; padding: 15px; margin-top: 30px; font-weight: bold; background-color: #4a3b5c; color: #ffcc00; border: 4px solid #ffcc00; border-radius: 8px; cursor: pointer; box-shadow: 6px 6px 0 #ffcc00; transform: scale(1.05);">INDIETRO</button>
+                            <button id="back-pause-btn" class="pause-back-btn">INDIETRO</button>
                         `;
                     }
                 } else if (e.target.id === 'prev-avatar' || e.target.id === 'next-avatar') {
@@ -555,6 +700,7 @@ export default class CPKScene extends Phaser.Scene {
                     let newAvatarPath = avatars[idx];
                     imgEl.src = newAvatarPath;
                     let numberToSave = idx + 1;
+
                     profilo.avatar_sprite = numberToSave;
 
                     const { error } = await supabaseClient.from('profilo')
@@ -577,7 +723,7 @@ export default class CPKScene extends Phaser.Scene {
                         });
                     }
                 } else if (e.target.id === 'back-pause-btn') {
-                    renderMainPause();
+                    renderMainPause(); // Questo ora lancia in automatico la transizione inversa!
                 }
             });
         }

@@ -14,33 +14,51 @@ export default class LoginScene extends Phaser.Scene {
         const html = `
             <div id="login-container">
                 <h1 class="text-shadows" style="font-size: 5rem; margin-bottom: 0;">NEOMON</h1>
-                <h2 style="font-size: 2rem; letter-spacing: 10px; margin-top: 0; color: #fff;">MULTIPLAYER</h2>
+                <p class="login-subtitle">Multiplayer</p>
                 
-                <div id="form-box" style="display: flex; flex-direction: column; align-items: center;">
-                    <input type="text" id="username-input" placeholder="NICKNAME..." autocomplete="off" 
-                        style="display: none; width: 300px; padding: 15px; font-size: 1.2rem; font-family: 'Courier New', monospace; font-weight: bold; text-align: center; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; margin-top: 20px; outline: none;">
+                <div class="login-card" id="form-box">
+                    <div class="login-input-wrapper" id="username-wrapper" style="display: none;">
+                        <input type="text" id="username-input" class="login-input" placeholder="NICKNAME..." autocomplete="off">
+                    </div>
                     
-                    <input type="email" id="email-input" placeholder="EMAIL..." autocomplete="off" 
-                        style="width: 300px; padding: 15px; font-size: 1.2rem; font-family: 'Courier New', monospace; font-weight: bold; text-align: center; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; margin-top: 20px; outline: none;">
+                    <div class="login-input-wrapper">
+                        <input type="email" id="email-input" class="login-input" placeholder="EMAIL..." autocomplete="off">
+                    </div>
                     
-                    <input type="password" id="password-input" placeholder="PASSWORD..." 
-                        style="width: 300px; padding: 15px; font-size: 1.2rem; font-family: 'Courier New', monospace; font-weight: bold; text-align: center; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; margin-top: 10px; outline: none;">
+                    <div class="login-input-wrapper">
+                        <input type="password" id="password-input" class="login-input" placeholder="PASSWORD...">
+                    </div>
                     
-                    <p id="forgot-btn" style="color: #b5d6d6; font-family: 'Courier New', monospace; font-size: 0.9rem; margin-top: 5px; cursor: pointer; text-decoration: underline;">Hai dimenticato la password?</p>
+                    <p id="forgot-btn" class="login-forgot">Hai dimenticato la password?</p>
 
-                    <button id="main-btn" style="width: 338px; padding: 15px; margin-top: 15px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">ACCEDI</button>
+                    <button id="main-btn" class="login-btn-primary">ACCEDI</button>
                     
-                    <button id="google-btn" style="width: 338px; padding: 15px; margin-top: 10px; font-size: 1.2rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #ffffff; color: #4285F4; border: 4px solid #4285F4; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #a0c1f9; display: flex; align-items: center; justify-content: center;">
-                        <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" style="width: 20px; margin-right: 10px;"> ACCEDI CON GOOGLE
+                    <button id="google-btn" class="login-btn-google">
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg"> ACCEDI CON GOOGLE
                     </button>
 
-                    <p id="toggle-mode" style="color: #fff; font-family: 'Courier New', monospace; font-weight: bold; margin-top: 20px; cursor: pointer; text-decoration: underline;">Nuovo allenatore? Registrati</p>
+                    <p id="toggle-mode" class="login-toggle">Nuovo allenatore? Registrati</p>
                     
-                    <p id="auth-msg" style="color: #ffcc00; font-family: 'Courier New', monospace; font-weight: bold; margin-top: 10px; text-align: center;"></p>
+                    <p id="auth-msg" class="login-msg"></p>
                 </div>
             </div>`;
 
         let dom = this.add.dom(500, 400).createFromHTML(html);
+
+        setTimeout(() => {
+            ['email-input', 'password-input', 'username-input'].forEach(id => {
+                let el = dom.getChildByID(id);
+                if (el) {
+                    el.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            let mainBtn = dom.getChildByID('main-btn');
+                            if (mainBtn) mainBtn.click();
+                        }
+                    });
+                }
+            });
+        }, 100);
 
         if (window.location.href.includes('error=')) {
             let params = new URLSearchParams(window.location.hash.substring(1) || window.location.search.substring(1));
@@ -89,25 +107,7 @@ export default class LoginScene extends Phaser.Scene {
             let emailInput = emailEl ? emailEl.value.trim() : '';
 
             if (e.target.id === 'forgot-btn') {
-                if (!emailInput) { msgLabel.innerText = "Inserisci l'email qui sopra per recuperarla!"; return; }
-                const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-                if (!emailRegex.test(emailInput)) { msgLabel.innerText = "Formato email non valido!"; return; }
-
-                this.isWaitingForReset = true;
-
-                msgLabel.innerText = "Verifica account...";
-                e.target.disabled = true;
-
-                const { error } = await supabaseClient.auth.resetPasswordForEmail(emailInput);
-
-                if (error) {
-                    if (error.message.includes('rate limit')) msgLabel.innerText = "Troppi tentativi. Riprova tra un'ora!";
-                    else if (error.message.includes('not found') || error.message.includes('User not')) msgLabel.innerText = "Nessun allenatore trovato con questa email.";
-                    else msgLabel.innerText = "Errore: " + error.message;
-                } else {
-                    msgLabel.innerText = "Se l'email esiste, riceverai un link a breve!";
-                }
-                setTimeout(() => { e.target.disabled = false; }, 3000);
+                this.apriModaleForgot(dom);
                 return;
             }
 
@@ -121,13 +121,11 @@ export default class LoginScene extends Phaser.Scene {
             if (e.target.id === 'toggle-mode') {
                 this.isWaitingForReset = false;
                 this.isLoginMode = !this.isLoginMode;
-                dom.getChildByID('username-input').style.display = this.isLoginMode ? 'none' : 'block';
+                dom.getChildByID('username-wrapper').style.display = this.isLoginMode ? 'none' : 'block';
                 dom.getChildByID('forgot-btn').style.display = this.isLoginMode ? 'block' : 'none';
 
                 let btn = dom.getChildByID('main-btn');
                 btn.innerText = this.isLoginMode ? 'ACCEDI' : 'REGISTRATI';
-                btn.style.backgroundColor = this.isLoginMode ? '#f6eedf' : '#e69597';
-                btn.style.color = this.isLoginMode ? '#ff7477' : '#fff';
                 dom.getChildByID('toggle-mode').innerText = this.isLoginMode ? 'Nuovo allenatore? Registrati' : 'Hai già un account? Accedi';
                 msgLabel.innerText = '';
                 return;
@@ -176,12 +174,80 @@ export default class LoginScene extends Phaser.Scene {
         });
     }
 
+    apriModaleForgot(dom) {
+        let existing = document.getElementById('forgot-modal-root');
+        if (existing) existing.remove();
+
+        let modalOverlay = document.createElement('div');
+        modalOverlay.id = 'forgot-modal-root';
+        modalOverlay.className = 'forgot-modal-overlay';
+        modalOverlay.innerHTML = `
+            <div class="forgot-modal-card">
+                <button class="forgot-modal-close" id="forgot-close-btn">✕</button>
+                <div class="forgot-modal-title">Recupera Password</div>
+                <div class="forgot-modal-desc">Inserisci la tua email e ti invieremo un link per reimpostare la password.</div>
+                <div class="login-input-wrapper" style="width: 100%;">
+                    <input type="email" id="forgot-email-input" class="login-input" placeholder="LA TUA EMAIL..." autocomplete="off">
+                </div>
+                <button id="forgot-send-btn" class="forgot-modal-btn">RICEVI LINK</button>
+                <p id="forgot-msg" class="forgot-modal-msg"></p>
+            </div>
+        `;
+
+        document.getElementById('game-container').appendChild(modalOverlay);
+
+        let forgotEmailEl = document.getElementById('forgot-email-input');
+        if (forgotEmailEl) {
+            forgotEmailEl.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    document.getElementById('forgot-send-btn').click();
+                }
+            });
+            forgotEmailEl.focus();
+        }
+
+        document.getElementById('forgot-close-btn').addEventListener('click', () => {
+            modalOverlay.remove();
+        });
+
+        modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay) modalOverlay.remove();
+        });
+
+        document.getElementById('forgot-send-btn').addEventListener('click', async () => {
+            let emailVal = document.getElementById('forgot-email-input').value.trim();
+            let msgEl = document.getElementById('forgot-msg');
+            let sendBtn = document.getElementById('forgot-send-btn');
+
+            if (!emailVal) { msgEl.innerText = "Inserisci la tua email!"; return; }
+            const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            if (!emailRegex.test(emailVal)) { msgEl.innerText = "Formato email non valido!"; return; }
+
+            this.isWaitingForReset = true;
+            msgEl.innerText = "Verifica account...";
+            sendBtn.disabled = true;
+
+            const { error } = await supabaseClient.auth.resetPasswordForEmail(emailVal);
+
+            if (error) {
+                if (error.message.includes('rate limit')) msgEl.innerText = "Troppi tentativi. Riprova tra un'ora!";
+                else if (error.message.includes('not found') || error.message.includes('User not')) msgEl.innerText = "Nessun allenatore trovato con questa email.";
+                else msgEl.innerText = "Errore: " + error.message;
+            } else {
+                msgEl.innerText = "Se l'email esiste, riceverai un link a breve!";
+            }
+            setTimeout(() => { sendBtn.disabled = false; }, 3000);
+        });
+    }
+
     mostraTestoCaricamento() {
         let container = document.getElementById('login-container');
         if (container) {
             container.innerHTML = `
                 <h1 class="text-shadows" style="font-size: 5rem; margin-bottom: 0;">NEOMON</h1>
-                <h2 style="font-size: 2rem; color: #fff; font-family: 'Courier New';">Bentornato! Accesso in corso...</h2>
+                <p class="login-subtitle" style="margin-bottom: 30px;">Multiplayer</p>
+                <p style="font-family: 'Outfit', 'Courier New', monospace; font-size: 1.1rem; color: var(--ab-cyan); font-weight: 800; letter-spacing: 4px; text-transform: uppercase; text-shadow: 0 0 10px rgba(0,240,255,0.3);">ACCESSO IN CORSO...</p>
             `;
         }
     }
@@ -190,12 +256,26 @@ export default class LoginScene extends Phaser.Scene {
         let container = document.getElementById('login-container');
         container.innerHTML = `
             <h1 class="text-shadows" style="font-size: 4rem; margin-bottom: 0;">RECUPERO</h1>
-            <h2 style="font-size: 1.5rem; color: #fff; font-family: 'Courier New'; text-align: center; margin-top: 10px;">Inserisci la tua nuova password:</h2>
-            <input type="password" id="new-password-input" placeholder="NUOVA PASSWORD..." autocomplete="off" 
-                style="width: 300px; padding: 15px; font-size: 1.2rem; font-family: 'Courier New', monospace; font-weight: bold; text-align: center; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; margin-top: 20px; outline: none;">
-            <button id="save-pwd-btn" style="width: 338px; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">SALVA</button>
-            <p id="pwd-msg" style="color: #ffcc00; font-family: 'Courier New', monospace; font-weight: bold; margin-top: 15px; text-align: center;"></p>
+            <p class="login-subtitle" style="margin-bottom: 20px;">Password</p>
+            <div class="login-card" style="margin-top: 10px;">
+                <p style="font-family: 'Outfit', 'Courier New', monospace; font-size: 0.92rem; color: var(--ab-text-dim); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 2px;">NUOVA PASSWORD:</p>
+                <div class="login-input-wrapper" style="width: 100%;">
+                    <input type="password" id="new-password-input" class="login-input" placeholder="NUOVA PASSWORD..." autocomplete="off">
+                </div>
+                <button id="save-pwd-btn" class="login-btn-primary" style="margin-top: 15px;">SALVA</button>
+                <p id="pwd-msg" class="login-msg"></p>
+            </div>
         `;
+
+        let newPwdInput = document.getElementById('new-password-input');
+        if (newPwdInput) {
+            newPwdInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    document.getElementById('save-pwd-btn').click();
+                }
+            });
+        }
 
         let btn = document.getElementById('save-pwd-btn');
         btn.addEventListener('click', async () => {
@@ -244,7 +324,17 @@ export default class LoginScene extends Phaser.Scene {
             showBanner("Errore nel caricamento del profilo. Riprova.");
             return;
         }
+        
         this.registry.set('playerProfile', profiloUtente);
+
+        // --- INIZIALIZZAZIONE VOLUME DA DATABASE ---
+        let dbVolume = profiloUtente.volume !== undefined ? profiloUtente.volume : 0.5;
+        this.registry.set('musicState', { 
+            currentTrackIndex: 0, 
+            volume: dbVolume, 
+            isPlaying: false,
+            isLooping: false // Stato del Loop impostato di base su false
+        });
 
         let { data: myPokemon } = await supabaseClient
             .from('pokemon')
@@ -302,13 +392,31 @@ export default class LoginScene extends Phaser.Scene {
         let nameHtml = `
             <div id="login-container">
                 <h1 class="text-shadows" style="font-size: 3rem; margin-bottom: 0;">BENVENUTO!</h1>
-                <h2 style="font-size: 1.5rem; color: #fff; font-family: 'Courier New'; text-align: center;">Scegli il tuo Nickname da Allenatore:</h2>
-                <input type="text" id="new-username" value="${currentName}" placeholder="NICKNAME..." style="width: 300px; padding: 15px; font-size: 1.2rem; font-family: 'Courier New', monospace; font-weight: bold; text-align: center; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; outline: none; margin-top: 20px;">
-                <button id="save-name-btn" style="width: 338px; padding: 15px; margin-top: 20px; font-size: 1.5rem; font-family: 'Courier New', monospace; font-weight: bold; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">CONFERMA</button>
-                <p id="name-msg" style="color: #ffcc00; font-family: 'Courier New', monospace; font-weight: bold; margin-top: 10px;"></p>
+                <p class="login-subtitle" style="margin-bottom: 15px;">Allenatore</p>
+                <div class="login-card">
+                    <p style="font-family: 'Outfit', 'Courier New', monospace; font-size: 0.92rem; color: var(--ab-text-dim); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 2px;">SCEGLI IL TUO NICKNAME:</p>
+                    <div class="login-input-wrapper" style="width: 100%;">
+                        <input type="text" id="new-username" class="login-input" value="${currentName}" placeholder="NICKNAME...">
+                    </div>
+                    <button id="save-name-btn" class="login-btn-primary">CONFERMA</button>
+                    <p id="name-msg" class="login-msg"></p>
+                </div>
             </div>`;
 
         let nameDom = this.add.dom(500, 400).createFromHTML(nameHtml);
+
+        setTimeout(() => {
+            let nameInput = nameDom.getChildByID('new-username');
+            if (nameInput) {
+                nameInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        let saveBtn = nameDom.getChildByID('save-name-btn');
+                        if (saveBtn) saveBtn.click();
+                    }
+                });
+            }
+        }, 100);
 
         nameDom.addListener('click').on('click', async (e) => {
             if (e.target.id === 'save-name-btn') {
