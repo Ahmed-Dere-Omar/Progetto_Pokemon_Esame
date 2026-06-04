@@ -59,6 +59,11 @@ class gestionePartita {
     processaTurno(azioneP1, azioneP2) {
         this.logs.length = 0;
         this.statiTurno = {};
+        this.azioneP1 = azioneP1;
+        this.azioneP2 = azioneP2;
+
+        let p1DeadBefore = this.p1.squadra.filter(p => p.hp <= 0).length;
+        let p2DeadBefore = this.p2.squadra.filter(p => p.hp <= 0).length;
 
         // 0. Controlla subito le fughe PvP e forza il termine
         let haFuggitoQualcuno = false;
@@ -95,15 +100,32 @@ class gestionePartita {
             this.turno++;
         }
 
+        let p1DeadAfter = this.p1.squadra.filter(p => p.hp <= 0).length;
+        let p2DeadAfter = this.p2.squadra.filter(p => p.hp <= 0).length;
+
+        let p1KoThisTurn = p1DeadAfter > p1DeadBefore;
+        let p2KoThisTurn = p2DeadAfter > p2DeadBefore;
+
+        [this.p1, this.p2].forEach(p => {
+            let koThisTurn = (p === this.p1) ? p1KoThisTurn : p2KoThisTurn;
+            p.squadra.forEach(pk => {
+                pk.statiVolatili = pk.statiVolatili || {};
+                pk.statiVolatili.alleatoKOTurnoPrecedente = koThisTurn;
+            });
+        });
+
         return this.ottieniStatoAggiornato();
     }
 
-    calcolaVelocitaCorrente(pk) {
+    calcolaVelocitaCorrente(pk, proprietario) {
         let velBase = pk.statistiche.velocita || pk.statistiche.speed?.base_stat || 50;
         let grado = Math.max(-6, Math.min(6, Math.floor(pk.modificatori?.velocita || 0)));
         let moltiplicatore = grado >= 0 ? (2 + grado) / 2 : 2 / (2 - grado);
         let velFinale = Math.floor(velBase * moltiplicatore);
         if (pk.stato === 'Paralisi') velFinale = Math.floor(velFinale / 2);
+        if (proprietario && proprietario.effetti && proprietario.effetti["Ventoincoda"]) {
+            velFinale *= 2;
+        }
         return velFinale;
     }
 
@@ -117,10 +139,16 @@ class gestionePartita {
         ];
 
         return azioni.sort((a, b) => {
-            // 1. Priorità massima alla sostituzione
-            if (a.tipo === 'switch' && b.tipo !== 'switch') return -1;
-            if (a.tipo !== 'switch' && b.tipo === 'switch') return 1;
-            if (a.tipo === 'switch' && b.tipo === 'switch') return 0;
+            // 1. Priorità massima alla sostituzione o all'uso di strumenti
+            let isSwitchA = a.tipo === 'switch' || a.tipo === 'item';
+            let isSwitchB = b.tipo === 'switch' || b.tipo === 'item';
+            if (isSwitchA && !isSwitchB) return -1;
+            if (!isSwitchA && isSwitchB) return 1;
+            if (isSwitchA && isSwitchB) {
+                if (a.tipo === 'switch' && b.tipo === 'item') return -1;
+                if (a.tipo === 'item' && b.tipo === 'switch') return 1;
+                return 0;
+            }
 
             // 2. Priorità delle mosse (se entrambi non stanno switchando)
             let prioA = a.mossa ? (a.mossa.Priorità || 0) : 0;
@@ -128,8 +156,8 @@ class gestionePartita {
             if (prioA !== prioB) return prioB - prioA;
 
             // 3. Velocità
-            const velA = this.calcolaVelocitaCorrente(a.pk);
-            const velB = this.calcolaVelocitaCorrente(b.pk);
+            const velA = this.calcolaVelocitaCorrente(a.pk, a.proprietario);
+            const velB = this.calcolaVelocitaCorrente(b.pk, b.proprietario);
             return velB - velA;
         });
     }
@@ -141,18 +169,30 @@ class gestionePartita {
         if (azione.tipo === 'switch') {
             const vecchioPk = proprietario.squadra[proprietario.attivoIdx];
 
-            // FIX: Cambiamo subito l'indice e azzeriamo gli stati in silenzio!
-            if (vecchioPk) vecchioPk.statiVolatili = {};
+            if (vecchioPk) {
+                vecchioPk.statiVolatili = {};
+                vecchioPk.modificatori = {};
+                vecchioPk.trappoleApplicate = false;
+                if (vecchioPk.tipiOriginali) {
+                    vecchioPk.tipi = [...vecchioPk.tipiOriginali];
+                }
+            }
             proprietario.attivoIdx = azione.nuovoIdx;
             const nuovoPk = proprietario.squadra[proprietario.attivoIdx];
             nuovoPk.statiVolatili = { primoTurnoInCampo: true }; // Flag per Bruciapelo
 
-            // ORA registriamo i log testuali. Il "fotografo" catturerà la barra della vita 
-            // del NUOVO Pokémon per entrambe le righe, eliminando il ritardo visivo e sistemando i nomi!
             this.logs.push(`${proprietario.id === this.p1.id ? 'Hai' : "L'allenatore avversario"} ritirato ${vecchioPk.nome}!`);
             this.logs.push(`Vai, ${nuovoPk.nome}!`);
 
+            this.applicaTrappoleAlPokemon(proprietario, nuovoPk);
+
             nuovoPk.haGiaAgito = true;
+            return;
+        }
+
+        // 0.5 GESTIONE STRUMENTI (ITEM)
+        if (azione.tipo === 'item') {
+            pk.haGiaAgito = true;
             return;
         }
 
@@ -243,14 +283,45 @@ class gestionePartita {
         }
 
         let mossaPK = pk.mosse.find(m => m.Nome === mossa.Nome);
+        let forzaScontro = false;
+        if (mossa.Nome !== "Scontro" && mossa.Nome !== "Ricarica") {
+            if (!mossaPK || mossaPK.ppAttuali <= 0) {
+                forzaScontro = true;
+            }
+        }
+
+        if (forzaScontro) {
+            mossa = {
+                Nome: "Scontro",
+                Tipo: "Normale",
+                Categoria: "Fisico",
+                Potenza: 50,
+                Precisione: 100,
+                PP: 1,
+                CodiceFunzione: [
+                    {
+                        NomeFunzione: "DannoContraccolpo",
+                        Parametri: {
+                            Percentuale: 25,
+                            Su: "PSMassimi"
+                        }
+                    }
+                ]
+            };
+            mossaPK = null;
+        }
+
         if (mossaPK && mossaPK.ppAttuali > 0) {
             mossaPK.ppAttuali--; // Sottrae il PP solo se il pokemon non è bloccato
             mossaPK.usataAlmenoUnaVolta = true; // Tracciamento per Ultimascelta
         }
         // ==========================================
 
+        let latoPk = (pk === this.p1.squadra[this.p1.attivoIdx]) ? 1 : 2;
+        let latoTarget = (targetPk === this.p1.squadra[this.p1.attivoIdx]) ? 1 : 2;
+
         if (mossa.Nome === "Ricarica") {
-            this.logs.push(`${pk.nome} deve riposarsi!`);
+            this.logs.push(`${pk.nome} deve riposarsi!|LATO:${latoPk}`);
             if (pk.statiVolatili) {
                 pk.statiVolatili.ricarica = false;
                 pk.statiVolatili.mossaForzata = null;
@@ -262,24 +333,25 @@ class gestionePartita {
         if (mossa.Nome === "Copione") {
             if (this.ultimaMossaGlobale && !["Copione", "Scontro", "Ricarica"].includes(this.ultimaMossaGlobale.Nome)) {
                 mossa = { ...this.ultimaMossaGlobale };
-                this.logs.push(`${pk.nome} usa Copione e copia ${mossa.Nome}!`);
+                this.logs.push(`${pk.nome} usa Copione e copia ${mossa.Nome}!|LATO:${latoPk}`);
             } else {
-                this.logs.push(`${pk.nome} usa Copione, ma fallisce!`);
+                this.logs.push(`${pk.nome} usa Copione, ma fallisce!|LATO:${latoPk}`);
                 pk.haGiaAgito = true;
                 return;
             }
         } else {
-            this.logs.push(`${pk.nome} usa ${mossa.Nome}!`);
+            this.logs.push(`${pk.nome} usa ${mossa.Nome}!|LATO:${latoPk}`);
         }
 
         if (GestoreFlagsModulo.gestione_proteggibile(mossa) && targetPk.protetto) {
-            this.logs.push(`${targetPk.nome} si è protetto!`);
+            this.logs.push(`${targetPk.nome} si è protetto!|LATO:${latoTarget}`);
             return;
         }
 
         if (GestoreFlagsModulo.gestione_riflettibile(mossa) && targetPk.riflette) {
-            this.logs.push(`${targetPk.nome} riflette la mossa!`);
+            this.logs.push(`${targetPk.nome} riflette la mossa!|LATO:${latoTarget}`);
             targetPk = pk;
+            latoTarget = latoPk;
         }
 
         this.ultimaMossaUsata = mossa; // Tracciamo la mossa per le meccaniche che la richiedono
@@ -292,7 +364,7 @@ class gestionePartita {
                 if (eff.NomeFunzione === "FallisceSeMosseNonUsate" && !EffettiModulo.FallisceSeMosseNonUsate({ Utente: pk })) fallisce = true;
             });
             if (fallisce) {
-                this.logs.push(`${pk.nome} usa ${mossa.Nome}, ma fallisce!`);
+                this.logs.push(`${pk.nome} usa ${mossa.Nome}, ma fallisce!|LATO:${latoPk}`);
                 pk.haGiaAgito = true;
                 return;
             }
@@ -317,7 +389,7 @@ class gestionePartita {
                 let mult = stage >= 0 ? (3 + stage) / 3 : 3 / (3 - stage);
 
                 if ((Math.random() * 100) > (precisione * mult)) {
-                    this.logs.push(`${pk.nome} usa ${mossa.Nome} ma fallisce!`);
+                    this.logs.push(`${pk.nome} usa ${mossa.Nome} ma fallisce!|LATO:${latoPk}`);
                     pk.haGiaAgito = true;
                     if (pk.statiVolatili && pk.statiVolatili.potenzaConsecutiva) pk.statiVolatili.potenzaConsecutiva = null;
                     return;
@@ -334,9 +406,9 @@ class gestionePartita {
             if (!pk.statiVolatili.inCarica) {
                 pk.statiVolatili.inCarica = true;
                 pk.statiVolatili.mossaForzata = mossa.Nome;
-                let messaggio = effettoCarica.Parametri.Messaggio || `${pk.nome} si sta preparando per l'attacco!`;
-                this.logs.push(messaggio);
-                if (effettoCarica.Parametri.StatoSeminvulnerabile) {
+                let messaggio = (effettoCarica.Parametri && effettoCarica.Parametri.Messaggio) || `${pk.nome} si sta preparando per l'attacco!`;
+                this.logs.push(messaggio + `|LATO:${latoPk}`);
+                if (effettoCarica.Parametri && effettoCarica.Parametri.StatoSeminvulnerabile) {
                     pk.statiVolatili.statoSeminvulnerabile = effettoCarica.Parametri.StatoSeminvulnerabile;
                 }
 
@@ -384,20 +456,20 @@ class gestionePartita {
                 effectiveness = dmgResult.effectiveness;
 
                 if (effectiveness === 0) {
-                    if (i === 0) this.logs.push(`Non ha effetto su ${targetPk.nome}...`);
+                    if (i === 0) this.logs.push(`Non ha effetto su ${targetPk.nome}...|LATO:${latoTarget}`);
                     break;
                 }
 
-                if (dmgResult.isCrit) this.logs.push("Brutto colpo!");
-                if (i === 0 && effectiveness > 1) this.logs.push("È superefficace!");
-                if (i === 0 && effectiveness < 1 && effectiveness > 0) this.logs.push("Non è molto efficace...");
+                if (dmgResult.isCrit) this.logs.push(`Brutto colpo!|LATO:${latoTarget}`);
+                if (i === 0 && effectiveness > 1) this.logs.push(`È superefficace!|LATO:${latoTarget}`);
+                if (i === 0 && effectiveness < 1 && effectiveness > 0) this.logs.push(`Non è molto efficace...|LATO:${latoTarget}`);
 
                 let isFalseSwipe = mossa.CodiceFunzione && mossa.CodiceFunzione.some(e => e.NomeFunzione === "Lascia1PS");
                 let limit = isFalseSwipe ? 1 : 0;
 
                 if (targetPk.statiVolatili && targetPk.statiVolatili.resistenza && (targetPk.hp - danno) <= 0) {
                     limit = targetPk.statiVolatili.resistenza;
-                    if (i === 0) this.logs.push(`${targetPk.nome} resiste al colpo!`);
+                    if (i === 0) this.logs.push(`${targetPk.nome} resiste al colpo!|LATO:${latoTarget}`);
                     targetPk.statiVolatili.resistenza = 0; // Consuma l'effetto
                 }
 
@@ -410,7 +482,7 @@ class gestionePartita {
                     let mPK = pk.mosse.find(m => m.Nome === mossa.Nome);
                     if (mPK) {
                         mPK.ppAttuali = 0;
-                        this.logs.push(`I PP di ${mossa.Nome} si sono azzerati a causa di Rancore!`);
+                        this.logs.push(`I PP di ${mossa.Nome} si sono azzerati a causa di Rancore!|LATO:${latoPk}`);
                     }
                 }
             }
@@ -418,11 +490,11 @@ class gestionePartita {
             dannoInflittoReale = totalDanno;
 
             if (actualHits > 1) {
-                this.logs.push(`Ha colpito ${actualHits} volte!`);
+                this.logs.push(`Ha colpito ${actualHits} volte!|LATO:${latoTarget}`);
             }
 
             if (effectiveness > 0) {
-                this.logs.push(`Inflitti ${dannoInflittoReale} danni a ${targetPk.nome}!|HP:${targetPk.hp}`);
+                this.logs.push(`Inflitti ${dannoInflittoReale} danni a ${targetPk.nome}!|LATO:${latoTarget}|HP:${targetPk.hp}`);
             } else {
                 pk.haGiaAgito = true;
                 return; // Interrompe il turno senza applicare effetti secondari
@@ -495,25 +567,49 @@ class gestionePartita {
             targetPk.statiVolatili.forzaSostituzione = false;
             let available = azione.bersaglio.squadra.map((p, i) => ({ p, i })).filter(obj => obj.p.hp > 0 && obj.i !== azione.bersaglio.attivoIdx);
             if (available.length > 0) {
+                targetPk.statiVolatili = {};
+                targetPk.modificatori = {};
+                targetPk.trappoleApplicate = false;
+                if (targetPk.tipiOriginali) targetPk.tipi = [...targetPk.tipiOriginali];
+
                 let randomPk = available[Math.floor(Math.random() * available.length)];
                 azione.bersaglio.attivoIdx = randomPk.i;
                 this.logs.push(`${targetPk.nome} è stato spazzato via!`);
                 this.logs.push(`È stato trascinato in campo ${randomPk.p.nome}!`);
-                randomPk.p.statiVolatili = { primoTurnoInCampo: true };
+                
+                let subentrato = azione.bersaglio.squadra[randomPk.i];
+                subentrato.statiVolatili = { primoTurnoInCampo: true };
+                this.applicaTrappoleAlPokemon(azione.bersaglio, subentrato);
             } else {
                 this.logs.push(`Ma fallisce!`);
             }
         }
         if (pk.statiVolatili && pk.statiVolatili.sostituzioneForzata) {
+            let prepStaffetta = pk.statiVolatili.preparaStaffetta;
             pk.statiVolatili.sostituzioneForzata = false;
+            pk.statiVolatili.preparaStaffetta = false;
             let available = azione.proprietario.squadra.map((p, i) => ({ p, i })).filter(obj => obj.p.hp > 0 && obj.i !== azione.proprietario.attivoIdx);
             if (available.length > 0) {
                 let randomPk = available[Math.floor(Math.random() * available.length)];
-                let msg = pk.statiVolatili.preparaStaffetta ? "passa il testimone a" : "torna indietro! Vai,";
+                let msg = prepStaffetta ? "passa il testimone a" : "torna indietro! Vai,";
+
+                if (!prepStaffetta) {
+                    pk.modificatori = {};
+                    if (pk.tipiOriginali) pk.tipi = [...pk.tipiOriginali];
+                    pk.statiVolatili = {};
+                } else {
+                    azione.proprietario.squadra[randomPk.i].modificatori = { ...pk.modificatori };
+                    pk.modificatori = {};
+                    if (pk.tipiOriginali) pk.tipi = [...pk.tipiOriginali];
+                    pk.statiVolatili = {};
+                }
+                
                 azione.proprietario.attivoIdx = randomPk.i;
-                if (pk.statiVolatili.preparaStaffetta) azione.proprietario.squadra[randomPk.i].modificatori = pk.modificatori;
                 this.logs.push(`${pk.nome} ${msg} ${randomPk.p.nome}!`);
-                randomPk.p.statiVolatili = { primoTurnoInCampo: true };
+                
+                let subentrato = azione.proprietario.squadra[randomPk.i];
+                subentrato.statiVolatili = { primoTurnoInCampo: true };
+                this.applicaTrappoleAlPokemon(azione.proprietario, subentrato);
             } else {
                 this.logs.push(`Ma fallisce!`);
             }
@@ -565,6 +661,9 @@ class gestionePartita {
         let moltiplicatoreDanno = 1;
         let dannoFisso = null;
 
+        let ownerD = targetPlayer;
+        let ownerA = targetPlayer === this.p1 ? this.p2 : this.p1;
+
         // Controlla dinamicamente le variazioni di danno previste dal JSON
         if (m.CodiceFunzione) {
             m.CodiceFunzione.forEach(eff => {
@@ -573,8 +672,8 @@ class gestionePartita {
                     else if (eff.Parametri.Formula === "LivelloUtente") dannoFisso = a.livello || 50;
                 }
                 if (eff.NomeFunzione === "PotenzaVariabile" && eff.Parametri.Formula === "25 * (VelocitàBersaglio / VelocitàUtente)") {
-                    let velA = a.statistiche.velocita * (a.modificatori.velocita || 1);
-                    let velD = d.statistiche.velocita * (d.modificatori.velocita || 1);
+                    let velA = this.calcolaVelocitaCorrente(a, ownerA);
+                    let velD = this.calcolaVelocitaCorrente(d, ownerD);
                     potenzaReale = Math.min(150, Math.floor(25 * (velD / Math.max(1, velA))));
                     if (potenzaReale === 0) potenzaReale = 1;
                 }
@@ -602,9 +701,11 @@ class gestionePartita {
                     potenzaReale = EffettiModulo.DannoVariabile({ ...eff.Parametri, Utente: a });
                 }
                 if (eff.NomeFunzione === "PotenzaBasataSuPeso") {
+                    let velA = this.calcolaVelocitaCorrente(a, ownerA);
+                    let velD = this.calcolaVelocitaCorrente(d, ownerD);
                     if (eff.Parametri && eff.Parametri.Formula === "PesoUtenteVsBersaglio") {
                         // Per Pesobomba (Heavy Slam)
-                        let ratio = (d.peso || 10) / Math.max(1, (a.peso || 10));
+                        let ratio = velD / Math.max(1, velA);
                         if (ratio <= 0.2) potenzaReale = 120;
                         else if (ratio <= 0.25) potenzaReale = 100;
                         else if (ratio <= 0.33) potenzaReale = 80;
@@ -612,11 +713,11 @@ class gestionePartita {
                         else potenzaReale = 40;
                     } else {
                         // Per Colpo Basso (Low Kick)
-                        let w = d.peso || 10;
-                        if (w < 10) potenzaReale = 20;
-                        else if (w < 25) potenzaReale = 40;
-                        else if (w < 50) potenzaReale = 60;
-                        else if (w < 100) potenzaReale = 80;
+                        let w = velD;
+                        if (w < 50) potenzaReale = 20;
+                        else if (w < 80) potenzaReale = 40;
+                        else if (w < 110) potenzaReale = 60;
+                        else if (w < 150) potenzaReale = 80;
                         else if (w < 200) potenzaReale = 100;
                         else potenzaReale = 120;
                     }
@@ -642,10 +743,17 @@ class gestionePartita {
             }
         }
 
+        let isGravitaAttiva = (this.p1.effetti && this.p1.effetti["Gravità"]) || (this.p2.effetti && this.p2.effetti["Gravità"]);
+        let hasAbbattimento = d.statiVolatili && d.statiVolatili.abbattimento;
+
         let effectiveness = 1;
         d.tipi.forEach(tipoDifesa => {
             if (EfficaciaTipi[m.Tipo] && EfficaciaTipi[m.Tipo][tipoDifesa] !== undefined) {
-                effectiveness *= EfficaciaTipi[m.Tipo][tipoDifesa];
+                let eff = EfficaciaTipi[m.Tipo][tipoDifesa];
+                if (m.Tipo === "Terra" && tipoDifesa === "Volante" && (isGravitaAttiva || hasAbbattimento)) {
+                    eff = 1;
+                }
+                effectiveness *= eff;
             }
         });
 
@@ -668,7 +776,17 @@ class gestionePartita {
         if (a.stato === 'Scottatura' && isFisico) modificatoreSchermo *= 0.5; // Il taglio del danno ai bruciati!
         dannoBase *= moltiplicatoreDanno;
 
-        let dannoFinale = Math.floor(dannoBase * stab * effectiveness * random * modificatoreSchermo);
+        // Meteo boosts / reductions:
+        let moltiplicatoreMeteo = 1;
+        if (this.meteo === "Pioggia") {
+            if (m.Tipo === "Acqua") moltiplicatoreMeteo = 1.5;
+            else if (m.Tipo === "Fuoco") moltiplicatoreMeteo = 0.5;
+        } else if (this.meteo === "Sole") {
+            if (m.Tipo === "Fuoco") moltiplicatoreMeteo = 1.5;
+            else if (m.Tipo === "Acqua") moltiplicatoreMeteo = 0.5;
+        }
+
+        let dannoFinale = Math.floor(dannoBase * stab * effectiveness * random * modificatoreSchermo * moltiplicatoreMeteo);
         if (dannoFinale < 1 && effectiveness > 0) dannoFinale = 1;
 
         return { danno: dannoFinale, effectiveness, isCrit };
@@ -700,9 +818,39 @@ class gestionePartita {
             }
         }
 
+        if (this.meteo === "TempestaSabbia" || this.meteo === "Grandine") {
+            [this.p1, this.p2].forEach(p => {
+                const pk = p.squadra[p.attivoIdx];
+                if (!pk || pk.hp <= 0) return;
+                
+                let immune = false;
+                if (this.meteo === "TempestaSabbia") {
+                    if (pk.tipi.includes("Roccia") || pk.tipi.includes("Terra") || pk.tipi.includes("Acciaio")) {
+                        immune = true;
+                    }
+                } else if (this.meteo === "Grandine") {
+                    if (pk.tipi.includes("Ghiaccio")) {
+                        immune = true;
+                    }
+                }
+                
+                if (!immune) {
+                    let dannoMeteo = Math.max(1, Math.floor(pk.hpMax / 16));
+                    pk.hp = Math.max(0, pk.hp - dannoMeteo);
+                    let lato = (p === this.p1) ? 1 : 2;
+                    let msgMeteo = this.meteo === "TempestaSabbia" ? 
+                        `${pk.nome} è colpito dalla tempesta di sabbia!|LATO:${lato}|HP:${pk.hp}` :
+                        `${pk.nome} è colpito dalla grandine!|LATO:${lato}|HP:${pk.hp}`;
+                    this.logs.push(msgMeteo);
+                }
+            });
+        }
+
         [this.p1, this.p2].forEach(p => {
             const pk = p.squadra[p.attivoIdx];
             if (!pk || pk.hp <= 0) return;
+
+            let lato = (p === this.p1) ? 1 : 2;
 
             if (pk.statiVolatili && pk.statiVolatili.primoTurnoInCampo) {
                 pk.statiVolatili.primoTurnoInCampo = false;
@@ -712,30 +860,30 @@ class gestionePartita {
             if (pk.stato === 'Avvelenamento') {
                 const danno = Math.max(1, Math.floor(pk.hpMax / 8));
                 pk.hp = Math.max(0, pk.hp - danno);
-                this.logs.push(`${pk.nome} subisce danni dal veleno!`);
+                this.logs.push(`${pk.nome} subisce danni dal veleno!|LATO:${lato}|HP:${pk.hp}`);
             } else if (pk.stato === 'Iperavvelenamento') {
                 pk.contatoriStato = pk.contatoriStato || {};
-                let tossina = pk.contatoriStato.tossina || 1;
+                let tossina = pk.contatoriStato.tossina || 2;
                 const danno = Math.max(1, Math.floor(pk.hpMax * (tossina / 16)));
                 pk.hp = Math.max(0, pk.hp - danno);
-                this.logs.push(`${pk.nome} subisce gravi danni dal veleno!`);
+                this.logs.push(`${pk.nome} subisce gravi danni dal veleno!|LATO:${lato}|HP:${pk.hp}`);
                 pk.contatoriStato.tossina = tossina + 1;
             } else if (pk.stato === 'Scottatura') {
                 const danno = Math.max(1, Math.floor(pk.hpMax / 8));
                 pk.hp = Math.max(0, pk.hp - danno);
-                this.logs.push(`${pk.nome} subisce danni dalla scottatura!`);
+                this.logs.push(`${pk.nome} subisce danni dalla scottatura!|LATO:${lato}|HP:${pk.hp}`);
             }
 
             // 2. Intrappolamento Volatile (Legatutto, Mulinello, ecc.)
             if (pk.statiVolatili && pk.statiVolatili.dannoIntrappolamento && pk.statiVolatili.dannoIntrappolamento.attivo) {
                 let dannoTrap = Math.max(1, Math.floor(pk.hpMax * pk.statiVolatili.dannoIntrappolamento.dannoPerTurno));
                 pk.hp = Math.max(0, pk.hp - dannoTrap);
-                this.logs.push(`${pk.nome} subisce danni perché è intrappolato!`);
+                this.logs.push(`${pk.nome} subisce danni perché è intrappolato!|LATO:${lato}|HP:${pk.hp}`);
 
                 pk.statiVolatili.dannoIntrappolamento.turniRimanenti--;
                 if (pk.statiVolatili.dannoIntrappolamento.turniRimanenti <= 0) {
                     pk.statiVolatili.dannoIntrappolamento = null;
-                    this.logs.push(`${pk.nome} si è liberato!`);
+                    this.logs.push(`${pk.nome} si è liberato!|LATO:${lato}`);
                 }
             }
 
@@ -744,13 +892,14 @@ class gestionePartita {
                 let dannoLeech = Math.max(1, Math.floor(pk.hpMax / 8));
                 let effDanno = Math.min(pk.hp, dannoLeech);
                 pk.hp = Math.max(0, pk.hp - effDanno);
-                this.logs.push(`I semi rubano energia a ${pk.nome}!`);
+                this.logs.push(`I semi rubano energia a ${pk.nome}!|LATO:${lato}|HP:${pk.hp}`);
 
                 let pAvversario = (p === this.p1) ? this.p2 : this.p1;
                 let avversario = pAvversario.squadra[pAvversario.attivoIdx];
                 if (avversario && avversario.hp > 0) {
                     avversario.hp = Math.min(avversario.hpMax, avversario.hp + effDanno);
-                    this.logs.push(`${avversario.nome} recupera energia dai semi!`);
+                    let latoOpp = (pAvversario === this.p1) ? 1 : 2;
+                    this.logs.push(`${avversario.nome} recupera energia dai semi!|LATO:${latoOpp}|HP:${avversario.hp}`);
                 }
             }
 
@@ -758,7 +907,7 @@ class gestionePartita {
             if (pk.statiVolatili && pk.statiVolatili["Acquanello"]) {
                 let cura = Math.max(1, Math.floor(pk.hpMax / 16));
                 pk.hp = Math.min(pk.hpMax, pk.hp + cura);
-                this.logs.push(`Il velo d'acqua rigenera i PS di ${pk.nome}!`);
+                this.logs.push(`Il velo d'acqua rigenera i PS di ${pk.nome}!|LATO:${lato}|HP:${pk.hp}`);
             }
 
             // 5. Sbadiglio (Sonnolenza si trasforma in Sonno)
@@ -769,7 +918,7 @@ class gestionePartita {
                     pk.stato = 'Sonno';
                     pk.contatoriStato = pk.contatoriStato || {};
                     pk.contatoriStato.sonno = Math.floor(Math.random() * 3) + 1;
-                    this.logs.push(`${pk.nome} si è addormentato per la sonnolenza!`);
+                    this.logs.push(`${pk.nome} si è addormentato per la sonnolenza!|LATO:${lato}`);
                 }
             }
 
@@ -779,7 +928,7 @@ class gestionePartita {
                 if (pk.statiVolatili.ripeti.turniRimanenti <= 0) {
                     pk.statiVolatili.ripeti = null;
                     pk.statiVolatili.mossaForzata = null;
-                    this.logs.push(`${pk.nome} non deve più ripetere la mossa!`);
+                    this.logs.push(`${pk.nome} non deve più ripetere la mossa!|LATO:${lato}`);
                 }
             }
 
@@ -787,13 +936,13 @@ class gestionePartita {
             if (pk.statiVolatili && pk.statiVolatili.dannoFuturo && pk.statiVolatili.dannoFuturo.attivo) {
                 pk.statiVolatili.dannoFuturo.turniRimanenti--;
                 if (pk.statiVolatili.dannoFuturo.turniRimanenti <= 0) {
-                    this.logs.push(`${pk.nome} subisce l'attacco previsto!`);
+                    this.logs.push(`${pk.nome} subisce l'attacco previsto!|LATO:${lato}`);
                     let mossaFutura = pk.statiVolatili.dannoFuturo.mossa;
                     let origine = pk.statiVolatili.dannoFuturo.origineAttacco;
 
                     let dmgRes = this.calcolaDanno(origine || pk, pk, mossaFutura, null);
                     pk.hp = Math.max(0, pk.hp - dmgRes.danno);
-                    this.logs.push(`Inflitti ${dmgRes.danno} danni a ${pk.nome}!`);
+                    this.logs.push(`Inflitti ${dmgRes.danno} danni a ${pk.nome}!|LATO:${lato}|HP:${pk.hp}`);
 
                     pk.statiVolatili.dannoFuturo = null;
                 }
@@ -804,7 +953,7 @@ class gestionePartita {
                 pk.statiVolatili.inibizione.turniRimanenti--;
                 if (pk.statiVolatili.inibizione.turniRimanenti <= 0) {
                     pk.statiVolatili.inibizione = null;
-                    this.logs.push(`${pk.nome} non è più inibito!`);
+                    this.logs.push(`${pk.nome} non è più inibito!|LATO:${lato}`);
                 }
             }
 
@@ -813,7 +962,7 @@ class gestionePartita {
                 pk.statiVolatili.provocazione.turniRimanenti--;
                 if (pk.statiVolatili.provocazione.turniRimanenti <= 0) {
                     pk.statiVolatili.provocazione = null;
-                    this.logs.push(`${pk.nome} non è più provocato!`);
+                    this.logs.push(`${pk.nome} non è più provocato!|LATO:${lato}`);
                 }
             }
 
@@ -822,9 +971,9 @@ class gestionePartita {
                 pk.statiVolatili.ultimocanto.turniRimanenti--;
                 if (pk.statiVolatili.ultimocanto.turniRimanenti <= 0) {
                     pk.hp = 0;
-                    this.logs.push(`Il conteggio di Ultimocanto scende a 0! ${pk.nome} va KO!`);
+                    this.logs.push(`Il conteggio di Ultimocanto scende a 0! ${pk.nome} va KO!|LATO:${lato}`);
                 } else {
-                    this.logs.push(`Il conteggio di Ultimocanto per ${pk.nome} è a ${pk.statiVolatili.ultimocanto.turniRimanenti}!`);
+                    this.logs.push(`Il conteggio di Ultimocanto per ${pk.nome} è a ${pk.statiVolatili.ultimocanto.turniRimanenti}!|LATO:${lato}`);
                 }
             }
         });
@@ -850,6 +999,13 @@ class gestionePartita {
     ottieniStatoAggiornato() {
         let p1Pk = this.p1.squadra[this.p1.attivoIdx];
         let p2Pk = this.p2.squadra[this.p2.attivoIdx];
+
+        if (p1Pk && !p1Pk.trappoleApplicate && p1Pk.hp > 0) {
+            this.applicaTrappoleAlPokemon(this.p1, p1Pk);
+        }
+        if (p2Pk && !p2Pk.trappoleApplicate && p2Pk.hp > 0) {
+            this.applicaTrappoleAlPokemon(this.p2, p2Pk);
+        }
 
         let teamP1 = this.p1.squadra.map(p => ({ nome: p.nome, hp: p.hp, maxHp: p.hpMax, modificatori: p.modificatori || {} }));
         let teamP2 = this.p2.squadra.map(p => ({ nome: p.nome, hp: p.hp, maxHp: p.hpMax, modificatori: p.modificatori || {} }));
@@ -879,6 +1035,81 @@ class gestionePartita {
             finito: this.finito,
             turno: this.turno
         };
+    }
+
+    applicaTrappoleAlPokemon(proprietario, pk) {
+        if (pk.hp <= 0) return;
+        if (pk.trappoleApplicate) return;
+        pk.trappoleApplicate = true;
+
+        if (!proprietario.trappole || !proprietario.trappoleAttive) return;
+
+        let lato = (proprietario === this.p1) ? 1 : 2;
+
+        // 1. Fielepunte (Toxic Spikes) assorbimento
+        if (pk.tipi.includes("Veleno") && !pk.tipi.includes("Volante")) {
+            if (proprietario.trappole["Fielepunte"]) {
+                delete proprietario.trappole["Fielepunte"];
+                this.logs.push(`Le fielepunte sono state assorbite da ${pk.nome}!|LATO:${lato}`);
+                this.aggiornaTrappoleAttive(proprietario);
+            }
+        } else if (proprietario.trappole["Fielepunte"] && !pk.tipi.includes("Volante") && !pk.tipi.includes("Acciaio")) {
+            if (pk.stato === null || pk.stato === undefined) {
+                let strati = proprietario.trappole["Fielepunte"];
+                if (strati === 1) {
+                    pk.stato = "Avvelenamento";
+                    this.logs.push(`${pk.nome} è stato avvelenato dalle fielepunte!|LATO:${lato}`);
+                } else if (strati >= 2) {
+                    pk.stato = "Iperavvelenamento";
+                    pk.contatoriStato = pk.contatoriStato || {};
+                    pk.contatoriStato.tossina = 2; // Inizia a 2 come da requisiti
+                    this.logs.push(`${pk.nome} è stato iperavvelenato dalle fielepunte!|LATO:${lato}`);
+                }
+            }
+        }
+
+        // 2. Levitoroccia (Stealth Rock)
+        if (proprietario.trappole["Levitoroccia"]) {
+            let effectiveness = 1;
+            pk.tipi.forEach(t => {
+                if (EfficaciaTipi["Roccia"] && EfficaciaTipi["Roccia"][t] !== undefined) {
+                    effectiveness *= EfficaciaTipi["Roccia"][t];
+                }
+            });
+            let quota = 0.125 * effectiveness;
+            let danno = Math.max(1, Math.floor(pk.hpMax * quota));
+            pk.hp = Math.max(0, pk.hp - danno);
+            this.logs.push(`${pk.nome} è colpito dalle pietre appuntite! Perde ${danno} PS.|LATO:${lato}|HP:${pk.hp}`);
+            if (pk.hp <= 0) {
+                this.logs.push(`${pk.nome} è esausto!|LATO:${lato}`);
+                return;
+            }
+        }
+
+        // 3. Punte (Spikes)
+        if (proprietario.trappole["Punte"] && !pk.tipi.includes("Volante")) {
+            let strati = proprietario.trappole["Punte"];
+            let frazione = 0.125;
+            if (strati === 2) frazione = 0.166;
+            if (strati >= 3) frazione = 0.25;
+            let danno = Math.max(1, Math.floor(pk.hpMax * frazione));
+            pk.hp = Math.max(0, pk.hp - danno);
+            this.logs.push(`${pk.nome} soffre per le punte! Perde ${danno} PS.|LATO:${lato}|HP:${pk.hp}`);
+            if (pk.hp <= 0) {
+                this.logs.push(`${pk.nome} è esausto!|LATO:${lato}`);
+                return;
+            }
+        }
+    }
+
+    aggiornaTrappoleAttive(proprietario) {
+        let attive = false;
+        if (proprietario.trappole) {
+            for (let k in proprietario.trappole) {
+                if (proprietario.trappole[k]) attive = true;
+            }
+        }
+        proprietario.trappoleAttive = attive;
     }
     scegliMossaBotIntelligente(botPk, playerPk, botLati, playerLati) {
         let mosseDisponibili = botPk.mosse.filter(m => m && m.ppAttuali > 0);

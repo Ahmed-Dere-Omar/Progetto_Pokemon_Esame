@@ -6175,14 +6175,15 @@
       {
         "NomeFunzione": "ModificaStatisticaCasuale",
         "Parametri": {
-          "Gradi": 2
+          "Gradi": 2,
+          "RiduciAltra": true
         }
       }
     ],
     "Flags": [
       "Copiabile"
     ],
-    "Descrizione": "Aumenta drasticamente una statistica a caso di un alleato."
+    "Descrizione": "Aumenta di 2 stadi una statistica a caso del Pokémon, ma ne riduce un'altra di 1 stadio."
   },
   {
     "Nome": "Assalto",

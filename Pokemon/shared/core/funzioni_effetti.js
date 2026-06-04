@@ -13,7 +13,16 @@ class Effetti {
             case "BersaglioInVolo":
                 return target.statiVolatili && target.statiVolatili.statoSeminvulnerabile === "InVolo";
             case "NemicoAttacca":
-                return !target.haGiaAgito;
+                if (target.haGiaAgito) return false;
+                if (Partita) {
+                    let opponent = (target === Partita.p1.squadra[Partita.p1.attivoIdx]) ? Partita.p1 : Partita.p2;
+                    let oppAction = (opponent === Partita.p1) ? Partita.azioneP1 : Partita.azioneP2;
+                    if (oppAction) {
+                        if (oppAction.tipo === 'switch' || oppAction.tipo === 'flee' || oppAction.tipo === 'item') return false;
+                        if (oppAction.mossa && oppAction.mossa.Categoria === 'Stato') return false;
+                    }
+                }
+                return true;
             case "PSMassimi":
                 return target.hp === target.hpMax;
             case "MeteoPioggia":
@@ -59,11 +68,20 @@ class Effetti {
         if (!target) return false;
         if (Condizione && !this.verificaCondizione(Condizione, target, Utente, Partita)) return false;
 
+        if (Gradi < 0 && Partita) {
+            let targetTeam = (target === Partita.p1.squadra[Partita.p1.attivoIdx]) ? Partita.p1 : Partita.p2;
+            let sourceTeam = (Utente === Partita.p1.squadra[Partita.p1.attivoIdx]) ? Partita.p1 : Partita.p2;
+            if (targetTeam !== sourceTeam && targetTeam.effetti && targetTeam.effetti["Nebbia"]) {
+                if (Logs) Logs.push(`La nebbia protegge ${target.nome} dai cali di statistiche!|LATO:${target === Partita.p1.squadra[Partita.p1.attivoIdx] ? 1 : 2}`);
+                return false;
+            }
+        }
+
         target.modificatori = target.modificatori || {};
         let statKey = Statistica.toLowerCase();
         let statAttuale = target.modificatori[statKey] || 0;
         if ((Gradi > 0 && statAttuale >= 6) || (Gradi < 0 && statAttuale <= -6)) {
-            if (Logs) Logs.push(`La statistica ${Statistica} di ${target.nome} non può andare oltre!`);
+            if (Logs) Logs.push(`La statistica ${Statistica} di ${target.nome} non può andare oltre!|LATO:${target === Partita.p1.squadra[Partita.p1.attivoIdx] ? 1 : 2}`);
             return false;
         }
 
@@ -71,7 +89,7 @@ class Effetti {
 
         if (Logs) {
             let verbo = Gradi > 0 ? "aumenta" : "diminuisce";
-            Logs.push(`La statistica ${Statistica} di ${target.nome} ${verbo} di ${Math.abs(Gradi)}!`);
+            Logs.push(`La statistica ${Statistica} di ${target.nome} ${verbo} di ${Math.abs(Gradi)}!|LATO:${target === Partita.p1.squadra[Partita.p1.attivoIdx] ? 1 : 2}`);
         }
         return true;
     }
@@ -118,15 +136,16 @@ class Effetti {
         if (Stato === "Sonno") {
             target.contatoriStato.sonno = Durata || Math.floor(Math.random() * 3) + 1;
         } else if (Stato === "Iperavvelenamento") {
-            target.contatoriStato.tossina = 1;
+            target.contatoriStato.tossina = 2; // Inizia a 2 come da requisiti (1/8 max HP)
         } else if (Stato === "Sonnolenza") {
             target.contatoriStato.sonnolenzaTurni = 1;
         }
-        if (Logs) Logs.push(`${target.nome} è ora in stato di ${Stato}!`);
+        let lato = (Partita && target === Partita.p1.squadra[Partita.p1.attivoIdx]) ? 1 : 2;
+        if (Logs) Logs.push(`${target.nome} è ora in stato di ${Stato}!|LATO:${lato}`);
         return true;
     }
 
-    static ApplicaStatoUnico({ Tipo, Bersaglio, Turni = null, Utente, Proprietario, Avversario, Logs }) {
+    static ApplicaStatoUnico({ Tipo, Bersaglio, Turni = null, Utente, Proprietario, Avversario, Partita, Logs }) {
         // Applica stati alterati volatili al bersaglio come Parassiseme o Confusione.
         if (Tipo === "Ultimocanto") {
             let tutti = [];
@@ -156,11 +175,12 @@ class Effetti {
             target.contatoriStato = target.contatoriStato || {};
             target.contatoriStato.confusione = Turni || Math.floor(Math.random() * 4) + 2;
         }
-        if (Logs) Logs.push(`${target.nome} subisce l'effetto ${Tipo}!`);
+        let lato = (Partita && target === Partita.p1.squadra[Partita.p1.attivoIdx]) ? 1 : 2;
+        if (Logs) Logs.push(`${target.nome} subisce l'effetto ${Tipo}!|LATO:${lato}`);
         return true;
     }
 
-    static DannoContraccolpo({ Percentuale, Su, DannoInflitto = 0, Utente, Logs }) {
+    static DannoContraccolpo({ Percentuale, Su, DannoInflitto = 0, Utente, Partita, Logs }) {
         // Infligge danni di contraccolpo all'utente basati sul danno causato o sui PS massimi.
         let utente = Utente;
         if (!utente) return false;
@@ -175,11 +195,12 @@ class Effetti {
         if (danno === 0 && DannoInflitto > 0) danno = 1;
 
         utente.hp = Math.max(0, utente.hp - danno);
-        if (Logs) Logs.push(`${utente.nome} subisce ${danno} danni per il contraccolpo!`);
+        let lato = (Partita && utente === Partita.p1.squadra[Partita.p1.attivoIdx]) ? 1 : 2;
+        if (Logs) Logs.push(`${utente.nome} subisce ${danno} danni per il contraccolpo!|LATO:${lato}|HP:${utente.hp}`);
         return true;
     }
 
-    static Cura({ Tipo = null, Bersaglio = "Utente", Percentuale = null, ConsumaAccumulo = false, Utente, Logs }) {
+    static Cura({ Tipo = null, Bersaglio = "Utente", Percentuale = null, ConsumaAccumulo = false, Utente, Partita, Logs }) {
         // Cura l'utente o un alleato ricaricando i PS in base a percentuale, accumulo o condizioni meteo.
         let target = (typeof Bersaglio === "string" && Bersaglio === "Utente") ? Utente : Bersaglio;
         if (!target || target.hp >= target.hpMax) return false;
@@ -190,9 +211,8 @@ class Effetti {
         if (Percentuale) {
             psDaCurare = Math.floor(target.hpMax * (Percentuale / 100));
         } else if (Tipo === "DipendenteDaMeteo") {
-            let meteo = typeof getMeteo !== "undefined" ? getMeteo() : "Normale";
+            let meteo = (Partita && Partita.meteo) || (typeof getMeteo !== "undefined" ? getMeteo() : "Normale");
             if (meteo === "Sole") psDaCurare = Math.floor(target.hpMax * (2 / 3));
-            else if (["Pioggia", "TempestaSabbia", "Neve"].includes(meteo)) psDaCurare = Math.floor(target.hpMax * 0.25);
             else if (["Pioggia", "TempestaSabbia", "Grandine", "Neve"].includes(meteo)) psDaCurare = Math.floor(target.hpMax * 0.25);
             else psDaCurare = Math.floor(target.hpMax * 0.5);
         } else if (Tipo === "DipendenteDaAccumulo") {
@@ -204,7 +224,8 @@ class Effetti {
         }
 
         target.hp = Math.min(target.hpMax, target.hp + psDaCurare);
-        if (Logs && psDaCurare > 0) Logs.push(`${target.nome} recupera ${psDaCurare} PS!`);
+        let lato = (Partita && target === Partita.p1.squadra[Partita.p1.attivoIdx]) ? 1 : 2;
+        if (Logs && psDaCurare > 0) Logs.push(`${target.nome} recupera ${psDaCurare} PS!|LATO:${lato}|HP:${target.hp}`);
         return true;
     }
 
@@ -687,7 +708,6 @@ class Effetti {
         if (Logs) Logs.push("Ma non succede nulla...");
         return true;
     }
-
     static PotenzaBasataSuStatistiche({ Utente }) {
         // Genera una potenza elevata proporzionata ai modificatori positivi dell'utente.
         let utente = Utente;
@@ -702,28 +722,28 @@ class Effetti {
 
         return 20 + (20 * aumenti);
     }
+
     static PotenzaBasataSuPeso({ Formula, Max = 120, Bersaglio, Utente }) {
-        // Poiché peso e livello non sono gestiti, usiamo gli HP massimi come indicatore astratto di "stazza/peso"
-        let hpUtente = Math.max(1, Utente.hpMax || 100);
-        let hpBersaglio = Math.max(1, Bersaglio.hpMax || 100);
+        let velUtente = Utente.statistiche.velocita;
+        let velBersaglio = Bersaglio.statistiche.velocita;
 
         if (Formula === "PesoUtenteVsBersaglio") {
-            let ratio = hpBersaglio / hpUtente;
+            let ratio = velBersaglio / Math.max(1, velUtente);
             if (ratio <= 0.2) return Math.min(120, Max);
             if (ratio <= 0.25) return Math.min(100, Max);
             if (ratio <= 0.33) return Math.min(80, Max);
             if (ratio <= 0.5) return Math.min(60, Max);
             return Math.min(40, Max);
         } else {
-            if (hpBersaglio < 50) return Math.min(20, Max);
-            if (hpBersaglio < 80) return Math.min(40, Max);
-            if (hpBersaglio < 110) return Math.min(60, Max);
-            if (hpBersaglio < 150) return Math.min(80, Max);
-            if (hpBersaglio < 200) return Math.min(100, Max);
+            if (velBersaglio < 50) return Math.min(20, Max);
+            if (velBersaglio < 80) return Math.min(40, Max);
+            if (velBersaglio < 110) return Math.min(60, Max);
+            if (velBersaglio < 150) return Math.min(80, Max);
+            if (velBersaglio < 200) return Math.min(100, Max);
             return Math.min(120, Max);
         }
     }
-    static RiduciPP({ Quantita = 4, Bersaglio = "Bersaglio", Utente }) {
+    static RiduciPP({ Quantita = 4, Bersaglio = "Bersaglio", Utente, Partita, Logs }) {
         // Toglie PP aggiuntivi all'ultima mossa utilizzata dal bersaglio.
         let target = (typeof Bersaglio === "string" && Bersaglio === "Utente") ? Utente : Bersaglio;
         if (!target || !target.ultimaMossaUsata) return false;
@@ -732,6 +752,8 @@ class Effetti {
         if (!mossa || mossa.ppAttuali <= 0) return false;
 
         mossa.ppAttuali = Math.max(0, mossa.ppAttuali - Quantita);
+        let lato = (Partita && target === Partita.p1.squadra[Partita.p1.attivoIdx]) ? 1 : 2;
+        if (Logs) Logs.push(`Ridotti di ${Quantita} i PP di ${target.ultimaMossaUsata} di ${target.nome}!|LATO:${lato}`);
         return true;
     }
 
@@ -857,24 +879,30 @@ class Effetti {
 
         if (!target || target.isTerastallizzato) return false;
 
+        if (!target.tipiOriginali) {
+            target.tipiOriginali = [...target.tipi];
+        }
         target.tipi = Array.isArray(Tipo) ? Tipo : [Tipo];
         return true;
     }
 
-    static CopiaStatistiche({ Bersaglio = "Bersaglio", Utente }) {
+    static CopiaStatistiche({ Bersaglio = "Bersaglio", Utente, Partita, Logs }) {
         // Adotta gli stessi valori nei modificatori di statistiche presenti sul bersaglio.
         let utente = Utente;
         let target = (typeof Bersaglio === "string" && Bersaglio === "Utente") ? Utente : Bersaglio;
         if (!utente || !target) return false;
-        utente.modificatori = utente.modificatori || {};
+        utente.modificatori = {};
+        target.modificatori = target.modificatori || {};
 
         for (let stat in target.modificatori) {
             utente.modificatori[stat] = target.modificatori[stat];
         }
+        let lato = (Partita && utente === Partita.p1.squadra[Partita.p1.attivoIdx]) ? 1 : 2;
+        if (Logs) Logs.push(`${utente.nome} copia le modifiche alle statistiche di ${target.nome}!|LATO:${lato}`);
         return true;
     }
 
-    static ScambiaStatistiche({ Statistiche = ["Attacco", "AttaccoSpeciale"], Bersaglio = "Bersaglio", Utente }) {
+    static ScambiaStatistiche({ Statistiche = ["Attacco", "AttaccoSpeciale"], Bersaglio = "Bersaglio", Utente, Partita, Logs }) {
         // Inverte in modo permanente i modificatori delle statistiche indicate tra utente e bersaglio.
         let utente = Utente;
         let target = (typeof Bersaglio === "string" && Bersaglio === "Utente") ? Utente : Bersaglio;
@@ -888,6 +916,8 @@ class Effetti {
             utente.modificatori[stat] = target.modificatori[stat] || 0;
             target.modificatori[stat] = temp;
         });
+        let lato = (Partita && utente === Partita.p1.squadra[Partita.p1.attivoIdx]) ? 1 : 2;
+        if (Logs) Logs.push(`${utente.nome} scambia le statistiche (${Statistiche.join(", ")}) con ${target.nome}!|LATO:${lato}`);
         return true;
     }
 
@@ -949,13 +979,30 @@ class Effetti {
         return true;
     }
 
-    static FuggiOSostituisci({ Utente }) {
-        // Ritira l'utente dalla lotta in modo forzato attivandone la sostituzione logica.
+    static FuggiOSostituisci({ Utente, Partita, Logs }) {
         let utente = Utente;
-        if (!utente) return false;
-        utente.statiVolatili = utente.statiVolatili || {};
+        if (!utente || !Partita) return false;
+        
+        // Se è una lotta selvatica (isWild), termina la battaglia fuggendo
+        if (Partita.isWild) {
+            Partita.finito = true;
+            let team = (Partita.p1.squadra.includes(utente)) ? Partita.p1 : Partita.p2;
+            team.haFuggito = true;
+            if (Logs) Logs.push(`${utente.nome} fugge dalla lotta!`);
+            return true;
+        }
 
+        // Altrimenti (PvP/NPC), forza la sostituzione se ci sono alleati non esausti
+        let team = (Partita.p1.squadra.includes(utente)) ? Partita.p1 : Partita.p2;
+        let vivi = team.squadra.filter(p => p.hp > 0 && p !== utente);
+        if (vivi.length === 0) {
+            if (Logs) Logs.push(`Non ci sono altri Pokémon pronti a lottare!`);
+            return false;
+        }
+
+        utente.statiVolatili = utente.statiVolatili || {};
         utente.statiVolatili.sostituzioneForzata = true;
+        if (Logs) Logs.push(`${utente.nome} si prepara a sostituirsi!`);
         return true;
     }
 
@@ -1031,6 +1078,9 @@ class Effetti {
 
         if (!target || !utente || utente.isTerastallizzato || target.tipi.length === 0) return false;
 
+        if (!utente.tipiOriginali) {
+            utente.tipiOriginali = [...utente.tipi];
+        }
         utente.tipi = [...target.tipi];
         return true;
     }
@@ -1103,7 +1153,7 @@ class Effetti {
         return true;
     }
 
-    static ModificaStatisticaCasuale({ Gradi = 2, Bersaglio = "Utente", Utente, Logs }) {
+    static ModificaStatisticaCasuale({ Gradi = 2, Bersaglio = "Utente", Utente, Partita, Logs, RiduciAltra = false }) {
         // Migliora l'indice di una statistica bersagliata casualmente.
         let target = (typeof Bersaglio === "string" && Bersaglio === "Utente") ? Utente : Bersaglio;
         if (!target) return false;
@@ -1112,10 +1162,25 @@ class Effetti {
         let statisticheBase = ["attacco", "difesa", "attaccospeciale", "difesaspeciale", "velocita", "precisione", "elusione"];
         let statisticheAumentabili = statisticheBase.filter(stat => (target.modificatori[stat] || 0) < 6);
 
-        if (statisticheAumentabili.length === 0) return false;
+        if (statisticheAumentabili.length === 0 && !RiduciAltra) return false;
 
-        let statScelta = statisticheAumentabili[Math.floor(Math.random() * statisticheAumentabili.length)];
-        return this.ModificaStatistica({ Gradi: Gradi, Bersaglio: target, Statistica: statScelta, Utente, Logs });
+        let successo = false;
+        let statScelta = null;
+        if (statisticheAumentabili.length > 0) {
+            statScelta = statisticheAumentabili[Math.floor(Math.random() * statisticheAumentabili.length)];
+            successo = this.ModificaStatistica({ Gradi: Gradi, Bersaglio: target, Statistica: statScelta, Utente, Partita, Logs });
+        }
+
+        if (RiduciAltra) {
+            let statisticheRiducibili = statisticheBase.filter(stat => stat !== statScelta && (target.modificatori[stat] || 0) > -6);
+            if (statisticheRiducibili.length > 0) {
+                let statDaRidurre = statisticheRiducibili[Math.floor(Math.random() * statisticheRiducibili.length)];
+                let ridotto = this.ModificaStatistica({ Gradi: -1, Bersaglio: target, Statistica: statDaRidurre, Utente, Partita, Logs });
+                if (ridotto) successo = true;
+            }
+        }
+
+        return successo;
     }
 
     static FallisceSeMosseNonUsate({ Utente }) {
@@ -1138,15 +1203,15 @@ class Effetti {
         }
         return true;
     }
-
-    static SostituisciEPassaStatistiche({ Utente }) {
-        // Programma un cambio mandando lo schieramento e le alterazioni a favore del Pokémon subentrante.
+    static SostituisciEPassaStatistiche({ Utente, Partita, Logs }) {
         let utente = Utente;
         if (!utente) return false;
         utente.statiVolatili = utente.statiVolatili || {};
 
         utente.statiVolatili.preparaStaffetta = true;
         utente.statiVolatili.sostituzioneForzata = true;
+        let lato = (Partita && utente === Partita.p1.squadra[Partita.p1.attivoIdx]) ? 1 : 2;
+        if (Logs) Logs.push(`${utente.nome} si prepara a passare il testimone!|LATO:${lato}`);
         return true;
     }
 
@@ -1185,7 +1250,7 @@ class Effetti {
         return true;
     }
 
-    static TrasformaInBersaglio({ Bersaglio = "Bersaglio", Utente }) {
+    static TrasformaInBersaglio({ Bersaglio = "Bersaglio", Utente, Logs }) {
         // Copia in tutto e per tutto la sembianza, la tipologia, la tecnica e i vantaggi avversari.
         let utente = Utente;
         let target = (typeof Bersaglio === "string" && Bersaglio === "Utente") ? Utente : Bersaglio;
@@ -1197,6 +1262,9 @@ class Effetti {
         if (target.statiVolatili.trasformato || target.isIllusion) return false;
 
         utente.statiVolatili.trasformato = true;
+        if (!utente.tipiOriginali) {
+            utente.tipiOriginali = [...utente.tipi];
+        }
         utente.tipi = [...target.tipi];
         utente.peso = target.peso;
 

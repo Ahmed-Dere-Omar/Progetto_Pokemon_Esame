@@ -6,9 +6,9 @@ const fs = require('fs');
 const path = require('path');
 
 app.use(cors());
-app.use(express.static('../public'));
-app.use('/src', express.static('../src'));
-app.use('/shared', express.static('../shared'));
+app.use(express.static(path.join(__dirname, '../public')));
+app.use('/src', express.static(path.join(__dirname, '../src')));
+app.use('/shared', express.static(path.join(__dirname, '../shared')));
 
 // Abilitiamo il CORS anche direttamente su Socket.io
 const io = require('socket.io')(server, {

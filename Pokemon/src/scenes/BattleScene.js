@@ -140,6 +140,7 @@ export default class BattleScene extends Phaser.Scene {
             let p1 = { id: 'player', squadra: this.myTeamData, attivoIdx: this.myActiveIdx };
             let p2 = { id: 'bot', squadra: this.oppTeamData, attivoIdx: this.oppActiveIdx };
             this.partita = new window.gestionePartita(p1, p2); // Utilizzo la classe importata/globale
+            this.partita.isWild = this.isWild && !this.isNPC;
             this.myTeamData = this.partita.p1.squadra;
         }
 
@@ -372,6 +373,9 @@ export default class BattleScene extends Phaser.Scene {
             return;
         }
 
+        if (this.menuState === 'MOVES') {
+            this.lastUsedMoveIndex = this.selectedMoveIndex;
+        }
         this.isInputActive = false;
         this.btns.forEach(b => b.setVisible(false));
         this.moveInfoUI.forEach(element => element.setVisible(false));
@@ -411,7 +415,13 @@ export default class BattleScene extends Phaser.Scene {
     handleButtonClick(index) {
         if (this.menuState === 'MAIN') {
             if (index === 0) {
-                this.menuState = 'MOVES'; this.selectedMoveIndex = 0; this.updateMenuSelection();
+                this.menuState = 'MOVES';
+                if (this.lastUsedMoveIndex !== undefined && this.lastUsedMoveIndex < this.pEntity.moves.length && this.pEntity.moves[this.lastUsedMoveIndex]) {
+                    this.selectedMoveIndex = this.lastUsedMoveIndex;
+                } else {
+                    this.selectedMoveIndex = 0;
+                }
+                this.updateMenuSelection();
             } else if (index === 1) {
                 this.tentaCattura();
             } else if (index === 2) {
@@ -516,7 +526,7 @@ export default class BattleScene extends Phaser.Scene {
         this.time.delayedCall(1500, () => {
             let activeBot = this.partita.p2.squadra[this.partita.p2.attivoIdx];
             let botMoveData = this.partita.scegliMossaBotIntelligente(activeBot, this.partita.p1.squadra[this.partita.p1.attivoIdx], this.partita.p2, this.partita.p1);
-            let stato = this.partita.processaTurno({ mossa: { Nome: "Fallita" } }, { mossa: botMoveData });
+            let stato = this.partita.processaTurno({ tipo: 'item' }, { mossa: botMoveData });
             this.applicaStatoPartita(stato, false);
         });
     }
@@ -736,28 +746,53 @@ export default class BattleScene extends Phaser.Scene {
                     this.updateUI();
                 }
 
+                let targetLato = null;
                 let targetHp = null;
-                if (typeof riga === 'string' && riga.includes("|HP:")) {
-                    let parts = riga.split("|HP:");
-                    riga = parts[0]; targetHp = parseInt(parts[1]);
+
+                if (typeof riga === 'string') {
+                    let parts = riga.split('|');
+                    riga = parts[0];
+                    for (let i = 1; i < parts.length; i++) {
+                        if (parts[i].startsWith('LATO:')) {
+                            targetLato = parseInt(parts[i].substring(5));
+                        } else if (parts[i].startsWith('HP:')) {
+                            targetHp = parseInt(parts[i].substring(3));
+                        }
+                    }
                 }
 
                 this.logText.setText(riga);
-                let isPlayerTarget = riga.includes(this.pEntity.name);
-                let isEnemyTarget = riga.includes(this.eEntity.name);
+
+                let isPlayerTarget = false;
+                let isEnemyTarget = false;
+                if (targetLato !== null) {
+                    isPlayerTarget = this.invertiLogs ? (targetLato === 2) : (targetLato === 1);
+                    isEnemyTarget = this.invertiLogs ? (targetLato === 1) : (targetLato === 2);
+                } else {
+                    isPlayerTarget = riga.includes(this.pEntity.name);
+                    isEnemyTarget = riga.includes(this.eEntity.name);
+                }
 
                 if (riga.includes(" usa ")) {
-                    ultimoAttaccanteEraPlayer = riga.includes(this.pEntity.name);
+                    if (targetLato !== null) {
+                        ultimoAttaccanteEraPlayer = this.invertiLogs ? (targetLato === 2) : (targetLato === 1);
+                    } else {
+                        ultimoAttaccanteEraPlayer = riga.includes(this.pEntity.name);
+                    }
                     this.playDash(ultimoAttaccanteEraPlayer);
                 }
 
-                if (riga.includes("Inflitti") || riga.includes("efficace") || riga.includes("subisce danni") || riga.includes("rubano energia") || riga.includes("recupera") || riga.includes("rigenera") || riga.includes("contraccolpo")) {
+                if (riga.includes("Inflitti") || riga.includes("efficace") || riga.includes("subisce danni") || riga.includes("rubano energia") || riga.includes("recupera") || riga.includes("rigenera") || riga.includes("contraccolpo") || riga.includes("Perde ") || riga.includes("colpito da")) {
                     let targetEnt = isPlayerTarget ? this.pEntity : (isEnemyTarget ? this.eEntity : null);
                     if (targetEnt && targetHp !== null) targetEnt.hp = targetHp;
                     this.updateUI(targetEnt);
 
-                    if (riga.includes("Inflitti") || riga.includes("efficace")) { if (ultimoAttaccanteEraPlayer !== null) this.playDamage(!ultimoAttaccanteEraPlayer); }
-                    else if (riga.includes("subisce danni") || riga.includes("rubano energia") || riga.includes("contraccolpo")) { this.playDamage(isPlayerTarget); }
+                    if (riga.includes("Inflitti") || riga.includes("efficace")) {
+                        if (ultimoAttaccanteEraPlayer !== null) this.playDamage(!ultimoAttaccanteEraPlayer);
+                    }
+                    else if (riga.includes("subisce danni") || riga.includes("rubano energia") || riga.includes("contraccolpo") || riga.includes("Perde ") || riga.includes("colpito da")) {
+                        this.playDamage(isPlayerTarget);
+                    }
                 }
 
                 if (riga.includes("aumenta")) this.playStatAnim(isPlayerTarget, true);
@@ -770,7 +805,12 @@ export default class BattleScene extends Phaser.Scene {
                 else if (riga.includes("si è svegliato") || riga.includes("si è scongelato") || riga.includes("curato dal suo problema di stato")) this.updateStatusOverlay(isPlayerTarget, null);
 
                 if ((riga.includes("confuso") || riga.includes("Confusione")) && !riga.includes("non è più confuso")) this.playConfusion(isPlayerTarget);
-                if (riga.includes("intrappolato") || riga.includes("Legatutto") || riga.includes("Parassiseme")) this.playTrap(isPlayerTarget);
+
+                if (riga.includes("Parassiseme") || riga.includes("semi rubano")) {
+                    this.playSeeds(isPlayerTarget);
+                } else if (riga.includes("intrappolato") || riga.includes("Legatutto") || riga.includes("pietre appuntite") || riga.includes("fielepunte")) {
+                    this.playTrap(isPlayerTarget);
+                }
 
                 index++;
                 this.time.delayedCall(1500, mostraProssimo);
@@ -780,6 +820,20 @@ export default class BattleScene extends Phaser.Scene {
             }
         };
         mostraProssimo();
+    }
+
+    playSeeds(isPlayer) {
+        let targetX = isPlayer ? 250 : 750;
+        let targetY = isPlayer ? 550 : 280;
+        let seed = this.add.text(targetX, targetY, '🌱', { fontSize: '100px' }).setOrigin(0.5);
+        this.tweens.add({
+            targets: seed,
+            scale: { from: 0.1, to: 1.2 },
+            alpha: { from: 0, to: 1 },
+            duration: 1000,
+            yoyo: true,
+            onComplete: () => seed.destroy()
+        });
     }
 
     playDash(isPlayer) { let sprite = isPlayer ? this.pSprite : this.eSprite; let dist = isPlayer ? 60 : -60; this.tweens.add({ targets: sprite, x: sprite.x + dist, duration: 100, yoyo: true, ease: 'Power2' }); }

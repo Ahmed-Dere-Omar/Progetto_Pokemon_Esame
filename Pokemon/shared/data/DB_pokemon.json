@@ -882,7 +882,6 @@
       "Dragodanza",
       "Iper Raggio",
       "Nebbia",
-      "Trasformazione",
       "Occhioni Teneri",
       "Fanghiglia",
       "Lavasbuffo",
@@ -2927,39 +2926,6 @@
     }
   },
   {
-    "nome": "Ditto",
-    "tipi": [
-      "Normale"
-    ],
-    "statistiche": {
-      "speed": {
-        "base_stat": 48
-      },
-      "special-defense": {
-        "base_stat": 48
-      },
-      "special-attack": {
-        "base_stat": 48
-      },
-      "defense": {
-        "base_stat": 48
-      },
-      "attack": {
-        "base_stat": 48
-      },
-      "hp": {
-        "base_stat": 48
-      }
-    },
-    "mosse": [
-      "Trasformazione"
-    ],
-    "sprite": {
-      "normal": "https://media.pokemoncentral.it/wiki/d/d4/Sprnbm0132.gif",
-      "shiny": "https://media.pokemoncentral.it/wiki/0/01/Sprnbmsh0132.gif"
-    }
-  },
-  {
     "nome": "Vaporeon",
     "tipi": [
       "Acqua"
@@ -3598,7 +3564,6 @@
       "Goccia Vitale",
       "Congiura",
       "Esclusiva",
-      "Trasformazione",
       "Sferapulsar",
       "Psichico"
     ],
