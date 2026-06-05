@@ -111,6 +111,8 @@ export default class BattleScene extends Phaser.Scene {
         this.moveDB = this.registry.get('moveDB');
 
         this.keys = this.input.keyboard.addKeys(InputConfig);
+        this.keyDelete = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.DELETE);
+
         this.createStatsUI();
 
         // === OBIETTIVO 5: Pausa musica lobby e avvia musica battaglia ===
@@ -244,6 +246,14 @@ export default class BattleScene extends Phaser.Scene {
             this.socket.off('opponentDisconnected');
             this.socket.on('opponentDisconnected', () => this.vittoriaPerForfeit());
         }
+        this.battleInputHandler = (e) => this.handleBattleMenuKeys(e);
+        window.addEventListener('keydown', this.battleInputHandler);
+        window.addEventListener('dpad-input', this.battleInputHandler);
+
+        this.events.on('shutdown', () => {
+            window.removeEventListener('keydown', this.battleInputHandler);
+            window.removeEventListener('dpad-input', this.battleInputHandler);
+        });
         this.startTurn();
     }
     vittoriaPerForfeit() {
@@ -405,6 +415,7 @@ export default class BattleScene extends Phaser.Scene {
     }
 
     update() {
+        // Qui lasciamo SOLO il controllo delle statistiche (tasto SHIFT)
         if (this.keys.STATS && this.keys.STATS.isDown && this.isInputActive && (this.menuState === 'MAIN' || this.menuState === 'MOVES')) {
             if (this.statsDom.node.querySelector('#stats-overlay').style.display === 'none') {
                 this.updateStatsUI();
@@ -414,35 +425,48 @@ export default class BattleScene extends Phaser.Scene {
             this.statsDom.node.querySelector('#stats-overlay').style.display = 'none';
         }
 
+        // (Tutto il resto dei comandi frecce/conferma/cancella è stato spostato in handleBattleMenuKeys)
+    }
+    handleBattleMenuKeys(e) {
         if (!this.isInputActive) return;
+        // Legge sia la tastiera fisica che il pad mobile
+        let key = e.key || (e.detail && e.detail.key);
+        if (!key) return;
 
-        if (Phaser.Input.Keyboard.JustDown(this.keys.LEFT) || Phaser.Input.Keyboard.JustDown(this.keys.A)) {
-            if (this.selectedMoveIndex % 2 !== 0) this.selectedMoveIndex--;
-            this.updateMenuSelection();
-        } else if (Phaser.Input.Keyboard.JustDown(this.keys.RIGHT) || Phaser.Input.Keyboard.JustDown(this.keys.D)) {
-            if (this.selectedMoveIndex % 2 === 0) this.selectedMoveIndex++;
-            this.updateMenuSelection();
-        } else if (Phaser.Input.Keyboard.JustDown(this.keys.UP) || Phaser.Input.Keyboard.JustDown(this.keys.W)) {
-            if (this.selectedMoveIndex >= 2) this.selectedMoveIndex -= 2;
-            this.updateMenuSelection();
-        } else if (Phaser.Input.Keyboard.JustDown(this.keys.DOWN) || Phaser.Input.Keyboard.JustDown(this.keys.S)) {
-            if (this.selectedMoveIndex <= 1) this.selectedMoveIndex += 2;
-            this.updateMenuSelection();
-        }
+        // Anti-skip debounce (Evita salti doppi col joystick)
+        if (!this.lastBattleNavTime) this.lastBattleNavTime = 0;
+        if (Date.now() - this.lastBattleNavTime < 150) return;
+        this.lastBattleNavTime = Date.now();
 
-        if (Phaser.Input.Keyboard.JustDown(this.keys.CONFIRM)) {
-            this.handleButtonClick(this.selectedMoveIndex);
-        }
-
-        if (Phaser.Input.Keyboard.JustDown(this.keys.CANCEL)) {
+        // TASTO INDIETRO (B del Pad, Esc, Delete, Backspace)
+        if (key === 'Escape' || key === 'Backspace' || key === 'Delete') {
             if (this.menuState === 'MOVES') {
                 this.menuState = 'MAIN';
                 this.selectedMoveIndex = 0;
                 this.updateMenuSelection();
             }
+            return;
+        }
+
+        // FRECCE DIREZIONALI / JOYSTICK
+        if (key === 'ArrowLeft' || key === 'a' || key === 'A') {
+            if (this.selectedMoveIndex % 2 !== 0) this.selectedMoveIndex--;
+            this.updateMenuSelection();
+        } else if (key === 'ArrowRight' || key === 'd' || key === 'D') {
+            if (this.selectedMoveIndex % 2 === 0) this.selectedMoveIndex++;
+            this.updateMenuSelection();
+        } else if (key === 'ArrowUp' || key === 'w' || key === 'W') {
+            if (this.selectedMoveIndex >= 2) this.selectedMoveIndex -= 2;
+            this.updateMenuSelection();
+        } else if (key === 'ArrowDown' || key === 's' || key === 'S') {
+            if (this.selectedMoveIndex <= 1) this.selectedMoveIndex += 2;
+            this.updateMenuSelection();
+        }
+        // TASTO CONFERMA (A del Pad, Invio, Spazio)
+        else if (key === 'Enter' || key === ' ') {
+            this.handleButtonClick(this.selectedMoveIndex);
         }
     }
-
     startTurn() {
         this.logText.setVisible(false);
         this.isInputActive = true;
@@ -985,32 +1009,37 @@ export default class BattleScene extends Phaser.Scene {
         let teamData = this.myTeamData;
 
         const html = `
-            <div class="pkmn-modal-content">
+            <div class="pkmn-modal-content cyber-modal">
                     <div id="modal-list-view" style="display: flex; flex-direction: column; width: 100%; flex: 1; overflow: hidden;">
-                        <div class="pkmn-modal-header" style="margin-bottom: 25px;">SQUADRA POKÉMON</div> <div class="pokemon-list" id="pkmn-list-container" style="display: flex; flex-direction: column; gap: 10px; width: 100%; box-sizing: border-box; overflow-y: auto; overflow-x: hidden; flex: 1;"></div>
+                        <div class="pkmn-modal-header cyber-header" style="margin-bottom: 25px;">SQUADRA POKÉMON</div> 
+                        <div class="pokemon-list" id="pkmn-list-container" style="display: flex; flex-direction: column; gap: 15px; width: 100%; box-sizing: border-box; overflow-y: auto; overflow-x: hidden; flex: 1; padding: 10px;"></div>
                     </div>
-
+                    <div id="modal-action-menu" style="display: none; flex-direction: column; gap: 10px; width: 100%; margin-top: auto; padding-bottom: 5px;">
+                            <div class="action-btn-inline" data-action="0">MANDA IN CAMPO</div>
+                            <div class="action-btn-inline" data-action="1">SUMMARY</div>
+                            <div class="action-btn-inline" data-action="2">INDIETRO</div>
+                    </div>
                     <div id="modal-summary-view" class="summary-view" style="display: none; flex-direction: column; width: 100%; flex: 1; overflow: hidden;">
-                        <div class="pkmn-modal-header" id="summary-page-indicator" style="cursor: pointer; padding: 5px 0; margin-bottom: 25px;">◀ INFO E STATISTICHE ▶</div>
+                        <div class="pkmn-modal-header cyber-header" id="summary-page-indicator" style="cursor: pointer; padding: 5px 0; margin-bottom: 25px; color: var(--ab-yellow) !important; border-bottom-color: var(--ab-yellow) !important;">◀ INFO E STATISTICHE ▶</div>
                         
                         <div class="summary-layout" style="display: flex; gap: 20px; flex: 1; overflow: hidden;">
-                            <div class="summary-left" style="flex: 1; text-align: center; border-right: 4px dashed var(--color-quaternary); display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">
-                               <div class="pkmn-name" id="summary-name" style="margin-bottom: 10px; font-size: 1.8rem; flex-shrink: 0;">NOME</div>
+                            <div class="summary-left" style="flex: 1; text-align: center; border-right: 2px dashed var(--ab-cyan); display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">
+                               <div class="cyber-highlight-text" id="summary-name" style="margin-bottom: 10px; font-size: 2rem; flex-shrink: 0; text-shadow: 3px 3px 0 #000;">NOME</div>
                             <div style="flex: 1; display: flex; align-items: center; justify-content: center; min-height: 140px;">
-                               <img id="summary-sprite" src="" style="width: 240px; height: 240px; object-fit: contain; image-rendering: pixelated; filter: drop-shadow(4px 4px 0 rgba(0,0,0,0.5));">
+                               <img id="summary-sprite" src="" style="width: 240px; height: 240px; object-fit: contain; image-rendering: pixelated; filter: drop-shadow(4px 4px 0 rgba(0,240,255,0.5));">
                             </div>
                             <div class="summary-types" id="summary-types" style="display: flex; justify-content: center; gap: 10px; margin-top: 10px; margin-bottom: 15px; flex-shrink: 0;"></div>
                             
-                            <div class="move-description-box" id="summary-move-desc" style="display: none; width: 100%; height: 130px; flex-shrink: 0;">
-                                <div id="desc-text" style="flex: 1; text-align: left; font-size: 1.1rem; overflow-y: auto; padding-right: 5px; line-height: 1.3;">Seleziona una mossa...</div>
-                                <div style="display: flex; justify-content: space-between; border-top: 2px dashed #ff7477; padding-top: 8px; margin-top: 8px; font-weight: bold; color: #ffcc00; font-size: 1.1rem;">
+                            <div class="cyber-panel move-description-box" id="summary-move-desc" style="display: none; width: 100%; height: 130px; flex-shrink: 0; padding: 10px;">
+                                <div id="desc-text" style="flex: 1; text-align: left; font-size: 1rem; overflow-y: auto; padding-right: 5px; line-height: 1.3; color: #fff;">Seleziona una mossa...</div>
+                                <div style="display: flex; justify-content: space-between; border-top: 2px dashed var(--ab-magenta); padding-top: 8px; margin-top: 8px; font-weight: bold; color: var(--ab-yellow); font-size: 1.1rem;">
                                     <div>POT: <span id="desc-pot" style="color:#fff;">--</span></div>
                                     <div>PREC: <span id="desc-prec" style="color:#fff;">--</span></div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="summary-right" style="flex: 1.5; padding-left: 5px; display: flex; flex-direction: column; overflow: hidden;">
+                        <div class="summary-right" style="flex: 1.5; padding-left: 15px; display: flex; flex-direction: column; overflow: hidden;">
                             <div id="summary-page-0" class="stats-grid" style="flex: 1; align-content: center;"></div>
                             
                             <div id="summary-page-1" style="display: none; flex-direction: column; flex: 1; overflow: hidden;">
@@ -1108,9 +1137,22 @@ export default class BattleScene extends Phaser.Scene {
         this.updateModalVisuals();
     }
     setupModalNavigation(teamData) {
+        // ---> FIX: Avvia il timer di blocco ADESSO per assorbire l'urto del tasto "A" dal menu precedente <---
+        this.lastTeamNavTime = Date.now();
+
         this.modalKeyListener = (event) => {
             if (this.isInputActive) return;
-            const key = event.key;
+            // Supporto simultaneo per Tastiera e Tasti del Pad Virtuale
+            let key = event.key || (event.detail && event.detail.key);
+            if (!key) return;
+
+            // --- ANTI-SKIP DEBOUNCE ---
+            if (!this.lastTeamNavTime) this.lastTeamNavTime = 0;
+            // Alziamo leggermente a 200ms per proteggere meglio i tap sul telefono!
+            if (Date.now() - this.lastTeamNavTime < 200) return;
+            this.lastTeamNavTime = Date.now();
+            // --------------------------
+
             if (this.currentView === 'list') {
                 let max = document.querySelectorAll('.pokemon-item').length;
                 if (max > 0) {
@@ -1119,8 +1161,8 @@ export default class BattleScene extends Phaser.Scene {
                 }
             } else if (this.currentView === 'inline-actions') {
                 let max = 3;
-                if (key === 'ArrowDown' || key === 's') { this.actionSelectionIdx = (this.actionSelectionIdx + 1) % max; this.updateModalVisuals(); }
-                if (key === 'ArrowUp' || key === 'w') { this.actionSelectionIdx = (this.actionSelectionIdx - 1 + max) % max; this.updateModalVisuals(); }
+                if (key === 'ArrowDown' || key === 's' || key === 'ArrowRight' || key === 'd') { this.actionSelectionIdx = (this.actionSelectionIdx + 1) % max; this.updateModalVisuals(); }
+                if (key === 'ArrowUp' || key === 'w' || key === 'ArrowLeft' || key === 'a') { this.actionSelectionIdx = (this.actionSelectionIdx - 1 + max) % max; this.updateModalVisuals(); }
             } else if (this.currentView === 'summary') {
                 if (this.summaryPage === 1) {
                     let numMoves = document.querySelectorAll('.move-entry').length;
@@ -1137,8 +1179,13 @@ export default class BattleScene extends Phaser.Scene {
                 }
             }
 
-            if (key === 'Enter' || key === ' ') this.confirmModalSelection(teamData);
-            if (key === 'Escape' || key === 'Backspace') {
+            // ---> FIX: TASTO A / INVIO (Rimossa scorciatoia del KO!) <---
+            if (key === 'Enter' || key === ' ') {
+                this.confirmModalSelection(teamData);
+            }
+
+            // TASTO B / ESC / DELETE
+            if (key === 'Escape' || key === 'Backspace' || key === 'Delete') {
                 if (this.currentView === 'inline-actions') { this.currentView = 'list'; this.updateModalVisuals(); }
                 else if (this.currentView === 'summary') this.cancelModalSelection();
                 else this.cancelModalSelection(true);
@@ -1146,6 +1193,7 @@ export default class BattleScene extends Phaser.Scene {
         };
 
         window.addEventListener('keydown', this.modalKeyListener);
+        window.addEventListener('dpad-input', this.modalKeyListener);
 
         this.teamModalDom.addEventListener('click', (e) => {
             if (e.target.id === 'summary-page-indicator') {
@@ -1160,16 +1208,20 @@ export default class BattleScene extends Phaser.Scene {
                 return;
             }
 
+            // ---> FIX: CLICK DEL MOUSE/TOUCH (Rimossa scorciatoia del KO!) <---
             let item = e.target.closest('.pokemon-item');
-            if (item && this.currentView === 'list') {
-                this.modalSelection = parseInt(item.dataset.index); this.confirmModalSelection(teamData); return;
+            if (item && !e.target.classList.contains('action-btn-inline') && this.currentView === 'list') {
+                this.modalSelection = parseInt(item.dataset.index);
+                this.confirmModalSelection(teamData);
+                return;
             }
+
             if (e.target.classList.contains('action-btn-inline')) {
                 let actionText = e.target.innerText.trim();
                 let parentItem = e.target.closest('.pokemon-item');
                 this.modalSelection = parseInt(parentItem.dataset.index);
 
-                if (actionText === 'SOSTITUISCI') this.executeSwitch(this.modalSelection);
+                if (actionText === 'SOSTITUISCI' || actionText === 'MANDA IN CAMPO') this.executeSwitch(this.modalSelection);
                 else if (actionText === 'SUMMARY') this.openSummary(teamData[this.modalSelection]);
                 else if (actionText === 'INDIETRO') { this.currentView = 'list'; this.updateModalVisuals(); }
                 return;
@@ -1235,6 +1287,7 @@ export default class BattleScene extends Phaser.Scene {
 
         if (forceClose) {
             window.removeEventListener('keydown', this.modalKeyListener);
+            window.removeEventListener('dpad-input', this.modalKeyListener);
             if (this.teamModalDom) {
                 this.teamModalDom.remove();
                 this.teamModalDom = null;
@@ -1244,7 +1297,7 @@ export default class BattleScene extends Phaser.Scene {
         } else {
             this.currentView = 'inline-actions';
             document.getElementById('modal-summary-view').style.display = 'none';
-            document.getElementById('modal-list-view').style.display = 'block';
+            document.getElementById('modal-list-view').style.display = 'flex';
             this.updateModalVisuals();
         }
     }
@@ -1279,6 +1332,7 @@ export default class BattleScene extends Phaser.Scene {
             this.teamModalDom = null;
         }
         window.removeEventListener('keydown', this.modalKeyListener);
+        window.removeEventListener('dpad-input', this.modalKeyListener);
         this.btns.forEach(b => b.setVisible(false)); this.logText.setVisible(true);
 
         const switchAction = { tipo: 'switch', nuovoIdx: index };

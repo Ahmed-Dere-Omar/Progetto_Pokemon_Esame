@@ -50,7 +50,7 @@ export default class CPKScene extends Phaser.Scene {
             this.keys.UP.reset(); this.keys.DOWN.reset();
             this.keys.A.reset(); this.keys.D.reset();
             this.keys.W.reset(); this.keys.S.reset();
-            
+
             let ms = this.registry.get('musicState');
             let ls = this.registry.get('lobbySound');
             if (ms && ls) {
@@ -109,7 +109,7 @@ export default class CPKScene extends Phaser.Scene {
     }
 
     update() {
-        if (Phaser.Input.Keyboard.JustDown(this.keys.CANCEL) && !this.isTransitioning && !this.pcOpen && !this.isDialogActive) {
+        if (Phaser.Input.Keyboard.JustDown(this.keys.CANCEL) && !this.isTransitioning && !this.pcOpen && !this.isDialogActive && !this.isPaused) {
             this.togglePauseMenu();
         }
 
@@ -231,7 +231,8 @@ export default class CPKScene extends Phaser.Scene {
             choiceContainer = document.createElement('div');
             choiceContainer.id = 'dialog-choice-container';
             choiceContainer.style.position = 'fixed';
-            choiceContainer.style.bottom = '160px';
+            let isMobile = window.innerWidth <= 1024;
+            choiceContainer.style.bottom = isMobile ? 'calc(22vh + 165px)' : '180px';
             choiceContainer.style.right = '5%';
             choiceContainer.style.transform = 'none';
             choiceContainer.style.width = 'auto';
@@ -379,8 +380,7 @@ export default class CPKScene extends Phaser.Scene {
         overlay.style.alignItems = 'center';
         overlay.style.zIndex = '9999';
 
-        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 7vw; text-align: center; max-width: 90%; color: #fff;">TORNO ALLA LOBBY...</h1>`;
-        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: clamp(2rem, 5vw, 3.5rem); text-align: center; width: 90%; color: #fff;">TORNO ALLA LOBBY...</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; width: 100%; max-width: 100vw; padding: 0 20px; box-sizing: border-box; font-size: clamp(1rem, 5vw, 3rem); text-align: center; line-height: 1.4; word-wrap: break-word; word-break: break-word; white-space: normal; color: #fff;">TORNO ALLA LOBBY...</h1>`;
         document.getElementById('game-container').appendChild(overlay);
 
         setTimeout(() => {
@@ -396,15 +396,17 @@ export default class CPKScene extends Phaser.Scene {
         if (this.isPaused) {
             let existingMenu = document.getElementById('pause-menu-overlay');
             if (existingMenu && existingMenu.inSubMenu) {
-                // Se premo ESC nel sottomenu, Phaser chiama questa funzione.
-                // Invece di chiudere, torniamo al menu principale!
                 existingMenu.renderMainPause();
                 return;
             }
-            // Se non sono in un sottomenu, chiudo tutto.
             this.isPaused = false;
+
+            // Svuota la memoria del tasto!
+            if (this.keys && this.keys.CANCEL) this.keys.CANCEL.reset();
+
             if (this.handlePauseKeyDown) {
                 window.removeEventListener('keydown', this.handlePauseKeyDown);
+                window.removeEventListener('dpad-input', this.handlePauseKeyDown); // Spegne il pad
                 this.handlePauseKeyDown = null;
             }
             if (existingMenu) existingMenu.remove();
@@ -492,7 +494,7 @@ export default class CPKScene extends Phaser.Scene {
                 }
             };
 
-           const renderMusicMenu = () => {
+            const renderMusicMenu = () => {
                 overlay.inSubMenu = true;
                 let lobbyTracks = this.registry.get('lobbyTracks') || [];
                 let musicState = this.registry.get('musicState') || { currentTrackIndex: 0, volume: 0.5, isPlaying: false, isLooping: false };
@@ -529,7 +531,7 @@ export default class CPKScene extends Phaser.Scene {
                             let ms = this.registry.get('musicState');
                             ms.volume = val;
                             let ls = this.registry.get('lobbySound');
-                            if (ls) ls.setVolume(val); 
+                            if (ls) ls.setVolume(val);
                             let volLabel = document.getElementById('music-vol-val');
                             if (volLabel) volLabel.innerText = Math.round(val * 100) + '%';
                         });
@@ -537,12 +539,12 @@ export default class CPKScene extends Phaser.Scene {
                         volSlider.addEventListener('change', async (ev) => {
                             let val = parseInt(ev.target.value) / 100;
                             let profilo = this.registry.get('playerProfile');
-                            profilo.volume = val; 
-                            
+                            profilo.volume = val;
+
                             const { error } = await supabaseClient.from('profilo')
                                 .update({ volume: val })
                                 .eq('id_profilo', profilo.id_profilo);
-                            
+
                             if (error) console.error("Errore salvataggio volume DB:", error);
                         });
                     }
@@ -559,9 +561,9 @@ export default class CPKScene extends Phaser.Scene {
 
                 musicState.currentTrackIndex = (musicState.currentTrackIndex + direction + lobbyTracks.length) % lobbyTracks.length;
                 let track = lobbyTracks[musicState.currentTrackIndex];
-                
+
                 let newSound = this.sound.add(track.key, { loop: musicState.isLooping, volume: musicState.volume });
-                
+
                 newSound.on('complete', () => {
                     let ms = this.registry.get('musicState');
                     let lt = this.registry.get('lobbyTracks');
@@ -582,7 +584,25 @@ export default class CPKScene extends Phaser.Scene {
             renderMainPause();
 
             this.handlePauseKeyDown = (e) => {
-                let key = e.key;
+                let key = e.key || (e.detail && e.detail.key);
+                if (!key) return;
+
+                // Anti-skip per il joystick
+                if (!this.lastPauseNavTime) this.lastPauseNavTime = 0;
+                if (Date.now() - this.lastPauseNavTime < 150) return;
+                this.lastPauseNavTime = Date.now();
+
+                // Tasto DELETE/ESC/BACKSPACE per chiudere o tornare indietro
+                if (key === 'Escape' || key === 'Backspace' || key === 'Delete') {
+                    if (overlay.inSubMenu) {
+                        let btn = document.getElementById('back-pause-btn');
+                        if (btn) btn.click();
+                    } else {
+                        this.togglePauseMenu(); // Chiude tutto il menu!
+                    }
+                    return;
+                }
+
                 if (!overlay.inSubMenu) {
                     if (key === 'ArrowUp' || key === 'w' || key === 'W') {
                         selectedIdx = (selectedIdx - 1 + currentButtons.length) % currentButtons.length;
@@ -595,8 +615,8 @@ export default class CPKScene extends Phaser.Scene {
                         if (btn) btn.click();
                     }
                 } else if (overlay.inSubMenu) {
-                    // 3. TOLTO 'Escape' DA QUI. Adesso i conflitti di sistema non esistono più!
-                    if (key === 'Enter' || key === ' ' || key === 'Backspace') {
+                    // Cliccare il bottone INDIETRO
+                    if (key === 'Enter' || key === ' ') {
                         let btn = document.getElementById('back-pause-btn');
                         if (btn) btn.click();
                     } else if (key === 'ArrowLeft' || key === 'a' || key === 'A') {
@@ -608,13 +628,18 @@ export default class CPKScene extends Phaser.Scene {
                     }
                 }
             };
+
             window.addEventListener('keydown', this.handlePauseKeyDown);
+            window.addEventListener('dpad-input', this.handlePauseKeyDown); // PAD MOBILE
 
             overlay.addEventListener('click', async (e) => {
                 if (e.target.id === 'lobby-btn') {
                     e.target.innerText = "USCITA...";
                     this.isPaused = false;
-                    if (this.handlePauseKeyDown) window.removeEventListener('keydown', this.handlePauseKeyDown);
+                    if (this.handlePauseKeyDown) {
+                        window.removeEventListener('keydown', this.handlePauseKeyDown);
+                        window.removeEventListener('dpad-input', this.handlePauseKeyDown);
+                    }
                     let existingMenu = document.getElementById('pause-menu-overlay');
                     if (existingMenu) existingMenu.remove();
                     this.tornaAllaLobby(); // <-- Richiama la funzione di uscita del Centro!
@@ -626,11 +651,11 @@ export default class CPKScene extends Phaser.Scene {
                     renderMusicMenu();
                 } else if (e.target.id === 'music-loop') {
                     let ms = this.registry.get('musicState');
-                    ms.isLooping = !ms.isLooping; 
-                    
+                    ms.isLooping = !ms.isLooping;
+
                     let ls = this.registry.get('lobbySound');
-                    if (ls) ls.setLoop(ms.isLooping); 
-                    
+                    if (ls) ls.setLoop(ms.isLooping);
+
                     if (ms.isLooping) {
                         e.target.style.color = 'var(--ab-cyan)';
                         e.target.style.borderColor = 'var(--ab-cyan)';

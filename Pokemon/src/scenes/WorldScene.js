@@ -129,7 +129,7 @@ export default class WorldScene extends Phaser.Scene {
     }
 
     update() {
-        if (Phaser.Input.Keyboard.JustDown(this.keys.CANCEL) && !this.isTransitioning && !this.pcOpen && !this.isDialogActive) {
+        if (Phaser.Input.Keyboard.JustDown(this.keys.CANCEL) && !this.isTransitioning && !this.pcOpen && !this.isDialogActive && !this.isPaused) {
             this.togglePauseMenu();
         }
 
@@ -352,7 +352,8 @@ export default class WorldScene extends Phaser.Scene {
             choiceContainer = document.createElement('div');
             choiceContainer.id = 'dialog-choice-container';
             choiceContainer.style.position = 'fixed';
-            choiceContainer.style.bottom = '180px';
+            let isMobile = window.innerWidth <= 1024;
+            choiceContainer.style.bottom = isMobile ? 'calc(22vh + 165px)' : '180px';
             choiceContainer.style.left = '65%';
             choiceContainer.style.transform = 'translateX(-50%)';
             choiceContainer.style.right = 'auto';
@@ -494,9 +495,8 @@ export default class WorldScene extends Phaser.Scene {
         overlay.style.justifyContent = 'center';
         overlay.style.alignItems = 'center';
         overlay.style.zIndex = '9999';
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; width: 100%; max-width: 100vw; padding: 0 20px; box-sizing: border-box; font-size: clamp(1rem, 5vw, 3rem); text-align: center; line-height: 1.4; word-wrap: break-word; word-break: break-word; white-space: normal; color: #fff;">CARICAMENTO ARENA PVP...</h1>`;
 
-        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 7vw; text-align: center; max-width: 90%; color: #fff;">CARICAMENTO ARENA PVP...</h1>`;
-        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: clamp(2rem, 5vw, 3.5rem); text-align: center; width: 90%; color: #fff;">CARICAMENTO ARENA PVP...</h1>`;
         document.getElementById('game-container').appendChild(overlay);
 
         setTimeout(() => {
@@ -546,8 +546,7 @@ export default class WorldScene extends Phaser.Scene {
         overlay.style.alignItems = 'center';
         overlay.style.zIndex = '9999';
 
-        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 7vw; text-align: center; max-width: 90%; color: #fff;">CARICAMENTO CENTRO POKÉMON...</h1>`;
-        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: clamp(2rem, 5vw, 3.5rem); text-align: center; width: 90%; color: #fff;">CARICAMENTO CENTRO POKÉMON...</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; width: 100%; max-width: 100vw; padding: 0 20px; box-sizing: border-box; font-size: clamp(1rem, 5vw, 3rem); text-align: center; line-height: 1.4; word-wrap: break-word; word-break: break-word; white-space: normal; color: #fff;">CARICAMENTO CENTRO POKÉMON...</h1>`;
         document.getElementById('game-container').appendChild(overlay);
 
         setTimeout(() => {
@@ -578,8 +577,7 @@ export default class WorldScene extends Phaser.Scene {
         overlay.style.alignItems = 'center';
         overlay.style.zIndex = '9999';
 
-        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 7vw; text-align: center; max-width: 90%; color: #fff;">CARICAMENTO LIVELLO ${levelToLoad}...</h1>`;
-        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: clamp(2rem, 5vw, 3.5rem); text-align: center; width: 90%; color: #fff;">CARICAMENTO LIVELLO ${levelToLoad}...</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; width: 100%; max-width: 100vw; padding: 0 20px; box-sizing: border-box; font-size: clamp(1rem, 5vw, 3rem); text-align: center; line-height: 1.4; word-wrap: break-word; word-break: break-word; white-space: normal; color: #fff;">CARICAMENTO LIVELLO ${levelToLoad}...</h1>`;
         document.getElementById('game-container').appendChild(overlay);
 
         try {
@@ -650,9 +648,16 @@ export default class WorldScene extends Phaser.Scene {
                 existingMenu.renderMainPause();
                 return;
             }
+
             this.isPaused = false;
+
+            // ---> FIX CORTOCIRCUITO: Svuotiamo la memoria di Phaser! <---
+            // Diciamo a Phaser di "dimenticare" che hai appena premuto ESC o B
+            if (this.keys && this.keys.CANCEL) this.keys.CANCEL.reset();
+
             if (this.handlePauseKeyDown) {
                 window.removeEventListener('keydown', this.handlePauseKeyDown);
+                window.removeEventListener('dpad-input', this.handlePauseKeyDown); // <-- Fix chiusura Pad
                 this.handlePauseKeyDown = null;
             }
             if (existingMenu) existingMenu.remove();
@@ -827,7 +832,25 @@ export default class WorldScene extends Phaser.Scene {
             renderMainPause();
 
             this.handlePauseKeyDown = (e) => {
-                let key = e.key;
+                let key = e.key || (e.detail && e.detail.key);
+                if (!key) return;
+
+                // Anti-skip per il joystick
+                if (!this.lastPauseNavTime) this.lastPauseNavTime = 0;
+                if (Date.now() - this.lastPauseNavTime < 150) return;
+                this.lastPauseNavTime = Date.now();
+
+                // Tasto DELETE/ESC/BACKSPACE per chiudere o tornare indietro
+                if (key === 'Escape' || key === 'Backspace' || key === 'Delete') {
+                    if (overlay.inSubMenu) {
+                        let btn = document.getElementById('back-pause-btn');
+                        if (btn) btn.click();
+                    } else {
+                        this.togglePauseMenu(); // Chiude tutto il menu!
+                    }
+                    return;
+                }
+
                 if (!overlay.inSubMenu) {
                     if (key === 'ArrowUp' || key === 'w' || key === 'W') {
                         selectedIdx = (selectedIdx - 1 + currentButtons.length) % currentButtons.length;
@@ -840,7 +863,8 @@ export default class WorldScene extends Phaser.Scene {
                         if (btn) btn.click();
                     }
                 } else if (overlay.inSubMenu) {
-                    if (key === 'Enter' || key === ' ' || key === 'Backspace') {
+                    // ---> FIX: REINSERITO IL TASTO INVIO/SPAZIO PER IL PULSANTE INDIETRO <---
+                    if (key === 'Enter' || key === ' ') {
                         let btn = document.getElementById('back-pause-btn');
                         if (btn) btn.click();
                     } else if (key === 'ArrowLeft' || key === 'a' || key === 'A') {
@@ -852,7 +876,10 @@ export default class WorldScene extends Phaser.Scene {
                     }
                 }
             };
+
+            // ---> FIX ASCOLTATORI <---
             window.addEventListener('keydown', this.handlePauseKeyDown);
+            window.addEventListener('dpad-input', this.handlePauseKeyDown); // DEVE ASCOLTARE IL PAD MOBILE!
 
             overlay.addEventListener('click', async (e) => {
                 if (e.target.id === 'logout-btn') {
@@ -996,12 +1023,33 @@ export default class WorldScene extends Phaser.Scene {
         this.player.anims.stop();
 
         let profilo = this.registry.get('playerProfile');
-        const { data: myPokemon, error } = await supabaseClient.from('pokemon').select('*').eq('id_profilo_proprietario', profilo.id_profilo);
+
+        // ---> FIX: Chiamiamo i dati in arrivo "dbPokemon" per evitare il conflitto di nomi!
+        const { data: dbPokemon, error } = await supabaseClient.from('pokemon').select('*').eq('id_profilo_proprietario', profilo.id_profilo);
 
         if (error) { console.error("Errore lettura PC:", error); this.pcOpen = false; return; }
 
+        // Salviamo i dati freschi nel gioco
+        if (dbPokemon) {
+            this.registry.set('userPokemon', dbPokemon);
+        }
+
+        // Ora possiamo usare myPokemon senza nessun errore SyntaxError!
+        let myPokemon = this.registry.get('userPokemon') || [];
         let squadra = myPokemon.filter(p => p.in_squadra).sort((a, b) => a.posizione_slot - b.posizione_slot);
-        let box = myPokemon.filter(p => !p.in_squadra);
+
+        // ---> FIX 1: ORDINAMENTO ALFABETICO DEL BOX <---
+        let boxRaw = myPokemon.filter(p => !p.in_squadra).sort((a, b) => {
+            let nomeA = a.id_specie || "";
+            let nomeB = b.id_specie || "";
+            return nomeA.localeCompare(nomeB);
+        });
+
+        // Crea 30 slot e infila i Pokémon ordinati, lasciando vuoti quelli in fondo
+        let box = new Array(30).fill(null);
+        boxRaw.forEach((p, i) => {
+            if (i < 30) box[i] = p;
+        });
 
         let pkmnDB = this.registry.get('pokemonDB');
         let moveDB = this.registry.get('moveDB');
@@ -1012,28 +1060,28 @@ export default class WorldScene extends Phaser.Scene {
         overlay.className = 'pkmn-modal-overlay';
         overlay.id = 'pc-overlay-main';
         overlay.innerHTML = `
-            <div class="pkmn-modal-content" id="pc-modal-content">
-                <div class="pkmn-modal-header" style="margin-bottom: 15px;">SISTEMA MEMORIA POKÉMON</div>
+            <div class="pkmn-modal-content cyber-modal" id="pc-modal-content">
+                <div class="pkmn-modal-header cyber-header" style="margin-bottom: 15px;">SISTEMA MEMORIA POKÉMON</div>
                 
                 <div id="pc-main-view" style="display: flex; gap: 20px; flex: 1;">
-                    <div style="flex: 1; display: flex; flex-direction: column; background: var(--battle-panel); border: 4px solid var(--color-secondary); border-radius: 8px; padding: 15px; box-sizing: border-box;">
-                        <h2 style="color: var(--battle-accent); text-align: center; margin-top: 0; flex-shrink: 0;">SQUADRA</h2>
+                    <div class="cyber-panel" style="flex: 1; display: flex; flex-direction: column; padding: 15px; box-sizing: border-box;">
+                        <h2 class="cyber-title">SQUADRA</h2>
                         <div id="pc-squadra" style="display: flex; flex-direction: column; gap: 10px; width: 100%; box-sizing: border-box; flex: 1; align-content: start; padding: 10px;"></div>
                     </div>
 
-                    <div style="flex: 2.2; background: var(--battle-panel); border: 4px solid var(--battle-border); border-radius: 8px; padding: 15px; display: flex; flex-direction: column; box-sizing: border-box;">
-                        <h2 style="color: var(--battle-accent); text-align: center; margin-top: 0; flex-shrink: 0;">BOX DATI</h2>
+                    <div class="cyber-panel" style="flex: 2.2; padding: 15px; display: flex; flex-direction: column; box-sizing: border-box;">
+                        <h2 class="cyber-title">BOX DATI</h2>
                         <div id="pc-box" class="pc-grid-box" style="display: grid; gap: 10px; box-sizing: border-box; flex: 1; align-content: start; padding: 10px;"></div>
                     </div>
 
-                    <div style="flex: 1; background: var(--battle-bg); border: 4px dashed var(--color-quaternary); border-radius: 8px; padding: 15px; display: flex; flex-direction: column; align-items: center; text-align: center;">
+                    <div class="cyber-panel" style="flex: 1; padding: 15px; display: flex; flex-direction: column; align-items: center; text-align: center; border-style: dashed;">
                         <div id="pc-preview-panel" style="width: 100%; display: flex; flex-direction: column; align-items: center;">
-                            <h3 id="pc-preview-name" style="color: var(--battle-text); margin: 0 0 10px 0; font-size: 1.5rem; min-height: 30px;">--</h3>
-                            <div style="width: 160px; height: 160px; background: #000; border: 2px solid #555; border-radius: 8px; display: flex; justify-content: center; align-items: center; margin-bottom: 15px; box-shadow: inset 2px 2px 5px rgba(0,0,0,0.8);">
-                                <img id="pc-preview-sprite" src="" style="width: 140px; height: 140px; object-fit: contain; image-rendering: pixelated; display: none;">
+                            <h3 id="pc-preview-name" class="cyber-highlight-text" style="margin: 0 0 10px 0; font-size: 1.5rem; min-height: 30px;">--</h3>
+                            <div style="width: 160px; height: 160px; background: rgba(0,0,0,0.8); border: 2px solid var(--ab-cyan); display: flex; justify-content: center; align-items: center; margin-bottom: 15px; box-shadow: inset 0 0 15px rgba(0,240,255,0.2);">
+                                <img id="pc-preview-sprite" src="" style="width: 140px; height: 140px; object-fit: contain; image-rendering: pixelated; display: none; filter: drop-shadow(0 0 5px rgba(0,240,255,0.8));">
                             </div>
                             <div id="pc-preview-types" style="display: flex; gap: 5px; margin-bottom: 15px; min-height: 25px;"></div>
-                            <div id="pc-preview-stats" style="color: var(--battle-accent); font-weight: bold; width: 100%; text-align: left; padding: 0 10px;"></div>
+                            <div id="pc-preview-stats" style="color: #fff; font-family: 'Courier New', monospace; font-size: 0.9rem; width: 100%; text-align: left; padding: 0 10px; line-height: 1.4;"></div>
                         </div>
 
                         <div id="pc-action-menu" style="display: none; flex-direction: column; gap: 10px; width: 100%; margin-top: auto; padding-bottom: 5px;">
@@ -1045,29 +1093,27 @@ export default class WorldScene extends Phaser.Scene {
                 </div>
 
                 <div id="pc-summary-view" class="summary-view" style="display: none; flex-direction: column; width: 100%; flex: 1; overflow: hidden;">
-                    <div class="pkmn-modal-header" id="pc-summary-page-indicator" style="cursor: pointer; padding: 5px 0; margin-bottom: 25px;">◀ INFO E STATISTICHE ▶</div>
+                    <div class="pkmn-modal-header cyber-header" id="pc-summary-page-indicator" style="cursor: pointer; padding: 5px 0; margin-bottom: 25px; color: var(--ab-yellow) !important; border-bottom-color: var(--ab-yellow) !important;">◀ INFO E STATISTICHE ▶</div>
                     
                     <div class="summary-layout" style="display: flex; gap: 20px; flex: 1; overflow: hidden;">
-                        
-                        <div class="summary-left" style="flex: 1; text-align: center; border-right: 4px dashed var(--color-quaternary); display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">
-                            <div class="pkmn-name" id="pc-sum-name" style="margin-bottom: 10px; font-size: 1.8rem; flex-shrink: 0;">NOME</div>
+                        <div class="summary-left" style="flex: 1; text-align: center; border-right: 2px dashed var(--ab-cyan); display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">
+                            <div class="cyber-highlight-text" id="pc-sum-name" style="margin-bottom: 10px; font-size: 2rem; flex-shrink: 0; text-shadow: 3px 3px 0 #000;">NOME</div>
                             <div style="flex: 1; display: flex; align-items: center; justify-content: center; min-height: 140px;">
-                              <img id="pc-sum-sprite" src="" style="width: 240px; height: 240px; object-fit: contain; image-rendering: pixelated; filter: drop-shadow(4px 4px 0 rgba(0,0,0,0.5));">
+                              <img id="pc-sum-sprite" src="" style="width: 240px; height: 240px; object-fit: contain; image-rendering: pixelated; filter: drop-shadow(4px 4px 0 rgba(0,240,255,0.5));">
                             </div>
                             <div class="summary-types" id="pc-sum-types" style="display: flex; justify-content: center; gap: 10px; margin-top: 10px; margin-bottom: 15px; flex-shrink: 0;"></div>
                             
-                            <div class="move-description-box" id="pc-summary-move-desc" style="display: none; width: 100%; height: 130px; flex-shrink: 0;">
-                                <div id="pc-desc-text" style="flex: 1; text-align: left; font-size: 1.1rem; overflow-y: auto; padding-right: 5px; line-height: 1.3;">Seleziona una mossa...</div>
-                                <div style="display: flex; justify-content: space-between; border-top: 2px dashed #ff7477; padding-top: 8px; margin-top: 8px; font-weight: bold; color: #ffcc00; font-size: 1.1rem;">
+                            <div class="cyber-panel move-description-box" id="pc-summary-move-desc" style="display: none; width: 100%; height: 130px; flex-shrink: 0; padding: 10px;">
+                                <div id="pc-desc-text" style="flex: 1; text-align: left; font-size: 1rem; overflow-y: auto; padding-right: 5px; line-height: 1.3; color: #fff;">Seleziona una mossa...</div>
+                                <div style="display: flex; justify-content: space-between; border-top: 2px dashed var(--ab-magenta); padding-top: 8px; margin-top: 8px; font-weight: bold; color: var(--ab-yellow); font-size: 1.1rem;">
                                     <div>POT: <span id="pc-desc-pot" style="color:#fff;">--</span></div>
                                     <div>PREC: <span id="pc-desc-prec" style="color:#fff;">--</span></div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="summary-right" style="flex: 1.5; padding-left: 5px; display: flex; flex-direction: column; overflow: hidden;">
+                        <div class="summary-right" style="flex: 1.5; padding-left: 15px; display: flex; flex-direction: column; overflow: hidden;">
                             <div id="pc-sum-page-0" class="stats-grid" style="flex: 1; align-content: center;"></div>
-                            
                             <div id="pc-sum-page-1" style="display: none; flex-direction: column; flex: 1; overflow: hidden;">
                                 <div id="pc-moves-list-container" class="moves-scroll-area"></div>
                             </div>
@@ -1076,35 +1122,16 @@ export default class WorldScene extends Phaser.Scene {
                 </div>
 
                 <div style="margin-top: 15px; display: flex; justify-content: center; align-items: center; gap: 30px; flex-shrink: 0; height: 65px;">
-                    <button id="pc-save-btn" style="padding: 10px 40px; font-size: 1.5rem; font-weight: bold; font-family: 'Courier New'; background-color: #f6eedf; color: #ff7477; border: 4px solid #ff7477; border-radius: 8px; cursor: pointer; box-shadow: 4px 4px 0 #e69597;">SALVA ED ESCI</button>
-                    <p style="color: #fff; line-height: 1.2; font-size: 0.9rem; margin: 0;">Comandi:<br>Frecce: Muoviti<br>Invio: Seleziona<br>ESC/CANC: Indietro/Chiudi</p>
+                    <button id="pc-save-btn" class="cyber-btn-save">SALVA ED ESCI</button>
+                    <p style="color: var(--ab-cyan); font-family: 'Courier New', monospace; line-height: 1.2; font-size: 0.8rem; margin: 0; text-transform: uppercase;">// Comandi di Sistema<br>> Frecce: Muoviti<br>> Invio: Seleziona<br>> ESC: Indietro</p>
                 </div>
             </div>
         `;
         document.getElementById('game-container').appendChild(overlay);
 
-        let style = document.createElement('style');
-        style.id = 'pc-styles-extra';
-        style.innerHTML = `
-            .pc-grid-slot { background: #222; border: 3px solid #555; border-radius: 8px; height: 65px; display: flex; justify-content: center; align-items: center; position: relative; box-shadow: inset 2px 2px 5px rgba(0,0,0,0.5); }
-            
-            .pc-sq-slot { width: 100%; max-width: 92%; margin: 0 auto; background: #3d2b4f; border: 3px dashed #555; border-radius: 8px; height: 100px; display: flex; align-items: center; padding: 0 15px; gap: 15px; box-sizing: border-box; box-shadow: 2px 2px 0 var(--battle-shadow); } 
-            
-            .pc-grid-slot.selected, .pc-sq-slot.selected { border-color: var(--battle-accent) !important; background-color: #4a3b5c !important; transform: scale(1.05); box-shadow: 0 0 10px var(--battle-accent); z-index: 10; }
-            .pc-action-btn { background: var(--battle-panel); border: 2px solid var(--battle-border); color: #fff; padding: 10px; font-weight: bold; cursor: pointer; }
-            .pc-action-btn.selected { border-color: var(--battle-accent); color: var(--battle-accent); background: #3d2b4f; transform: translateX(-5px); box-shadow: 4px 4px 0 var(--battle-accent); }
-            
-            .pc-grid-box { grid-template-columns: repeat(6, 1fr); }
+        // IL VECCHIO BLOCCO "document.createElement('style')" È STATO RIMOSSO DA QUI.
 
-            @media (max-width: 1024px) {
-                #pc-modal-content { height: 90dvh !important; max-height: 90dvh !important; overflow-y: scroll !important; overflow-x: hidden !important; }
-                #pc-main-view { flex-direction: column !important; overflow-y: visible !important; }
-                .pc-grid-box { grid-template-columns: repeat(auto-fit, minmax(50px, 1fr)) !important; }
-                #pc-squadra, #pc-box { overflow: visible !important; }
-                .pc-sq-slot { width: 100% !important; max-width: 100% !important; }
-                .summary-right { overflow-y: visible !important; }
-            }
-        `;
+        let style = document.createElement('style');
         document.head.appendChild(style);
 
         const renderPCLists = () => {
@@ -1154,17 +1181,24 @@ export default class WorldScene extends Phaser.Scene {
                 let typesEl = document.getElementById('pc-preview-types');
                 let statsEl = document.getElementById('pc-preview-stats');
 
+                // ---> FIX 2: SE C'È UN POKEMON MOSTRA I DATI, SE È VUOTO PROTEGGI IL CODICE <---
                 if (pkmn) {
                     let pData = pkmnDB[pkmn.id_specie];
                     nameEl.innerText = pData.nome.toUpperCase();
+                    nameEl.style.color = 'var(--ab-yellow)'; // Colore Cyberpunk
+
                     spriteEl.src = pData.sprite.normal;
                     spriteEl.style.display = 'block';
-                    typesEl.innerHTML = pData.tipi.map(t => `<div class="badge" style="background:${getColor(t)}">${t.toUpperCase()}</div>`).join('');
+
+                    // Aggiunti ombra e bordo Cyberpunk ai badge dei tipi
+                    typesEl.innerHTML = pData.tipi.map(t => `<div class="badge" style="background:${getColor(t)}; text-shadow: 1px 1px 0 #000; box-shadow: 2px 2px 0 rgba(0,0,0,0.5);">${t.toUpperCase()}</div>`).join('');
 
                     let maxHp = Math.floor(pData.statistiche.hp.base_stat * 1.5);
                     statsEl.innerHTML = `HP: ${maxHp}<br>ATK: ${pData.statistiche.attack.base_stat}<br>DEF: ${pData.statistiche.defense.base_stat}<br>ATT.SP: ${pData.statistiche['special-attack'].base_stat}<br>DIF.SP: ${pData.statistiche['special-defense'].base_stat}<br>VEL: ${pData.statistiche.speed.base_stat}`;
                 } else {
-                    nameEl.innerText = "Nessun Pokémon";
+                    // SLOT VUOTO: Nessun crash e interfaccia pulita!
+                    nameEl.innerText = "-- VUOTO --";
+                    nameEl.style.color = '#6b7a8d'; // Grigio scuro/spento
                     spriteEl.style.display = 'none';
                     typesEl.innerHTML = '';
                     statsEl.innerHTML = '';
@@ -1242,52 +1276,64 @@ export default class WorldScene extends Phaser.Scene {
 
             if (s.area === 'squadra') {
                 if (squadra.length <= 1) { window.showBanner("Non puoi viaggiare senza Pokémon in squadra!"); return; }
-                box.push(squadra.splice(s.index, 1)[0]);
+
+                // 1. Rimuovi dalla squadra
+                let spostato = squadra.splice(s.index, 1)[0];
+
+                // 2. Filtra il box per prendere solo i Pokémon veri, aggiungi quello spostato e riordina
+                let validBox = box.filter(p => p !== null);
+                validBox.push(spostato);
+                validBox.sort((a, b) => {
+                    let nomeA = a.id_specie || "";
+                    let nomeB = b.id_specie || "";
+                    return nomeA.localeCompare(nomeB);
+                });
+
+                // 3. Ricrea i 30 slot perfetti
+                box = new Array(30).fill(null);
+                validBox.forEach((p, i) => { if (i < 30) box[i] = p; });
+
             } else {
                 if (squadra.length >= 3) { window.showBanner("La tua squadra è già piena! (Max 3)"); return; }
-                squadra.push(box.splice(s.index, 1)[0]);
+
+                // 1. Rimuovi dal box
+                let spostato = box[s.index];
+                box[s.index] = null;
+
+                // 2. Aggiungi alla squadra
+                squadra.push(spostato);
+
+                // 3. Ricompatta il box (chiudendo il buco lasciato) e riordina
+                let validBox = box.filter(p => p !== null);
+                validBox.sort((a, b) => {
+                    let nomeA = a.id_specie || "";
+                    let nomeB = b.id_specie || "";
+                    return nomeA.localeCompare(nomeB);
+                });
+
+                // 4. Ricrea i 30 slot perfetti
+                box = new Array(30).fill(null);
+                validBox.forEach((p, i) => { if (i < 30) box[i] = p; });
             }
 
             s.view = 'browsing';
+
+            // Aggiorna istantaneamente la grafica!
             renderPCLists();
             updateVisuals();
         };
 
-        const chiudiESalva = async () => {
-            let btn = document.getElementById('pc-save-btn');
-            btn.innerText = "SALVATAGGIO...";
-            btn.style.backgroundColor = "#ffcc00";
-            window.removeEventListener('keydown', handleKey);
 
-            squadra.forEach((p, i) => { p.in_squadra = true; p.posizione_slot = i + 1; });
-            box.forEach((p, i) => { p.in_squadra = false; p.posizione_slot = null; });
-
-            let allUpdates = [...squadra, ...box].map(p => ({
-                id_pokemon: p.id_pokemon, id_specie: p.id_specie, id_profilo_proprietario: p.id_profilo_proprietario, in_squadra: p.in_squadra, posizione_slot: p.posizione_slot
-            }));
-
-            const { error } = await supabaseClient.from('pokemon').upsert(allUpdates);
-
-            if (error) {
-                window.showBanner("Errore di rete durante il salvataggio!");
-                btn.innerText = "SALVA ED ESCI";
-                btn.style.backgroundColor = "#f6eedf";
-                window.addEventListener('keydown', handleKey);
-            } else {
-                this.registry.set('userPokemon', [...squadra, ...box]);
-                window.showBanner("Dati del PC sincronizzati!", false);
-                setTimeout(() => {
-                    if (document.getElementById('pc-overlay-main')) {
-                        overlay.remove();
-                        document.getElementById('pc-styles-extra').remove();
-                        this.pcOpen = false;
-                    }
-                }, 1000);
-            }
-        };
 
         const handleKey = (e) => {
-            const key = e.key;
+            let key = e.key || (e.detail && e.detail.key); // ---> FIX: Legge il joystick
+            if (!key) return;
+
+            // ---> FIX: Timer anti-skip <---
+            if (!this.lastPcNavTime) this.lastPcNavTime = 0;
+            if (Date.now() - this.lastPcNavTime < 150) return;
+            this.lastPcNavTime = Date.now();
+
             let s = this.pcState;
 
             if (s.view === 'browsing') {
@@ -1310,12 +1356,12 @@ export default class WorldScene extends Phaser.Scene {
                     if (targetList[s.index]) { s.view = 'actions'; s.actionIdx = 0; }
                     else { window.showBanner("Questo slot è vuoto!"); }
                 }
-                if (key === 'Escape' || key === 'Backspace') chiudiESalva();
+                if (key === 'Escape' || key === 'Backspace' || key === 'Delete') chiudiESalva();
 
             } else if (s.view === 'actions') {
                 if (key === 'ArrowDown' || key === 's') s.actionIdx = (s.actionIdx + 1) % 3;
                 if (key === 'ArrowUp' || key === 'w') s.actionIdx = (s.actionIdx - 1 + 3) % 3;
-                if (key === 'Escape' || key === 'Backspace') s.view = 'browsing';
+                if (key === 'Escape' || key === 'Backspace' || key === 'Delete') s.view = 'browsing';
                 if (key === 'Enter' || key === ' ') {
                     if (s.actionIdx === 0) eseguiSpostamento();
                     else if (s.actionIdx === 1) {
@@ -1338,13 +1384,61 @@ export default class WorldScene extends Phaser.Scene {
                     s.summaryPage = s.summaryPage === 0 ? 1 : 0;
                     s.moveSelectionIdx = 0;
                 }
-                if (key === 'Escape' || key === 'Backspace') {
+                if (key === 'Escape' || key === 'Backspace' || key === 'Delete') {
                     s.view = 'actions';
                     document.getElementById('pc-summary-view').style.display = 'none';
                     document.getElementById('pc-main-view').style.display = 'flex';
                 }
             }
             updateVisuals();
+        };
+
+        // ---> FIX: ATTIVA I LISTENER SIA PER TASTIERA CHE PER PAD <---
+        window.addEventListener('keydown', handleKey);
+        window.addEventListener('dpad-input', handleKey);
+
+        // ... Cerca la funzione chiudiESalva e ricordati di rimuoverli entrambi!
+        const chiudiESalva = async () => {
+            let btn = document.getElementById('pc-save-btn');
+            btn.innerText = "SALVATAGGIO...";
+            btn.style.backgroundColor = "#ffcc00";
+            window.removeEventListener('keydown', handleKey);
+            window.removeEventListener('dpad-input', handleKey);
+
+            // ---> FIX 1: Ignora i "null" (slot vuoti) con un IF <---
+            squadra.forEach((p, i) => { if (p) { p.in_squadra = true; p.posizione_slot = i + 1; } });
+            box.forEach((p, i) => { if (p) { p.in_squadra = false; p.posizione_slot = null; } });
+
+            // ---> FIX 2: Filtra e tieni solo i Pokémon reali prima di mandare i dati al Database <---
+            let validPokemon = [...squadra, ...box].filter(p => p !== null);
+
+            let allUpdates = validPokemon.map(p => ({
+                id_pokemon: p.id_pokemon,
+                id_specie: p.id_specie,
+                id_profilo_proprietario: p.id_profilo_proprietario,
+                in_squadra: p.in_squadra,
+                posizione_slot: p.posizione_slot
+            }));
+
+            const { error } = await supabaseClient.from('pokemon').upsert(allUpdates);
+
+            if (error) {
+                window.showBanner("Errore di rete durante il salvataggio!");
+                btn.innerText = "SALVA ED ESCI";
+                btn.style.backgroundColor = "transparent";
+                window.addEventListener('keydown', handleKey);
+                window.addEventListener('dpad-input', handleKey);
+            } else {
+                // ---> FIX 3: Salva nella memoria del gioco solo i Pokémon validi (senza i null) <---
+                this.registry.set('userPokemon', validPokemon);
+                window.showBanner("Dati del PC sincronizzati!", false);
+                setTimeout(() => {
+                    if (document.getElementById('pc-overlay-main')) {
+                        overlay.remove();
+                        this.pcOpen = false;
+                    }
+                }, 1000);
+            }
         };
 
         window.addEventListener('keydown', handleKey);
@@ -1397,8 +1491,7 @@ export default class WorldScene extends Phaser.Scene {
         overlay.style.pointerEvents = 'none';
         overlay.style.zIndex = '9999';
 
-        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: 7vw; text-align: center; max-width: 90%;">${testo}</h1>`;
-        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; font-size: clamp(2rem, 5vw, 3.5rem); text-align: center; width: 90%;">${testo}</h1>`;
+        overlay.innerHTML = `<h1 class="text-shadows" style="margin: 0; width: 100%; max-width: 100vw; padding: 0 20px; box-sizing: border-box; font-size: clamp(1rem, 5vw, 3rem); text-align: center; line-height: 1.4; word-wrap: break-word; word-break: break-word; white-space: normal;">${testo}</h1>`;
         document.getElementById('game-container').appendChild(overlay);
 
         setTimeout(() => {

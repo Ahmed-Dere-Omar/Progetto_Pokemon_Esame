@@ -6,6 +6,8 @@ export default class LoginScene extends Phaser.Scene {
     constructor() { super({ key: 'LoginScene' }); }
 
     create() {
+        let mobileControls = document.getElementById('mobile-controls');
+        if (mobileControls) mobileControls.style.display = 'none';
         this.input.keyboard.clearCaptures();
         this.isLoginMode = true;
         this.isStarting = false;

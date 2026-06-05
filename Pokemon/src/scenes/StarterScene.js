@@ -13,7 +13,7 @@ export default class StarterScene extends Phaser.Scene {
         const pkmnDB = this.registry.get('pokemonDB');
 
         let html = `
-            <div style="background-color: #3E1E68; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 1000px; height: 800px; box-sizing: border-box;">
+            <div style="background-color: #0B0C10; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 1000px; height: 800px; box-sizing: border-box;">
                 <h1 class="text-shadows" style="font-size: 3.5rem; margin-bottom: 20px;">PACCHETTO BENVENUTO!</h1>
                 <h2 style="color: #fff; font-family: 'Courier New'; margin-bottom: 40px; text-align: center;">Ecco i tuoi primi compagni di avventura:</h2>
                 

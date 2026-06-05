@@ -869,22 +869,6 @@ canvas {
     box-shadow: 0px 2px 0 var(--battle-shadow-heavy);
 }
 
-@media (max-width: 1024px) {
-
-    #pc-main-view,
-    .summary-layout {
-        flex-direction: column !important;
-        overflow-y: auto !important;
-    }
-
-    .summary-left,
-    .summary-right {
-        border-right: none !important;
-        border-bottom: 4px dashed var(--color-quaternary);
-        flex: none !important;
-        height: auto !important;
-    }
-}
 
 @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
     #mobile-controls {
@@ -927,15 +911,17 @@ canvas {
 #login-container::before {
     content: '';
     position: absolute;
-    top: 0; left: -10%;
-    width: 60%; height: 100%;
+    top: 0;
+    left: -10%;
+    width: 60%;
+    height: 100%;
     background: var(--ab-deep);
     transform: skewX(-12deg);
     z-index: 0;
     pointer-events: none;
 }
 
-#login-container > * {
+#login-container>* {
     position: relative;
     z-index: 1;
 }
@@ -967,16 +953,25 @@ canvas {
 }
 
 @keyframes abSlashIn {
-    from { opacity: 0; transform: translateX(-30px) skewX(-4deg); }
-    to   { opacity: 1; transform: translateX(0) skewX(0); }
+    from {
+        opacity: 0;
+        transform: translateX(-30px) skewX(-4deg);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0) skewX(0);
+    }
 }
 
 /* Taglio angolo decorativo */
 .login-card::after {
     content: '';
     position: absolute;
-    bottom: 0; right: 0;
-    width: 20px; height: 20px;
+    bottom: 0;
+    right: 0;
+    width: 20px;
+    height: 20px;
     background: var(--ab-coral);
     clip-path: polygon(100% 0, 100% 100%, 0 100%);
 }
@@ -986,7 +981,9 @@ canvas {
     width: 100%;
 }
 
-.login-input-icon { display: none; }
+.login-input-icon {
+    display: none;
+}
 
 .login-input {
     width: 100%;
@@ -1081,7 +1078,8 @@ canvas {
 }
 
 .login-btn-google img {
-    width: 18px; height: 18px;
+    width: 18px;
+    height: 18px;
 }
 
 .login-toggle {
@@ -1133,8 +1131,10 @@ canvas {
    ========================================================= */
 .forgot-modal-overlay {
     position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     background: linear-gradient(135deg, rgba(15, 37, 55, 0.95) 0%, rgba(11, 12, 16, 0.95) 100%);
     display: flex;
     justify-content: center;
@@ -1144,8 +1144,13 @@ canvas {
 }
 
 @keyframes abIrrupt {
-    from { clip-path: polygon(0 0, 0 0, 0 100%, 0 100%); }
-    to   { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); }
+    from {
+        clip-path: polygon(0 0, 0 0, 0 100%, 0 100%);
+    }
+
+    to {
+        clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+    }
 }
 
 .forgot-modal-card {
@@ -1166,15 +1171,18 @@ canvas {
 .forgot-modal-card::after {
     content: '';
     position: absolute;
-    bottom: 0; right: 0;
-    width: 16px; height: 16px;
+    bottom: 0;
+    right: 0;
+    width: 16px;
+    height: 16px;
     background: var(--ab-coral);
     clip-path: polygon(100% 0, 100% 100%, 0 100%);
 }
 
 .forgot-modal-close {
     position: absolute;
-    top: 8px; right: 14px;
+    top: 8px;
+    right: 14px;
     background: none;
     border: none;
     color: var(--ab-text-dim);
@@ -1261,8 +1269,10 @@ canvas {
    ========================================================= */
 .pause-overlay {
     position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     background: rgba(11, 12, 16, 0.92);
     display: flex;
     justify-content: center;
@@ -1274,23 +1284,32 @@ canvas {
 }
 
 @keyframes abFadeSlash {
-    from { opacity: 0; }
-    to   { opacity: 1; }
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 /* Background images stack */
 .pause-bg-stack {
     position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     z-index: 0;
     pointer-events: none;
 }
 
 .pause-bg-layer {
     position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     background-size: cover;
     background-position: center;
     mix-blend-mode: screen;
@@ -1709,4 +1728,319 @@ canvas {
     min-width: 36px;
     text-align: right;
     letter-spacing: 1px;
+}
+
+
+
+
+/* =========================================================
+   MODAL PC E SQUADRA - CYBERPUNK / PERSONA STYLE
+   ========================================================= */
+.cyber-modal {
+    background: var(--ab-dark) !important;
+    border: 4px solid var(--ab-cyan) !important;
+    border-radius: 0 !important;
+    box-shadow: 0 0 30px rgba(0, 240, 255, 0.2), inset 0 0 20px rgba(0, 240, 255, 0.1) !important;
+    font-family: 'Courier New', Courier, monospace !important;
+}
+
+.cyber-header {
+    color: var(--ab-magenta) !important;
+    text-shadow: 3px 3px 0 #000 !important;
+    letter-spacing: 4px !important;
+    border-bottom: 2px dashed var(--ab-magenta) !important;
+    padding-bottom: 10px !important;
+    font-size: 1.8rem !important;
+    background: transparent !important;
+    border-top: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    box-shadow: none !important;
+}
+
+.cyber-title {
+    color: var(--ab-cyan);
+    text-shadow: 2px 2px 0 #000;
+    text-align: center;
+    margin-top: 0;
+    font-size: 1.2rem;
+    letter-spacing: 2px;
+    border-bottom: 1px solid rgba(0, 240, 255, 0.3);
+    padding-bottom: 5px;
+}
+
+.cyber-panel {
+    background: rgba(0, 0, 0, 0.5);
+    border: 2px solid #1e293b;
+    border-radius: 0 !important;
+}
+
+.cyber-highlight-text {
+    color: var(--ab-yellow);
+    text-shadow: 2px 2px 0 #000;
+    letter-spacing: 1px;
+}
+
+/* Spegne i vecchi triangolini rotti (encoding bug) */
+.cyber-modal::before,
+.cyber-modal::after {
+    display: none !important;
+    content: none !important;
+}
+
+/* PC Overrides (Layout e Colori) */
+.pc-grid-box {
+    grid-template-columns: repeat(6, 1fr);
+}
+
+.pc-grid-slot {
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid #333;
+    border-radius: 0 !important;
+    height: 65px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    transition: all 0.1s;
+}
+
+.pc-sq-slot {
+    width: 100%;
+    max-width: 92%;
+    margin: 0 auto;
+    background: rgba(0, 240, 255, 0.05);
+    border: 2px dashed var(--ab-cyan);
+    border-radius: 0 !important;
+    height: 100px;
+    display: flex;
+    align-items: center;
+    padding: 0 15px;
+    gap: 15px;
+    box-sizing: border-box;
+    transition: all 0.1s;
+}
+
+.pc-grid-slot.selected,
+.pc-sq-slot.selected {
+    border: 2px solid var(--ab-yellow) !important;
+    background-color: rgba(255, 204, 0, 0.15) !important;
+    transform: scale(1.05);
+    box-shadow: 0 0 15px rgba(255, 204, 0, 0.3) !important;
+    z-index: 10;
+}
+
+/* Bottoni PC */
+.pc-action-btn {
+    background: transparent;
+    border: 2px solid var(--ab-cyan);
+    color: var(--ab-cyan);
+    padding: 10px;
+    font-weight: bold;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.1s;
+    font-family: 'Courier New', monospace;
+    border-radius: 0 !important;
+}
+
+.pc-action-btn.selected {
+    background: var(--ab-cyan) !important;
+    color: #000 !important;
+    box-shadow: 5px 5px 0 var(--ab-magenta) !important;
+    transform: translateX(-5px) !important;
+    font-weight: 900 !important;
+    border-color: var(--ab-cyan) !important;
+}
+
+.cyber-btn-save {
+    background: transparent !important;
+    border: 4px solid var(--ab-magenta) !important;
+    color: var(--ab-magenta) !important;
+    padding: 10px 40px;
+    font-size: 1.5rem;
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+    cursor: pointer;
+    box-shadow: 6px 6px 0 var(--ab-cyan) !important;
+    transition: all 0.1s;
+    text-transform: uppercase;
+    border-radius: 0 !important;
+}
+
+.cyber-btn-save:active {
+    transform: translate(4px, 4px) !important;
+    box-shadow: 2px 2px 0 var(--ab-cyan) !important;
+}
+
+/* Bottoni in Battaglia (Team Modal) */
+.pokemon-item {
+    background: rgba(0, 240, 255, 0.05) !important;
+    border: 2px dashed var(--ab-cyan) !important;
+    border-radius: 0 !important;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    color: #fff;
+    transition: all 0.1s;
+    box-shadow: none !important;
+}
+
+.pokemon-item.selected {
+    border: 2px solid var(--ab-yellow) !important;
+    background-color: rgba(255, 204, 0, 0.15) !important;
+    box-shadow: 0 0 15px rgba(255, 204, 0, 0.3) !important;
+    transform: scale(1.02) !important;
+    z-index: 10;
+}
+
+.action-btn-inline {
+    background: transparent !important;
+    border: 2px solid var(--ab-cyan) !important;
+    color: var(--ab-cyan) !important;
+    padding: 8px 15px;
+    font-weight: bold;
+    cursor: pointer;
+    text-transform: uppercase;
+    font-family: 'Courier New', monospace;
+    transition: all 0.1s;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+}
+
+.action-btn-inline.selected {
+    background: var(--ab-cyan) !important;
+    color: #000 !important;
+    box-shadow: 4px 4px 0 var(--ab-magenta) !important;
+    transform: translateY(-3px) !important;
+    font-weight: 900 !important;
+}
+
+/* Statistiche & Mosse (Summary) */
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    padding: 5px 0 !important;
+    color: #fff !important;
+    font-size: 1.2rem !important;
+    background: transparent !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-top: none !important;
+    box-shadow: none !important;
+}
+
+.stat-label {
+    color: var(--ab-cyan) !important;
+    font-weight: bold;
+}
+
+.stat-value {
+    font-weight: bold;
+}
+
+.move-entry {
+    background: rgba(0, 0, 0, 0.5) !important;
+    border: 2px solid #333 !important;
+    border-radius: 0 !important;
+    padding: 10px;
+    margin-bottom: 8px;
+    color: #fff;
+    transition: all 0.1s;
+    box-shadow: none !important;
+}
+
+.move-entry.selected {
+    border-color: var(--ab-yellow) !important;
+    background: rgba(255, 204, 0, 0.1) !important;
+    box-shadow: inset 4px 0 0 var(--ab-yellow) !important;
+    padding-left: 15px !important;
+    transform: none !important;
+}
+
+/* =========================================================
+   RESPONSIVITÀ MOBILE UNIFICATA (PC, SQUADRA E SUMMARY)
+   ========================================================= */
+@media (max-width: 1024px) {
+
+    /* 1. Blocca lo scroll esterno: le modali restano fisse a schermo */
+    #pc-modal-content,
+    .pkmn-modal-content {
+        height: 95dvh !important;
+        max-height: 95dvh !important;
+        padding: 15px !important;
+        overflow: hidden !important;
+    }
+
+    /* 2. Attiva lo scroll fluido interno per PC e Summary */
+    #pc-main-view,
+    #modal-list-view,
+    .summary-layout {
+        flex-direction: column !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        padding-right: 5px;
+    }
+
+    /* 3. Colonna sinistra del Summary: via il bordo, separatore Cyberpunk in basso */
+    .summary-left {
+        border-right: none !important;
+        border-bottom: 2px dashed var(--ab-cyan) !important;
+        flex: none !important;
+        height: auto !important;
+        padding-bottom: 20px !important;
+        margin-bottom: 20px !important;
+    }
+
+    /* 4. Colonna destra: unisci lo scroll, rimuovi i doppi scroll fastidiosi */
+    .summary-right {
+        padding-left: 0 !important;
+        flex: none !important;
+        overflow: visible !important;
+    }
+
+    .moves-scroll-area {
+        overflow: visible !important;
+        height: auto !important;
+        flex: none !important;
+    }
+
+    /* 5. Griglia del Box PC ridimensionata e centrata */
+    .pc-grid-box {
+        grid-template-columns: repeat(auto-fill, minmax(50px, 1fr)) !important;
+    }
+
+    #pc-squadra,
+    #pc-box {
+        overflow: visible !important;
+    }
+
+    .pc-sq-slot {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* 6. Adatta testi e immagini */
+    #pc-sum-sprite,
+    #summary-sprite {
+        width: 200px !important;
+        height: 200px !important;
+    }
+
+    .cyber-header {
+        font-size: 1.4rem !important;
+    }
+
+    /* 7. Mantieni i bottoni SALVA / ESCI del PC sempre visibili in fondo allo schermo! */
+    #pc-modal-content>div:last-child {
+        margin-top: 15px !important;
+        flex-shrink: 0 !important;
+    }
+
+    .cyber-btn-save {
+        font-size: 1.1rem !important;
+        padding: 10px 20px !important;
+    }
 }
