@@ -6,6 +6,7 @@ export default class LoginScene extends Phaser.Scene {
     constructor() { super({ key: 'LoginScene' }); }
 
     create() {
+        this.input.keyboard.clearCaptures();
         this.isLoginMode = true;
         this.isStarting = false;
         this.authEventBlocked = false;

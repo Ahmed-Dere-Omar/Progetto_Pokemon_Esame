@@ -72,17 +72,16 @@ io.on('connection', (socket) => {
             delete players[socket.id];
             io.emit('playerDisconnected', socket.id);
         }
+
+        // Gestione Disconnessione / Rage Quit in PVP
         for (let roomId in battleRooms) {
             let room = battleRooms[roomId];
             if (room.p1 === socket.id || room.p2 === socket.id) {
                 let winnerId = (room.p1 === socket.id) ? room.p2 : room.p1;
-                let statoForfait = {
-                    finito: true,
-                    logs: ["L'avversario si è disconnesso o è fuggito! Hai vinto a tavolino!"],
-                    p1: { sconfitto: room.p1 === socket.id, squadra: [] },
-                    p2: { sconfitto: room.p2 === socket.id, squadra: [] }
-                };
-                io.to(winnerId).emit('resolveTurn', { stato: statoForfait, inverti: winnerId === room.p2 });
+
+                // Avvisiamo il client superstite in modo sicuro
+                io.to(winnerId).emit('opponentDisconnected');
+
                 delete battleRooms[roomId];
             }
         }

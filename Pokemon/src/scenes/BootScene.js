@@ -70,6 +70,8 @@ export default class BootScene extends Phaser.Scene {
         this.load.audio('lobby_3', encodeURI('assets/musica_lobby/2 Hard 4 The Radio.mp3'));
         this.load.audio('lobby_4', encodeURI('assets/musica_lobby/National Treasures.mp3'));
         this.load.audio('lobby_5', 'assets/musica_lobby/Beneath the Mask.mp3');
+        this.load.audio('lobby_6', 'assets/musica_lobby/I Follow Rivers (The Magician Remix).mp3');
+
 
         // === OBIETTIVO 5: Musica Battaglia ===
         this.load.audio('battle_0', 'assets/musica_battaglia/Gym_BW.mp3');
@@ -115,6 +117,7 @@ export default class BootScene extends Phaser.Scene {
             { key: 'lobby_3', name: '2 Hard 4 The Radio' },
             { key: 'lobby_4', name: 'National Treasures' },
             { key: 'lobby_5', name: 'Beneath the Mask' },
+            { key: 'lobby_6', name: 'I Follow Rivers (The Magician Remix)' }
 
         ]);
 

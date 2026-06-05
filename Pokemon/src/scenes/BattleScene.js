@@ -24,7 +24,7 @@ export default class BattleScene extends Phaser.Scene {
         this.load.image('pokeball_scuoti', 'assets/Pokeball.png');
     }
 
-avviaMusicaBattaglia() {
+    avviaMusicaBattaglia() {
         try {
             // 1. Fade out rapido e pausa della musica della lobby
             let lobbySound = this.registry.get('lobbySound');
@@ -42,11 +42,11 @@ avviaMusicaBattaglia() {
             if (battleTracks && battleTracks.length > 0) {
                 let randomIdx = Phaser.Math.Between(0, battleTracks.length - 1);
                 let track = battleTracks[randomIdx];
-                
+
                 // Peschiamo la variabile aggiornata dal database
                 let musicState = this.registry.get('musicState');
                 let volumeDb = musicState ? musicState.volume : 0.5;
-                
+
                 this.battleMusic = this.sound.add(track.key, { loop: true, volume: volumeDb });
                 this.battleMusic.play();
             }
@@ -209,7 +209,7 @@ avviaMusicaBattaglia() {
 
         let pSpriteUrl = this.pkmnDB[this.pEntity.name]?.sprite?.normal || '';
         let eSpriteUrl = this.pkmnDB[this.eEntity.name]?.sprite?.normal || '';
-        
+
         this.pSprite = this.add.dom(250, 535).createFromHTML(`<img src="${pSpriteUrl}" style="transform: scale(2.5); image-rendering: pixelated;">`);
         this.eSprite = this.add.dom(750, 290).createFromHTML(`<img src="${eSpriteUrl}" style="transform: scale(2.2); image-rendering: pixelated;">`);
 
@@ -239,10 +239,64 @@ avviaMusicaBattaglia() {
         if (!this.isWild) {
             this.socket.off('resolveTurn');
             this.socket.on('resolveTurn', (data) => this.resolveTurn(data));
+
+            // ---> ASCOLTATORE PER IL FORFEIT <---
+            this.socket.off('opponentDisconnected');
+            this.socket.on('opponentDisconnected', () => this.vittoriaPerForfeit());
         }
         this.startTurn();
     }
+    vittoriaPerForfeit() {
+        this.isInputActive = false;
+        this.btns.forEach(b => b.setVisible(false));
+        this.moveInfoUI.forEach(element => element.setVisible(false));
 
+        // Se si disconnette mentre stiamo ancora scegliendo i Pokémon, chiude il popup di attesa
+        if (this.waitingDom) {
+            this.waitingDom.destroy();
+            this.waitingDom = null;
+        }
+
+        this.logText.setVisible(true);
+        this.logText.setText("L'avversario si è disconnesso o è fuggito! VITTORIA A TAVOLINO! 🎉");
+
+        this.time.delayedCall(2500, async () => {
+            this.registry.set('lastBattleResult', 'win');
+
+            try {
+                let profilo = this.registry.get('playerProfile');
+                if (profilo) {
+                    profilo.partite_totali = (profilo.partite_totali || 0) + 1;
+                    profilo.vittorie_totali = (profilo.vittorie_totali || 0) + 1;
+                    await supabaseClient.from('profilo').update({
+                        partite_totali: profilo.partite_totali,
+                        vittorie_totali: profilo.vittorie_totali
+                    }).eq('id_profilo', profilo.id_profilo);
+                    this.registry.set('playerProfile', profilo);
+                }
+            } catch (e) {
+                console.error("Errore salvataggio statistiche forfeit:", e);
+            }
+
+            // Finta animazione di morte per il Pokémon nemico in campo (se c'è)
+            if (this.eSprite) {
+                this.tweens.add({
+                    targets: this.eSprite, y: '+=100', alpha: 0, duration: 1000,
+                    onComplete: () => {
+                        if (this.socket) this.socket.emit('setInBattle', false);
+                        this.fermaEripristinaMusica();
+                        this.scene.stop();
+                        this.scene.resume(this.parentScene);
+                    }
+                });
+            } else {
+                if (this.socket) this.socket.emit('setInBattle', false);
+                this.fermaEripristinaMusica();
+                this.scene.stop();
+                this.scene.resume(this.parentScene);
+            }
+        });
+    }
     createUIBox(x, y, entity, isPlayer) {
         let pct = (entity.hp / entity.maxHp) * 100;
         let color = pct > 50 ? '#4caf50' : (pct > 20 ? '#ffeb3b' : '#f44336');
@@ -438,7 +492,7 @@ avviaMusicaBattaglia() {
 
         if (this.isWild) {
             let activeBot = this.partita.p2.squadra[this.partita.p2.attivoIdx];
-            let activePlayer = this.partita.p1.squadra[this.partita.p1.attivoIdx]; 
+            let activePlayer = this.partita.p1.squadra[this.partita.p1.attivoIdx];
             let mosseDisponibiliBot = activeBot.mosse.filter(m => m.ppAttuali > 0);
             let botMoveData;
 
@@ -519,7 +573,7 @@ avviaMusicaBattaglia() {
         if (giaPosseduto) {
             this.logText.setText("Hai già questo Pokémon nel PC! Scegli un'altra azione.");
             this.time.delayedCall(2000, () => {
-                this.startTurn(); 
+                this.startTurn();
             });
             return;
         }
@@ -588,18 +642,18 @@ avviaMusicaBattaglia() {
     }
 
     calcolaProbabilitaCattura() {
-        let base = 20; 
+        let base = 20;
         let bonus = 0;
 
         let hpPct = (this.eEntity.hp / this.eEntity.maxHp) * 100;
-        if (hpPct <= 25) bonus += 30;     
-        else if (hpPct <= 50) bonus += 15; 
+        if (hpPct <= 25) bonus += 30;
+        else if (hpPct <= 50) bonus += 15;
 
         if (this.eEntity.stato) {
             bonus += 15;
         }
 
-        let probTotale = Math.min(base + bonus, 90); 
+        let probTotale = Math.min(base + bonus, 90);
         return probTotale;
     }
 
@@ -639,6 +693,10 @@ avviaMusicaBattaglia() {
         let p1Data = inverti ? stato.p2 : stato.p1;
         let p2Data = inverti ? stato.p1 : stato.p2;
 
+        // 1. FIX: SALVIAMO I VECCHI HP PRIMA CHE VENGANO SOVRASCRITTI DAL NUOVO TURNO!
+        let oldMyActiveHp = (this.myTeamData && this.myTeamData[p1Data.attivoIdx]) ? this.myTeamData[p1Data.attivoIdx].hp : p1Data.squadra[p1Data.attivoIdx].hp;
+        let oldOppActiveHp = (this.oppTeamData && this.oppTeamData[p2Data.attivoIdx]) ? this.oppTeamData[p2Data.attivoIdx].hp : p2Data.squadra[p2Data.attivoIdx].hp;
+
         this.myActiveIdx = p1Data.attivoIdx;
 
         p1Data.squadra.forEach((p, i) => {
@@ -663,17 +721,19 @@ avviaMusicaBattaglia() {
             this.oppTeamData[p2Data.attivoIdx].mosse = [...(p2Data.mosse || [])];
         }
 
+        // 2. FIX: Inizializza l'interfaccia con i vecchi HP salvati (oldMyActiveHp)
         if (p1Data.nome !== this.pEntity.name) {
             let myNewActive = this.myTeamData[this.myActiveIdx];
-            this.pEntity = { name: myNewActive.nome, types: myNewActive.tipi, hp: myNewActive.hp, maxHp: myNewActive.maxHp, moves: myNewActive.mosse, alive: myNewActive.hp > 0 };
+            this.pEntity = { name: myNewActive.nome, types: myNewActive.tipi, hp: oldMyActiveHp, maxHp: myNewActive.maxHp, moves: myNewActive.mosse, alive: oldMyActiveHp > 0 };
             if (this.pSprite.node) this.pSprite.node.querySelector('img').src = this.pkmnDB[myNewActive.nome].sprite.normal;
             this.updateUI();
             this.updateStatusOverlay(true, null);
         }
 
+        // 3. FIX: Idem per il nemico (oldOppActiveHp)
         if (p2Data.nome !== this.eEntity.name) {
             let oppNewActive = this.oppTeamData[p2Data.attivoIdx];
-            this.eEntity = { name: oppNewActive.nome, types: oppNewActive.tipi, hp: oppNewActive.hp, maxHp: oppNewActive.maxHp, moves: oppNewActive.mosse, alive: oppNewActive.hp > 0 };
+            this.eEntity = { name: oppNewActive.nome, types: oppNewActive.tipi, hp: oldOppActiveHp, maxHp: oppNewActive.maxHp, moves: oppNewActive.mosse, alive: oldOppActiveHp > 0 };
             if (this.eSprite.node) this.eSprite.node.querySelector('img').src = this.pkmnDB[oppNewActive.nome].sprite.normal;
             this.updateUI();
             this.updateStatusOverlay(false, null);
@@ -1176,7 +1236,7 @@ avviaMusicaBattaglia() {
         if (forceClose) {
             window.removeEventListener('keydown', this.modalKeyListener);
             if (this.teamModalDom) {
-                this.teamModalDom.remove(); 
+                this.teamModalDom.remove();
                 this.teamModalDom = null;
             }
             this.isInputActive = true;
@@ -1215,7 +1275,7 @@ avviaMusicaBattaglia() {
         }
 
         if (this.teamModalDom) {
-            this.teamModalDom.remove(); 
+            this.teamModalDom.remove();
             this.teamModalDom = null;
         }
         window.removeEventListener('keydown', this.modalKeyListener);

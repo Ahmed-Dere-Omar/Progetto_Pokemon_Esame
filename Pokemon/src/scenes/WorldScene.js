@@ -517,7 +517,7 @@ export default class WorldScene extends Phaser.Scene {
 
         this.createDialogUI();
 
-        this.mostraTestiDialogo(["Vuoi entrare nel Centro Pokémon? ▼"], () => {
+        this.mostraTestiDialogo(["Vuoi entrare nel Centro Pokémon? "], () => {
             this.mostraSceltaSiNo((scelta) => {
                 this.chiudiDialogo();
                 if (scelta === 'SI') {
