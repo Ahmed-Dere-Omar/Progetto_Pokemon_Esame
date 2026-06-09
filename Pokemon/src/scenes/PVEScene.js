@@ -654,10 +654,30 @@ export default class PVEScene extends Phaser.Scene {
                     box.innerHTML = `
                         <h2 class="pause-title">COMANDI</h2>
                         <div class="pause-info-panel">
-                            <div class="info-section"><h3>MOVIMENTO</h3><p><strong>WASD</strong> o <strong>Frecce Direzionali</strong></p></div>
-                            <div class="info-section"><h3>AZIONI</h3><p><strong>Conferma:</strong> INVIO</p><p><strong>Annulla / Indietro:</strong> ESC</p></div>
-                            <div class="info-section"><h3>IN BATTAGLIA</h3><p><strong>Statistiche:</strong> SHIFT</p></div>
-                            <div class="info-section"><h3>GENERICI</h3><p><strong>Mouse / Touch:</strong> Interfaccia UI e Dialoghi</p></div>
+                            <div class="info-section">
+                                <h3>MOVIMENTO</h3>
+                                <p><strong>PC:</strong> WASD / Frecce</p>
+                                <p><strong>Mobile:</strong> D-Pad (▲▼◀▶)</p>
+                            </div>
+                            <div class="info-section">
+                                <h3>AZIONI</h3>
+                                <p><strong>PC:</strong> INVIO (A) / ESC (B)</p>
+                                <p><strong>Mobile:</strong> Pulsante A / B</p>
+                            </div>
+                            <div class="info-section">
+                                <h3>IN BATTAGLIA</h3>
+                                <p><strong>PC:</strong> SHIFT (Stats)</p>
+                                <p><strong>Mobile:</strong> Pulsante SHIFT</p>
+                            </div>
+                            <div class="info-section">
+                                <h3>MENU PAUSA</h3>
+                                <p><strong>PC:</strong> ESC (Apri/Chiudi)</p>
+                                <p><strong>Mobile:</strong> ☰ MENU (Pausa)</p>
+                            </div>
+                            <div class="info-section">
+                                <h3>GENERICI</h3>
+                                <p><strong>PC & Mobile:</strong> Mouse / Touch per UI e dialoghi</p>
+                            </div>
                         </div>
                         <button id="back-pause-btn" class="pause-back-btn">INDIETRO</button>
                     `;

@@ -773,11 +773,11 @@ canvas {
 
 .dpad-btn {
     pointer-events: auto;
-    width: 40px;
-    height: 40px;
-    font-size: 15px;
-    border-radius: 8px;
-    margin: 4px;
+    width: 34px;
+    height: 34px;
+    font-size: 13px;
+    border-radius: 6px;
+    margin: 3px;
     background: rgba(38, 28, 51, 0.85);
     border: 3px solid var(--battle-accent);
     color: white;
@@ -785,7 +785,7 @@ canvas {
     justify-content: center;
     align-items: center;
     font-weight: bold;
-    box-shadow: 2px 4px 0 var(--battle-shadow-heavy);
+    box-shadow: 2px 3px 0 var(--battle-shadow-heavy);
     touch-action: none;
     transition: transform 0.05s, background 0.1s;
 }
@@ -798,26 +798,27 @@ canvas {
 }
 
 .dpad-center {
-    width: 40px;
-    height: 40px;
-    margin: 4px;
+    width: 34px;
+    height: 34px;
+    margin: 3px;
 }
 
-/* Tasti A e B (Stile Console) */
+/* Tasti A, B e SHIFT (Triangolo e Dimensioni Ridotte) */
 #action-buttons {
-    position: static;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    align-items: end;
+    position: relative;
+    width: 120px;
+    height: 80px;
+    pointer-events: none;
+    margin-bottom: 20px;
 }
 
 .action-btn-mobile {
+    position: absolute;
     pointer-events: auto;
-    width: 50px;
-    height: 50px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
-    font-size: 20px;
+    font-size: 18px;
     background: rgba(38, 28, 51, 0.85);
     border: 3px solid var(--battle-accent);
     color: white;
@@ -837,12 +838,22 @@ canvas {
     box-shadow: 0px 2px 0 var(--battle-shadow-heavy);
 }
 
-#btn-enter {
-    margin-bottom: 30px;
+#btn-shift {
+    border-color: #00F0FF;
+    font-size: 22px;
+    left: 40px;
+    top: 0;
 }
 
 #btn-esc {
     border-color: #f44336;
+    left: 0;
+    top: 40px;
+}
+
+#btn-enter {
+    left: 80px;
+    top: 40px;
 }
 
 /* Tasto Menu (Rimpicciolito) */

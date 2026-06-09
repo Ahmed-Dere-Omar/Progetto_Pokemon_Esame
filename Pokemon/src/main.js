@@ -72,6 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
     bindMobileButton('btn-enter', 'Enter');
     bindMobileButton('btn-esc', 'Escape');
     bindMobileButton('btn-menu', 'Escape');
+    bindMobileButton('btn-shift', 'Shift');
 });
 
 export default game;
