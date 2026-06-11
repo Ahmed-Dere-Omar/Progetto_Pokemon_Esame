@@ -18,7 +18,7 @@ export default class BootScene extends Phaser.Scene {
 
         let progressBox = this.add.graphics();
         let progressBar = this.add.graphics();
-        
+
         // Bordo box caricamento
         progressBox.fillStyle(0x0B0C10, 0.8);
         progressBox.lineStyle(4, 0x1e293b);
@@ -63,15 +63,13 @@ export default class BootScene extends Phaser.Scene {
         this.load.image('nurse', 'assets/nurse.png');
 
         // === OBIETTIVO 5: Musica Lobby ===
-
-        this.load.audio('lobby_0', 'assets/musica_lobby/Pokemon BlackWhite Music - Pokemon Center.mp3');
+        this.load.audio('lobby_0', encodeURI('assets/musica_lobby/Pokemon BlackWhite Music - Pokemon Center.mp3'));
         this.load.audio('lobby_1', encodeURI('assets/musica_lobby/Pokemon Center (Night) - Pokémon Diamond & Pearl.mp3'));
-        this.load.audio('lobby_2', encodeURI('assets/musica_lobby/Janice STFU.mp3'));
-        this.load.audio('lobby_3', encodeURI('assets/musica_lobby/2 Hard 4 The Radio.mp3'));
-        this.load.audio('lobby_4', encodeURI('assets/musica_lobby/National Treasures.mp3'));
-        this.load.audio('lobby_5', 'assets/musica_lobby/Beneath the Mask.mp3');
-        this.load.audio('lobby_6', 'assets/musica_lobby/I Follow Rivers (The Magician Remix).mp3');
-
+        this.load.audio('lobby_2', encodeURI('assets/musica_lobby/Littleroot Town.mp3'));
+        this.load.audio('lobby_3', encodeURI("assets/musica_lobby/Flower Garden Yoshi's Island.mp3"));
+        this.load.audio('lobby_4', encodeURI('assets/musica_lobby/Beneath the Mask.mp3'));
+        this.load.audio('lobby_5', encodeURI('assets/musica_lobby/I Follow Rivers (The Magician Remix).mp3'));
+        this.load.audio('lobby_6', encodeURI('assets/musica_lobby/Janice STFU.mp3'));
 
         // === OBIETTIVO 5: Musica Battaglia ===
         this.load.audio('battle_0', 'assets/musica_battaglia/Gym_BW.mp3');
@@ -111,13 +109,14 @@ export default class BootScene extends Phaser.Scene {
 
         // === OBIETTIVO 5: Registry tracce musicali ===
         this.registry.set('lobbyTracks', [
+
             { key: 'lobby_0', name: 'Pokémon Center (BW)' },
             { key: 'lobby_1', name: 'Pokémon Center Night (DP)' },
-            { key: 'lobby_2', name: 'Janice STFU' },
-            { key: 'lobby_3', name: '2 Hard 4 The Radio' },
-            { key: 'lobby_4', name: 'National Treasures' },
-            { key: 'lobby_5', name: 'Beneath the Mask' },
-            { key: 'lobby_6', name: 'I Follow Rivers (The Magician Remix)' }
+            { key: 'lobby_2', name: "Littleroot Town" },
+            { key: 'lobby_3', name: "Flower Garden Yoshi's Island" },
+            { key: 'lobby_4', name: 'Beneath the Mask' },
+            { key: 'lobby_5', name: 'I Follow Rivers (The Magician Remix)' },
+            { key: 'lobby_6', name: 'Janice STFU' }
 
         ]);
 

@@ -30,6 +30,11 @@ export default class PvPScene extends Phaser.Scene {
         this.pcOpen = false;
 
         this.events.on('shutdown', () => {
+            // Se stavi ancora caricando, rimuovi l'avviso
+            if (this.connectionOverlay) {
+                this.connectionOverlay.remove();
+                this.connectionOverlay = null;
+            }
             if (this.socket) {
                 this.socket.disconnect();
                 this.socket = null;
@@ -84,10 +89,55 @@ export default class PvPScene extends Phaser.Scene {
     setupNetwork() {
         this.otherPlayers = this.physics.add.group();
 
-        const serverUrl = 'https://neomon-server.onrender.com';
+        // 1. Creiamo l'overlay di caricamento e blocchiamo il giocatore
+        this.isTransitioning = true;
+        this.connectionOverlay = document.createElement('div');
+        this.connectionOverlay.style.position = 'absolute';
+        this.connectionOverlay.style.top = '0';
+        this.connectionOverlay.style.left = '0';
+        this.connectionOverlay.style.width = '100%';
+        this.connectionOverlay.style.height = '100%';
+        this.connectionOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.85)';
+        this.connectionOverlay.style.display = 'flex';
+        this.connectionOverlay.style.flexDirection = 'column';
+        this.connectionOverlay.style.justifyContent = 'center';
+        this.connectionOverlay.style.alignItems = 'center';
+        this.connectionOverlay.style.zIndex = '99999';
 
+        this.connectionOverlay.innerHTML = `
+            <h1 class="text-shadows" style="margin: 0; width: 100%; max-width: 100vw; padding: 0 20px; box-sizing: border-box; font-size: clamp(1rem, 5vw, 3rem); text-align: center; line-height: 1.4; word-wrap: break-word; word-break: break-word; white-space: normal; color: #ffcc00;">
+                CONNESSIONE AL SERVER PVP...
+            </h1>
+            <p style="color: #fff; font-family: 'Courier New', Courier, monospace; font-size: clamp(0.8rem, 3vw, 1.2rem); margin-top: 20px; text-align: center; padding: 0 20px;">
+                Se il server è in standby, l'avvio potrebbe richiedere fino a 50 secondi.<br>Attendi...
+            </p>
+        `;
+        document.getElementById('game-container').appendChild(this.connectionOverlay);
+
+        const serverUrl = 'https://neomon-server.onrender.com';
         this.socket = window.io(serverUrl);
-        this.socket.emit('joinGame', this.myPlayerName);
+
+        // 2. Quando la connessione va a buon fine: rimuoviamo l'avviso e spawniamo
+        this.socket.on('connect', () => {
+            if (this.connectionOverlay) {
+                this.connectionOverlay.remove();
+                this.connectionOverlay = null;
+            }
+            this.isTransitioning = false; // Sblocchiamo i comandi
+            this.socket.emit('joinGame', this.myPlayerName); // Avvisiamo il server che siamo entrati
+        });
+
+        // 3. Gestione errori (se il server non risponde o crasha)
+        this.socket.on('connect_error', () => {
+            if (this.connectionOverlay) {
+                let h1 = this.connectionOverlay.querySelector('h1');
+                let p = this.connectionOverlay.querySelector('p');
+                if (h1) { h1.innerText = "ERRORE DI CONNESSIONE"; h1.style.color = "#ff4444"; }
+                if (p) { p.innerHTML = "Il server non risponde o è offline.<br>Premi ESC o il tasto Menu per uscire."; }
+            }
+        });
+
+        // --- IL RESTO DELLA GESTIONE DEL NETWORK RIMANE INVARIATO ---
 
         this.socket.on('currentPlayers', (players) => {
             Object.values(players).forEach(p => p.playerId === this.socket.id ? this.addPlayer(p) : this.addOtherPlayer(p));
@@ -101,38 +151,25 @@ export default class PvPScene extends Phaser.Scene {
         this.socket.on('playerMoved', (p) => {
             this.otherPlayers.getChildren().forEach(op => {
                 if (op.playerId === p.playerId) {
-                    // 1. Aggiorniamo subito l'aspetto e l'animazione
                     if (p.avatar && op.texture.key !== p.avatar) op.setTexture(p.avatar);
                     p.anim ? op.anims.play(p.anim, true) : op.anims.stop();
 
-                    // 2. INTERPOLAZIONE: Invece di teletrasportare (setPosition), 
-                    // creiamo un movimento fluido che dura quanto il movimento originale (250ms)
                     this.tweens.add({
-                        targets: op,
-                        x: p.x,
-                        y: p.y,
-                        duration: 250, // Sincronizzato con il tempo di movimento locale
-                        onUpdate: () => {
-                            // Aggiorna il nome in tempo reale mentre il giocatore scivola
-                            if (op.nameText) op.nameText.setPosition(op.x, op.y - 15);
-                        }
+                        targets: op, x: p.x, y: p.y, duration: 250,
+                        onUpdate: () => { if (op.nameText) op.nameText.setPosition(op.x, op.y - 15); }
                     });
                 }
             });
         });
 
         this.socket.on('challengeReceived', (id) => {
-            if (this.pcOpen || this.isDialogActive || this.isTransitioning) {
-                // Sei occupato: ignoriamo la sfida così non si corrompono i dati del PC
-                return;
-            }
+            if (this.pcOpen || this.isDialogActive || this.isTransitioning) return;
             this.socket.emit('acceptChallenge', id);
         });
 
         this.socket.on('opponentBusy', () => window.showBanner("La persona è in battaglia o occupata e non può essere sfidata ora."));
 
         this.socket.on('startPvP', (data) => {
-            // FIX 2: Se sei nel menu di pausa, chiudilo forzatamente prima di lottare!
             if (this.isPaused) {
                 this.isPaused = false;
                 if (this.handlePauseKeyDown) {
