@@ -1106,7 +1106,7 @@ export default class WorldScene extends Phaser.Scene {
 
                         <div id="pc-action-menu" style="display: none; flex-direction: column; gap: 10px; width: 100%; margin-top: auto; padding-bottom: 5px;">
                             <div class="pc-action-btn" data-action="0">SPOSTA</div>
-                            <div class="pc-action-btn" data-action="1">SUMMARY</div>
+                            <div class="pc-action-btn" data-action="1">INFO</div>
                             <div class="pc-action-btn" data-action="2">INDIETRO</div>
                         </div>
                     </div>

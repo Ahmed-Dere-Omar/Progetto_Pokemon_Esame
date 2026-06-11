@@ -79,6 +79,9 @@ class Effetti {
 
         target.modificatori = target.modificatori || {};
         let statKey = Statistica.toLowerCase();
+        if (statKey === "velocità" || statKey === "velocita") {
+            statKey = "velocita";
+        }
         let statAttuale = target.modificatori[statKey] || 0;
         if ((Gradi > 0 && statAttuale >= 6) || (Gradi < 0 && statAttuale <= -6)) {
             if (Logs) Logs.push(`La statistica ${Statistica} di ${target.nome} non può andare oltre!|LATO:${target === Partita.p1.squadra[Partita.p1.attivoIdx] ? 1 : 2}`);
@@ -121,9 +124,26 @@ class Effetti {
         if (Math.random() * 100 > prob) return false;
 
         let target = (typeof Bersaglio === "string" && Bersaglio === "Utente") ? Utente : Bersaglio;
-        if (!target || (target.stato !== null && target.stato !== undefined)) return false;
+        if (!target) return false;
 
         if (Condizione && !this.verificaCondizione(Condizione, target, Utente, Partita)) return false;
+
+        if (Stato === "Confusione") {
+            let targetTeam = (Partita && target === Partita.p1.squadra[Partita.p1.attivoIdx]) ? Partita.p1 : Partita.p2;
+            let sourceTeam = (Utente === Partita.p1.squadra[Partita.p1.attivoIdx]) ? Partita.p1 : Partita.p2;
+            return this.ApplicaStatoUnico({
+                Tipo: "Confusione",
+                Bersaglio: target,
+                Turni: Durata,
+                Utente: Utente,
+                Proprietario: sourceTeam,
+                Avversario: targetTeam,
+                Partita: Partita,
+                Logs: Logs
+            });
+        }
+
+        if (target.stato !== null && target.stato !== undefined) return false;
 
         if (Stato === "Scottatura" && target.tipi.includes("Fuoco")) return false;
         if (Stato === "Paralisi" && target.tipi.includes("Elettro")) return false;
@@ -491,6 +511,16 @@ class Effetti {
         if (!utente || !utente.tipi.includes(Tipo)) return false;
         utente.statiVolatili = utente.statiVolatili || {};
 
+        if (!utente.tipiOriginali) {
+            utente.tipiOriginali = [...utente.tipi];
+        }
+
+        // Rimuoviamo effettivamente il tipo dall'array tipi
+        utente.tipi = utente.tipi.filter(t => t !== Tipo);
+        if (utente.tipi.length === 0) {
+            utente.tipi.push("Normale");
+        }
+
         utente.statiVolatili.tipoRimosso = {
             tipo: Tipo,
             durata: Durata,
@@ -618,8 +648,16 @@ class Effetti {
         let potenza = 1;
 
         if (Formula === "25 * (VelocitàBersaglio / VelocitàUtente)") {
-            let velUtente = utente.statistiche.velocita * (utente.modificatori.velocita || 1);
-            let velBersaglio = bersaglio.statistiche.velocita * (bersaglio.modificatori.velocita || 1);
+            const calcolaVel = (p) => {
+                let velBase = p.statistiche.velocita || 50;
+                let grado = Math.max(-6, Math.min(6, Math.floor(p.modificatori?.velocita || 0)));
+                let moltiplicatore = grado >= 0 ? (2 + grado) / 2 : 2 / (2 - grado);
+                let velFinale = Math.floor(velBase * moltiplicatore);
+                if (p.stato === 'Paralisi') velFinale = Math.floor(velFinale / 2);
+                return velFinale;
+            };
+            let velUtente = calcolaVel(utente);
+            let velBersaglio = calcolaVel(bersaglio);
             potenza = Math.floor(25 * (velBersaglio / Math.max(1, velUtente)));
         }
 
@@ -660,7 +698,14 @@ class Effetti {
 
     static RimuoviStato({ Bersaglio = "Alleato", BersaglioObj, Utente, Proprietario, Logs }) {
         // Cura il bersaglio scelto rimuovendone il problema di stato primario.
-        let targets = Bersaglio === "TuttiAlleati" && Proprietario ? Proprietario.squadra : [(Bersaglio === "Utente" ? Utente : BersaglioObj)];
+        let targetVal = BersaglioObj || (typeof Bersaglio === "object" ? Bersaglio : null);
+        if (!targetVal && typeof Bersaglio === "string") {
+            if (Bersaglio === "Utente") targetVal = Utente;
+            else if (Proprietario && Proprietario.squadra) {
+                targetVal = Proprietario.squadra[Proprietario.attivoIdx];
+            }
+        }
+        let targets = (Bersaglio === "TuttiAlleati" && Proprietario) ? Proprietario.squadra : [targetVal];
         let successo = false;
 
         targets.forEach(t => {
@@ -970,6 +1015,9 @@ class Effetti {
 
         target.modificatori = target.modificatori || {};
         let statKey = Statistica.toLowerCase();
+        if (statKey === "velocità" || statKey === "velocita") {
+            statKey = "velocita";
+        }
 
         if (!target.modificatori[statKey]) target.modificatori[statKey] = 0;
 
@@ -979,12 +1027,12 @@ class Effetti {
         return true;
     }
 
-    static FuggiOSostituisci({ Utente, Partita, Logs }) {
+    static FuggiOSostituisci({ Utente, Partita, Logs, MossaNome }) {
         let utente = Utente;
         if (!utente || !Partita) return false;
         
-        // Se è una lotta selvatica (isWild), termina la battaglia fuggendo
-        if (Partita.isWild) {
+        // Se è una lotta selvatica (isWild) e stiamo usando Teletrasporto, termina la battaglia fuggendo
+        if (Partita.isWild && MossaNome === "Teletrasporto") {
             Partita.finito = true;
             let team = (Partita.p1.squadra.includes(utente)) ? Partita.p1 : Partita.p2;
             team.haFuggito = true;
@@ -992,7 +1040,7 @@ class Effetti {
             return true;
         }
 
-        // Altrimenti (PvP/NPC), forza la sostituzione se ci sono alleati non esausti
+        // Altrimenti (PvP/NPC o mosse d'attacco in wild), forza la sostituzione se ci sono alleati non esausti
         let team = (Partita.p1.squadra.includes(utente)) ? Partita.p1 : Partita.p2;
         let vivi = team.squadra.filter(p => p.hp > 0 && p !== utente);
         if (vivi.length === 0) {
@@ -1006,17 +1054,7 @@ class Effetti {
         return true;
     }
 
-    static ScambiaPosizioneAlleato({ Utente, Proprietario }) {
-        let alleato = Proprietario && Proprietario.squadra ? Proprietario.squadra[1] : null;
 
-        if (!alleato || !Utente) return false;
-        Utente.statiVolatili = Utente.statiVolatili || {};
-        alleato.statiVolatili = alleato.statiVolatili || {};
-
-        Utente.statiVolatili.scambiatoConAlleato = true;
-        alleato.statiVolatili.scambiatoConAlleato = true;
-        return true;
-    }
 
     static CalcolaDannoSuDifesaFisica() {
         // Questo flag è ora nativamente letto in gestione_partita.js durante il pre-calcolo
@@ -1132,13 +1170,24 @@ class Effetti {
         return true;
     }
 
-    static ImpedisciSonno({ Turni = 3, Utente, Proprietario, Avversario }) {
-        if (typeof getTuttiIPokemonInCampo === "undefined") return true;
+    static ImpedisciSonno({ Turni = 3, Utente, Proprietario, Avversario, Partita }) {
+        if (Proprietario) {
+            Proprietario.effetti = Proprietario.effetti || {};
+            Proprietario.effetti["Baraonda"] = Turni;
+        }
+        if (Avversario) {
+            Avversario.effetti = Avversario.effetti || {};
+            Avversario.effetti["Baraonda"] = Turni;
+        }
 
-        if (Proprietario) Proprietario.effetti["Baraonda"] = Turni;
-        if (Avversario) Avversario.effetti["Baraonda"] = Turni;
+        let tutti = [];
+        if (Partita) {
+            if (Partita.p1 && Partita.p1.squadra && Partita.p1.squadra[Partita.p1.attivoIdx]) tutti.push(Partita.p1.squadra[Partita.p1.attivoIdx]);
+            if (Partita.p2 && Partita.p2.squadra && Partita.p2.squadra[Partita.p2.attivoIdx]) tutti.push(Partita.p2.squadra[Partita.p2.attivoIdx]);
+        } else {
+            if (Utente) tutti.push(Utente);
+        }
 
-        let tutti = getTuttiIPokemonInCampo();
         tutti.forEach(p => {
             if (p.stato === "Sonno") {
                 p.stato = null;
@@ -1264,6 +1313,13 @@ class Effetti {
         utente.statiVolatili.trasformato = true;
         if (!utente.tipiOriginali) {
             utente.tipiOriginali = [...utente.tipi];
+        }
+        if (!utente.statisticheOriginali) {
+            utente.statisticheOriginali = { ...utente.statistiche };
+        }
+        if (!utente.mosseOriginali) {
+            // Clona le mosse per evitare di condividere lo stesso riferimento
+            utente.mosseOriginali = utente.mosse.map(m => ({ ...m }));
         }
         utente.tipi = [...target.tipi];
         utente.peso = target.peso;

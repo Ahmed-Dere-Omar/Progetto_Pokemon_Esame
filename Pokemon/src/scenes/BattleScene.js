@@ -173,7 +173,7 @@ export default class BattleScene extends Phaser.Scene {
                 <div>DEF ${formatStat(getMod(mods, 'difesa', 'Difesa'))}</div>
                 <div>S.DEF ${formatStat(getMod(mods, 'difesaSpeciale', 'Difesa Speciale'))}</div>
                 <div>EVA ${formatStat(getMod(mods, 'elusione', 'Elusione'))}</div>
-                <div style="grid-column: span 3; text-align: center;">SPD ${formatStat(getMod(mods, 'velocita', 'Velocità'))}</div>
+                <div style="grid-column: span 3; text-align: center;">SPD ${formatStat(getMod(mods, 'velocita'))}</div>
             </div>
         `;
 
@@ -740,9 +740,15 @@ export default class BattleScene extends Phaser.Scene {
 
         if (this.myTeamData && this.myTeamData[this.myActiveIdx]) {
             this.myTeamData[this.myActiveIdx].mosse = [...(p1Data.mosse || [])];
+            if (p1Data.tipi) {
+                this.myTeamData[this.myActiveIdx].tipi = [...p1Data.tipi];
+            }
         }
         if (this.oppTeamData && this.oppTeamData[p2Data.attivoIdx]) {
             this.oppTeamData[p2Data.attivoIdx].mosse = [...(p2Data.mosse || [])];
+            if (p2Data.tipi) {
+                this.oppTeamData[p2Data.attivoIdx].tipi = [...p2Data.tipi];
+            }
         }
 
         // 2. FIX: Inizializza l'interfaccia con i vecchi HP salvati (oldMyActiveHp)
@@ -752,6 +758,11 @@ export default class BattleScene extends Phaser.Scene {
             if (this.pSprite.node) this.pSprite.node.querySelector('img').src = this.pkmnDB[myNewActive.nome].sprite.normal;
             this.updateUI();
             this.updateStatusOverlay(true, null);
+        } else if (p1Data.trasformato) {
+            this.pEntity.moves = [...(p1Data.mosse || [])];
+            if (p1Data.tipi) {
+                this.pEntity.types = [...p1Data.tipi];
+            }
         }
 
         // 3. FIX: Idem per il nemico (oldOppActiveHp)
@@ -761,6 +772,11 @@ export default class BattleScene extends Phaser.Scene {
             if (this.eSprite.node) this.eSprite.node.querySelector('img').src = this.pkmnDB[oppNewActive.nome].sprite.normal;
             this.updateUI();
             this.updateStatusOverlay(false, null);
+        } else if (p2Data.trasformato) {
+            this.eEntity.moves = [...(p2Data.mosse || [])];
+            if (p2Data.tipi) {
+                this.eEntity.types = [...p2Data.tipi];
+            }
         }
 
         this.pEntity.mossaForzata = p1Data.mossaForzata;
@@ -1016,7 +1032,7 @@ export default class BattleScene extends Phaser.Scene {
                     </div>
                     <div id="modal-action-menu" style="display: none; flex-direction: column; gap: 10px; width: 100%; margin-top: auto; padding-bottom: 5px;">
                             <div class="action-btn-inline" data-action="0">MANDA IN CAMPO</div>
-                            <div class="action-btn-inline" data-action="1">SUMMARY</div>
+                            <div class="action-btn-inline" data-action="1">INFO</div>
                             <div class="action-btn-inline" data-action="2">INDIETRO</div>
                     </div>
                     <div id="modal-summary-view" class="summary-view" style="display: none; flex-direction: column; width: 100%; flex: 1; overflow: hidden;">
@@ -1086,7 +1102,7 @@ export default class BattleScene extends Phaser.Scene {
                     </div>
                     <div class="inline-actions" id="actions-${index}">
                         <div class="action-btn-inline">SOSTITUISCI</div>
-                        <div class="action-btn-inline">SUMMARY</div>
+                        <div class="action-btn-inline">INFO</div>
                         <div class="action-btn-inline">INDIETRO</div>
                     </div>
                 </div>`;
@@ -1222,7 +1238,7 @@ export default class BattleScene extends Phaser.Scene {
                 this.modalSelection = parseInt(parentItem.dataset.index);
 
                 if (actionText === 'SOSTITUISCI' || actionText === 'MANDA IN CAMPO') this.executeSwitch(this.modalSelection);
-                else if (actionText === 'SUMMARY') this.openSummary(teamData[this.modalSelection]);
+                else if (actionText === 'INFO') this.openSummary(teamData[this.modalSelection]);
                 else if (actionText === 'INDIETRO') { this.currentView = 'list'; this.updateModalVisuals(); }
                 return;
             }

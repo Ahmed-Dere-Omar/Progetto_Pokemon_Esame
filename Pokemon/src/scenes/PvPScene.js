@@ -84,7 +84,7 @@ export default class PvPScene extends Phaser.Scene {
     setupNetwork() {
         this.otherPlayers = this.physics.add.group();
 
-        const serverUrl = 'https://neomon-server.onrender.com';
+        const serverUrl = 'http://localhost:8081';
 
         this.socket = window.io(serverUrl);
         this.socket.emit('joinGame', this.myPlayerName);

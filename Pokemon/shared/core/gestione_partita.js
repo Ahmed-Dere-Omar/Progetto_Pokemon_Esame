@@ -170,11 +170,22 @@ class gestionePartita {
             const vecchioPk = proprietario.squadra[proprietario.attivoIdx];
 
             if (vecchioPk) {
+                if (vecchioPk.statiVolatili && vecchioPk.statiVolatili.trasformato) {
+                    if (vecchioPk.statisticheOriginali) {
+                        vecchioPk.statistiche = { ...vecchioPk.statisticheOriginali };
+                        delete vecchioPk.statisticheOriginali;
+                    }
+                    if (vecchioPk.mosseOriginali) {
+                        vecchioPk.mosse = [...vecchioPk.mosseOriginali];
+                        delete vecchioPk.mosseOriginali;
+                    }
+                }
                 vecchioPk.statiVolatili = {};
                 vecchioPk.modificatori = {};
                 vecchioPk.trappoleApplicate = false;
                 if (vecchioPk.tipiOriginali) {
                     vecchioPk.tipi = [...vecchioPk.tipiOriginali];
+                    delete vecchioPk.tipiOriginali;
                 }
             }
             proprietario.attivoIdx = azione.nuovoIdx;
@@ -250,9 +261,10 @@ class gestionePartita {
                     pk.contatoriStato.confusione--;
                     this.logs.push(`${pk.nome} è confuso!`);
                     if (Math.random() < 0.33) {
-                        this.logs.push(`Così confuso da colpirsi da solo!`);
                         let dannoConfusione = Math.max(1, Math.floor(pk.hpMax * 0.1));
                         pk.hp = Math.max(0, pk.hp - dannoConfusione);
+                        let lato = (proprietario === this.p1) ? 1 : 2;
+                        this.logs.push(`Così confuso da colpirsi da solo e subisce danni!|LATO:${lato}|HP:${pk.hp}`);
                         pk.haGiaAgito = true;
                         return;
                     }
@@ -570,7 +582,10 @@ class gestionePartita {
                 targetPk.statiVolatili = {};
                 targetPk.modificatori = {};
                 targetPk.trappoleApplicate = false;
-                if (targetPk.tipiOriginali) targetPk.tipi = [...targetPk.tipiOriginali];
+                if (targetPk.tipiOriginali) {
+                    targetPk.tipi = [...targetPk.tipiOriginali];
+                    delete targetPk.tipiOriginali;
+                }
 
                 let randomPk = available[Math.floor(Math.random() * available.length)];
                 azione.bersaglio.attivoIdx = randomPk.i;
@@ -595,12 +610,18 @@ class gestionePartita {
 
                 if (!prepStaffetta) {
                     pk.modificatori = {};
-                    if (pk.tipiOriginali) pk.tipi = [...pk.tipiOriginali];
+                    if (pk.tipiOriginali) {
+                        pk.tipi = [...pk.tipiOriginali];
+                        delete pk.tipiOriginali;
+                    }
                     pk.statiVolatili = {};
                 } else {
                     azione.proprietario.squadra[randomPk.i].modificatori = { ...pk.modificatori };
                     pk.modificatori = {};
-                    if (pk.tipiOriginali) pk.tipi = [...pk.tipiOriginali];
+                    if (pk.tipiOriginali) {
+                        pk.tipi = [...pk.tipiOriginali];
+                        delete pk.tipiOriginali;
+                    }
                     pk.statiVolatili = {};
                 }
                 
@@ -725,21 +746,21 @@ class gestionePartita {
             });
         }
 
-        // Raddoppiamenti progressivi (es. Rotolamento e Tagliofuria)
         // Raddoppiamenti progressivi o incrementi (es. Rotolamento, Tagliofuria, Echeggiavoce)
         if (a.statiVolatili && a.statiVolatili.potenzaConsecutiva && a.statiVolatili.potenzaConsecutiva.mossa === m.Nome) {
-            moltiplicatoreDanno *= Math.pow(2, a.statiVolatili.potenzaConsecutiva.contatore - 1);
             let effConsecutiva = m.CodiceFunzione ? m.CodiceFunzione.find(e => e.NomeFunzione === "AumentaPotenzaConsecutiva") : null;
+            let count = a.statiVolatili.potenzaConsecutiva.contatore - 1;
             if (effConsecutiva && effConsecutiva.Parametri) {
-                let count = a.statiVolatili.potenzaConsecutiva.contatore - 1;
                 if (effConsecutiva.Parametri.Incremento) {
                     potenzaReale += (effConsecutiva.Parametri.Incremento * count);
                     if (effConsecutiva.Parametri.Max && potenzaReale > effConsecutiva.Parametri.Max) potenzaReale = effConsecutiva.Parametri.Max;
                 } else if (effConsecutiva.Parametri.Moltiplicatore) {
                     moltiplicatoreDanno *= Math.pow(effConsecutiva.Parametri.Moltiplicatore, count);
+                } else {
+                    moltiplicatoreDanno *= Math.pow(2, count);
                 }
             } else {
-                moltiplicatoreDanno *= Math.pow(2, a.statiVolatili.potenzaConsecutiva.contatore - 1);
+                moltiplicatoreDanno *= Math.pow(2, count);
             }
         }
 
@@ -866,7 +887,7 @@ class gestionePartita {
                 let tossina = pk.contatoriStato.tossina || 2;
                 const danno = Math.max(1, Math.floor(pk.hpMax * (tossina / 16)));
                 pk.hp = Math.max(0, pk.hp - danno);
-                this.logs.push(`${pk.nome} subisce gravi danni dal veleno!|LATO:${lato}|HP:${pk.hp}`);
+                this.logs.push(`${pk.nome} subisce danni per l'iperavvelenamento!|LATO:${lato}|HP:${pk.hp}`);
                 pk.contatoriStato.tossina = tossina + 1;
             } else if (pk.stato === 'Scottatura') {
                 const danno = Math.max(1, Math.floor(pk.hpMax / 8));
@@ -976,6 +997,23 @@ class gestionePartita {
                     this.logs.push(`Il conteggio di Ultimocanto per ${pk.nome} è a ${pk.statiVolatili.ultimocanto.turniRimanenti}!|LATO:${lato}`);
                 }
             }
+
+            // 11. Ripristino tipo rimosso (Trespolo / Roost)
+            if (pk.statiVolatili && pk.statiVolatili.tipoRimosso) {
+                let tr = pk.statiVolatili.tipoRimosso;
+                if (tr.durata === "Turno" || tr.turniRimanenti <= 1) {
+                    if (pk.tipiOriginali) {
+                        pk.tipi = [...pk.tipiOriginali];
+                        delete pk.tipiOriginali;
+                    }
+                    this.logs.push(`Il tipo rimosso a ${pk.nome} viene ripristinato!`);
+                    delete pk.statiVolatili.tipoRimosso;
+                } else {
+                    if (tr.turniRimanenti !== null) {
+                        tr.turniRimanenti--;
+                    }
+                }
+            }
         });
     }
 
@@ -1014,6 +1052,7 @@ class gestionePartita {
             p1: {
                 hp: p1Pk.hp,
                 nome: p1Pk.nome,
+                tipi: p1Pk.tipi,
                 mosse: p1Pk.mosse,
                 trasformato: !!(p1Pk.statiVolatili && p1Pk.statiVolatili.trasformato),
                 mossaForzata: this.getMossaForzata(p1Pk),
@@ -1024,6 +1063,7 @@ class gestionePartita {
             p2: {
                 hp: p2Pk.hp,
                 nome: p2Pk.nome,
+                tipi: p2Pk.tipi,
                 mosse: p2Pk.mosse,
                 trasformato: !!(p2Pk.statiVolatili && p2Pk.statiVolatili.trasformato),
                 mossaForzata: this.getMossaForzata(p2Pk),

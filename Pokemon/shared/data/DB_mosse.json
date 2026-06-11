@@ -5083,24 +5083,7 @@
     ],
     "Descrizione": "Dimezza i danni fisici subiti per 5 turni."
   },
-  {
-    "Nome": "Cambiaposto",
-    "Tipo": "Psico",
-    "Categoria": "Stato",
-    "Potenza": 0,
-    "Precisione": 0,
-    "PP": 15,
-    "Bersaglio": "Utente",
-    "Priorità": 0,
-    "CodiceFunzione": [
-      {
-        "NomeFunzione": "ScambiaPosizioneAlleato",
-        "Parametri": {}
-      }
-    ],
-    "Flags": [],
-    "Descrizione": "Scambia posizione con un alleato in campo."
-  },
+
   {
     "Nome": "Psicotaglio",
     "Tipo": "Psico",

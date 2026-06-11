@@ -806,7 +806,6 @@
       "Cinèsi",
       "Teletrasporto",
       "Riflesso",
-      "Cambiaposto",
       "Psicotaglio",
       "Ripresa",
       "Psicoshock",
@@ -1510,7 +1509,6 @@
       "Teletrasporto",
       "Psicoraggio",
       "Riflesso",
-      "Cambiaposto",
       "Psicotaglio",
       "Ripresa",
       "Psicoshock",
@@ -2004,8 +2002,7 @@
       "Fangonda",
       "Stridio",
       "Sporcolancio",
-      "Scudo Acido",
-      "Memento"
+      "Scudo Acido"
     ],
     "sprite": {
       "normal": "https://media.pokemoncentral.it/wiki/3/3c/Sprnbm0089.gif",
@@ -2050,7 +2047,6 @@
       "Mulinello",
       "Pistolacqua",
       "Protezione",
-      "Punte",
       "Raggiaurora",
       "Ritirata",
       "Scagliagelo",
@@ -2099,7 +2095,6 @@
       "Dispetto",
       "Maledizione",
       "Sciagura",
-      "Ombra Notturna",
       "Sbigoattacco",
       "Neropulsar",
       "Palla Ombra"
@@ -2240,11 +2235,9 @@
       "Energisfera",
       "Autodistruzione",
       "Schermoluce",
-      "Magnetascesa",
       "Scarica",
       "Esplosione",
-      "Vortexpalla",
-      "Specchiovelo"
+      "Vortexpalla"
     ],
     "sprite": {
       "normal": "https://media.pokemoncentral.it/wiki/b/b1/Sprnbm0101.gif",
@@ -2387,8 +2380,7 @@
       "Leggimente",
       "Megacalcio",
       "Zuffa",
-      "Contropiede",
-      "Calcinvolo"
+      "Contropiede"
     ],
     "sprite": {
       "normal": "https://media.pokemoncentral.it/wiki/a/aa/Sprnbm0106.gif",
@@ -2439,9 +2431,7 @@
       "Tuonopugno",
       "Agilità",
       "Megapugno",
-      "Zuffa",
-      "Contrattacco",
-      "Cetripugno"
+      "Zuffa"
     ],
     "sprite": {
       "normal": "https://media.pokemoncentral.it/wiki/5/59/Sprnbm0107.gif",
@@ -2480,15 +2470,13 @@
       "Ondacalda",
       "Smog",
       "Velenogas",
-      "Pulifumo",
       "Garanzia",
       "Fango",
       "Nube",
       "Autodistruzione",
       "Fangobomba",
       "Tossina",
-      "Esplosione",
-      "Memento"
+      "Esplosione"
     ],
     "sprite": {
       "normal": "https://media.pokemoncentral.it/wiki/4/43/Sprnbm0110.gif",
@@ -3265,7 +3253,6 @@
     "mosse": [
       "Accumulo",
       "Azione",
-      "Blocco",
       "Flagello",
       "Introenergia",
       "Leccata",
@@ -3466,7 +3453,6 @@
       "Tuononda",
       "Tuonopugno",
       "Tifone",
-      "Codadrago",
       "Agilità",
       "Schianto",
       "Idrondata",
@@ -3510,18 +3496,16 @@
     "mosse": [
       "Comete",
       "Confusione",
-      "Goccia vitale",
+      "Goccia Vitale",
       "Inibitore",
       "Forzantica",
       "Psicoraggio",
       "Salvaguardia",
       "Amnesia",
-      "Sferapulsar",
       "Psichico",
       "Barattoforza",
       "Barattoscudo",
       "Nebbia",
-      "Psicobotta",
       "Ripresa",
       "Divinazione"
     ],
@@ -3556,16 +3540,7 @@
       }
     },
     "mosse": [
-      "Botta",
-      "Riflettipo",
-      "Amnesia",
-      "Staffetta",
-      "Forzantica",
-      "Goccia Vitale",
-      "Congiura",
-      "Esclusiva",
-      "Sferapulsar",
-      "Psichico"
+      "Trasformazione"
     ],
     "sprite": {
       "normal": "https://media.pokemoncentral.it/wiki/e/e2/Sprnbm0151.gif",
