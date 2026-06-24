@@ -159,7 +159,8 @@ Il sistema viene suddiviso in processi logici che riflettono l'architettura rela
 
 L'architettura dei dati separa la gestione degli utenti, dei progressi e delle sessioni (salvati in un database relazionale PostgreSQL tramite Supabase) dai dati statici e strutturali del gioco (gestiti tramite file JSON locali caricati a runtime dal server).
 
-<img width="746" height="526" alt="image" src="https://github.com/user-attachments/assets/88d9f707-97f8-451f-95b8-27fdcb6f71f0" />
+<img width="812" height="539" alt="Screenshot 2026-06-24 234832" src="https://github.com/user-attachments/assets/f9dd8080-623e-4238-b8d7-dbd65a691b91" />
+
 
 ## 6.1 Entità
 
