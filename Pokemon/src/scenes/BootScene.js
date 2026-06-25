@@ -25,7 +25,7 @@ export default class BootScene extends Phaser.Scene {
         progressBox.fillRect(width / 2 - 160, height / 2 + 50, 320, 24);
         progressBox.strokeRect(width / 2 - 160, height / 2 + 50, 320, 24);
 
-        // Aggiorna la barra man mano che scarica i 27 MP3
+        // Aggiorna la barra man mano che scarica
         this.load.on('progress', function (value) {
             percentText.setText(parseInt(value * 100) + '%');
             progressBar.clear();
@@ -77,25 +77,6 @@ export default class BootScene extends Phaser.Scene {
         this.load.audio('battle_2', 'assets/musica_battaglia/Gym_GB.mp3');
         this.load.audio('battle_3', 'assets/musica_battaglia/Gym_JC.mp3');
         this.load.audio('battle_4', 'assets/musica_battaglia/Gym_JGS.mp3');
-        this.load.audio('battle_5', 'assets/musica_battaglia/Gym_KC.mp3');
-        this.load.audio('battle_6', 'assets/musica_battaglia/Gym_KGS.mp3');
-        this.load.audio('battle_7', 'assets/musica_battaglia/Gym_RS.mp3');
-        this.load.audio('battle_8', 'assets/musica_battaglia/Trainer_BW.mp3');
-        this.load.audio('battle_9', 'assets/musica_battaglia/Trainer_DP.mp3');
-        this.load.audio('battle_10', 'assets/musica_battaglia/Trainer_GB.mp3');
-        this.load.audio('battle_11', 'assets/musica_battaglia/Trainer_JC.mp3');
-        this.load.audio('battle_12', 'assets/musica_battaglia/Trainer_JGS.mp3');
-        this.load.audio('battle_13', 'assets/musica_battaglia/Trainer_KC.mp3');
-        this.load.audio('battle_14', 'assets/musica_battaglia/Trainer_KGS.mp3');
-        this.load.audio('battle_15', 'assets/musica_battaglia/Trainer_RS.mp3');
-        this.load.audio('battle_16', 'assets/musica_battaglia/Wild Pokemon_BW.mp3');
-        this.load.audio('battle_17', 'assets/musica_battaglia/Wild Pokemon_DP.mp3');
-        this.load.audio('battle_18', 'assets/musica_battaglia/Wild Pokemon_GB.mp3');
-        this.load.audio('battle_19', 'assets/musica_battaglia/Wild Pokemon_JC.mp3');
-        this.load.audio('battle_20', 'assets/musica_battaglia/Wild Pokemon_JGS.mp3');
-        this.load.audio('battle_21', 'assets/musica_battaglia/Wild Pokemon_KC.mp3');
-        this.load.audio('battle_22', 'assets/musica_battaglia/Wild Pokemon_KGS.mp3');
-        this.load.audio('battle_23', 'assets/musica_battaglia/Wild Pokemon_RS.mp3');
     }
 
     create() {
@@ -125,26 +106,7 @@ export default class BootScene extends Phaser.Scene {
             { key: 'battle_1', name: 'Gym (DP)' },
             { key: 'battle_2', name: 'Gym (GB)' },
             { key: 'battle_3', name: 'Gym (JC)' },
-            { key: 'battle_4', name: 'Gym (JGS)' },
-            { key: 'battle_5', name: 'Gym (KC)' },
-            { key: 'battle_6', name: 'Gym (KGS)' },
-            { key: 'battle_7', name: 'Gym (RS)' },
-            { key: 'battle_8', name: 'Trainer (BW)' },
-            { key: 'battle_9', name: 'Trainer (DP)' },
-            { key: 'battle_10', name: 'Trainer (GB)' },
-            { key: 'battle_11', name: 'Trainer (JC)' },
-            { key: 'battle_12', name: 'Trainer (JGS)' },
-            { key: 'battle_13', name: 'Trainer (KC)' },
-            { key: 'battle_14', name: 'Trainer (KGS)' },
-            { key: 'battle_15', name: 'Trainer (RS)' },
-            { key: 'battle_16', name: 'Wild Pokémon (BW)' },
-            { key: 'battle_17', name: 'Wild Pokémon (DP)' },
-            { key: 'battle_18', name: 'Wild Pokémon (GB)' },
-            { key: 'battle_19', name: 'Wild Pokémon (JC)' },
-            { key: 'battle_20', name: 'Wild Pokémon (JGS)' },
-            { key: 'battle_21', name: 'Wild Pokémon (KC)' },
-            { key: 'battle_22', name: 'Wild Pokémon (KGS)' },
-            { key: 'battle_23', name: 'Wild Pokémon (RS)' }
+            { key: 'battle_4', name: 'Gym (JGS)' }
         ]);
 
         // Initialize music state in registry
